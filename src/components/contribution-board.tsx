@@ -71,7 +71,8 @@ export function ContributionBoard({
   isAdmin: boolean;
   returnTo?: string;
 }) {
-  const { request, contributed, outstanding, realised_total } = board;
+  const { request, contributed, outstanding, pledge_total, realised_total } =
+    board;
   const concluded = Boolean(request.concluded_at);
   const today = new Date().toISOString().slice(0, 10);
   const outstandingTitle = concluded ? "Didn't contribute" : "Yet to contribute";
@@ -91,10 +92,18 @@ export function ContributionBoard({
               ? ` · Concluded ${formatDate(request.concluded_at.slice(0, 10))}`
               : " · Open"}
           </p>
-          <p className="realised-line">
-            Realised <strong>{formatMoney(realised_total)}</strong>
-            <span className="muted"> · pledges + paid</span>
-          </p>
+          <div className="totals-line">
+            <span>
+              Pledges <strong>{formatMoney(pledge_total)}</strong>
+            </span>
+            <span className="totals-sep" aria-hidden="true">
+              ·
+            </span>
+            <span>
+              Realised <strong>{formatMoney(realised_total)}</strong>
+              <span className="muted"> · paid only</span>
+            </span>
+          </div>
         </div>
         <span className={concluded ? "badge badge-paid" : "badge badge-pledge"}>
           {concluded ? "Concluded" : "Current"}

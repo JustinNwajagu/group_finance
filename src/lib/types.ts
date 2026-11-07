@@ -57,6 +57,8 @@ export type ContributionLists = {
   request: PaymentRequest;
   contributed: MemberPaymentRow[];
   outstanding: MemberPaymentRow[];
-  /** Sum of pledge + paid amounts recorded for this title. */
+  /** Sum of amounts with status pledge. */
+  pledge_total: string;
+  /** Sum of amounts with status paid only (pledges never count as realised). */
   realised_total: string;
 };

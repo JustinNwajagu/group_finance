@@ -203,8 +203,12 @@ export async function contributionListsForRequest(
     [requestId],
   );
 
-  const realised = await sql<{ total: string }>(
-    `select coalesce(sum(amount), 0)::text as total
+  const totals = await sql<{ pledge_total: string; realised_total: string }>(
+    `select
+       coalesce(sum(case when status = 'pledge' then amount else 0 end), 0)::text
+         as pledge_total,
+       coalesce(sum(case when status = 'paid' then amount else 0 end), 0)::text
+         as realised_total
      from payments
      where payment_request_id = $1`,
     [requestId],
@@ -214,7 +218,8 @@ export async function contributionListsForRequest(
     request,
     contributed,
     outstanding,
-    realised_total: realised[0]?.total ?? "0",
+    pledge_total: totals[0]?.pledge_total ?? "0",
+    realised_total: totals[0]?.realised_total ?? "0",
   };
 }
 

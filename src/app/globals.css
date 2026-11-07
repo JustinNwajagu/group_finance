@@ -504,16 +504,24 @@ textarea {
   font-weight: 650;
 }
 
-.realised-line {
+.totals-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
   margin: 0.45rem 0 0;
   font-size: 0.95rem;
   color: var(--ink);
 }
 
-.realised-line strong {
+.totals-line strong {
   font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 650;
+}
+
+.totals-sep {
+  color: var(--ink-soft);
 }
 
 .contrib-split {

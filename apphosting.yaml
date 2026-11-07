@@ -6,7 +6,7 @@ runConfig:
 
 env:
   - variable: ADMIN_EMAIL
-    value: justin.nwajagu@gmail.com
+    value: klef2007.2013@gmail.com
     availability:
       - BUILD
       - RUNTIME

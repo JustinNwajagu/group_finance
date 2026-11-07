@@ -7,7 +7,7 @@ The app uses **Firebase Authentication**, **Cloud Firestore**, and **Firebase Ho
 Only one email is admin. Set:
 
 ```bash
-ADMIN_EMAIL=justin.nwajagu@gmail.com
+ADMIN_EMAIL=klef2007.2013@gmail.com
 ```
 
 Every other signed-in user is a **member**. There is no invite/role table.

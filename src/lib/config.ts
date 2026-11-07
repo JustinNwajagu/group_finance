@@ -4,7 +4,7 @@ import "server-only";
 export function adminEmail(): string {
   return (
     process.env.ADMIN_EMAIL?.trim().toLowerCase() ||
-    "justin.nwajagu@gmail.com"
+    "klef2007.2013@gmail.com"
   );
 }
 

@@ -1,5 +1,7 @@
 export type AppRole = "admin" | "member" | "pending";
 
+export type PaymentStatus = "pledge" | "paid";
+
 export type AppUser = {
   id: number;
   cursor_sub: string | null;
@@ -22,6 +24,7 @@ export type Payment = {
   member_id: number;
   amount: string;
   payment_date: string;
+  status: PaymentStatus;
   created_at: string;
 };
 
@@ -31,5 +34,5 @@ export type PaymentWithMember = Payment & {
 
 export type MemberContribution = Member & {
   payment_count: number;
-  contribution_total: string;
+  contribution_count: number;
 };

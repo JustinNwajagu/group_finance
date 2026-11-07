@@ -34,7 +34,8 @@ export default async function PaymentsPage({
         <div>
           <h1>Payments</h1>
           <p>
-            Amounts are in Nigerian Naira (₦). Payments are grouped by title.
+            Amounts are in Nigerian Naira (₦). Grouped by title for everyone.
+            New entries start as pledges until an admin marks them paid.
           </p>
         </div>
         <Suspense fallback={null}>
@@ -45,7 +46,10 @@ export default async function PaymentsPage({
       <Flash
         ok={ok}
         error={error}
-        messages={{ "1": "Payment recorded." }}
+        messages={{
+          "1": "Payment recorded.",
+          paid: "Marked as paid.",
+        }}
       />
 
       <div className={admin ? "split split-2" : "stack"}>
@@ -56,7 +60,7 @@ export default async function PaymentsPage({
               {q ? "No payments match that filter." : "No payments recorded yet."}
             </div>
           ) : (
-            <PaymentGroups groups={groups} showMember />
+            <PaymentGroups groups={groups} showMember isAdmin={admin} />
           )}
         </section>
 
@@ -108,6 +112,13 @@ export default async function PaymentsPage({
                     />
                   </label>
                 </div>
+                <label className="field">
+                  Status
+                  <select name="status" defaultValue="pledge">
+                    <option value="pledge">Pledge</option>
+                    <option value="paid">Paid</option>
+                  </select>
+                </label>
                 <button type="submit" className="btn-primary">
                   Record payment
                 </button>

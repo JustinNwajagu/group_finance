@@ -25,8 +25,10 @@ create table if not exists payments (
   member_id integer not null references members (id),
   amount numeric(12, 2) not null check (amount >= 0),
   payment_date date not null,
+  status text not null default 'pledge' check (status in ('pledge', 'paid')),
   created_at timestamptz not null default now()
 );
 
 create index if not exists payments_member_id_idx on payments (member_id);
 create index if not exists payments_payment_date_idx on payments (payment_date desc);
+create index if not exists payments_status_idx on payments (status);

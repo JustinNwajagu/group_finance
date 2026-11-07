@@ -303,6 +303,16 @@ table.data a.row-link:hover {
   color: var(--danger);
 }
 
+.badge-paid {
+  background: rgba(31, 122, 108, 0.14);
+  color: var(--sea-deep);
+}
+
+.badge-pledge {
+  background: rgba(201, 137, 26, 0.18);
+  color: #7a5608;
+}
+
 .form-grid {
   display: grid;
   gap: 0.85rem;

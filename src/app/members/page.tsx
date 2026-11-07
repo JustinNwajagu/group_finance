@@ -7,7 +7,6 @@ import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers } from "@/lib/data";
-import { formatMoney } from "@/lib/format";
 
 export const instant = false;
 
@@ -28,7 +27,10 @@ export default async function MembersPage({
       <div className="page-head">
         <div>
           <h1>Members</h1>
-          <p>Browse the group roster, filter by name, and open contribution totals.</p>
+          <p>
+            Browse the roster and open a member for payments grouped by title.
+            Contributions are paid entries; payments include pledges.
+          </p>
         </div>
         <Suspense fallback={null}>
           <FilterBar placeholder="Filter members…" />
@@ -61,7 +63,7 @@ export default async function MembersPage({
                     <th>Member</th>
                     <th>Email</th>
                     <th>Payments</th>
-                    <th>Contribution</th>
+                    <th>Contributions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -74,9 +76,7 @@ export default async function MembersPage({
                       </td>
                       <td className="muted">{m.email || "—"}</td>
                       <td>{m.payment_count}</td>
-                      <td className="money">
-                        {formatMoney(m.contribution_total)}
-                      </td>
+                      <td>{m.contribution_count}</td>
                     </tr>
                   ))}
                 </tbody>

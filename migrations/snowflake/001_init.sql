@@ -26,9 +26,12 @@ create table if not exists payments (
   member_id integer not null references members (id),
   amount number(12, 2) not null,
   payment_date date not null,
+  status varchar not null default 'pledge',
   created_at timestamp_tz not null default current_timestamp(),
-  constraint payments_amount_chk check (amount >= 0)
+  constraint payments_amount_chk check (amount >= 0),
+  constraint payments_status_chk check (status in ('pledge', 'paid'))
 );
 
 create index if not exists payments_member_id_idx on payments (member_id);
 create index if not exists payments_payment_date_idx on payments (payment_date);
+create index if not exists payments_status_idx on payments (status);

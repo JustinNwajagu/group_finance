@@ -13,17 +13,20 @@ export async function listAppUsers(): Promise<AppUser[]> {
 
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
   const q = query?.trim() ?? "";
+  const base = `
+    select
+      m.id,
+      m.name,
+      m.email,
+      m.created_at::text as created_at,
+      count(p.id)::int as payment_count,
+      count(case when p.status = 'paid' then 1 end)::int as contribution_count
+    from members m
+    left join payments p on p.member_id = m.id
+  `;
   if (q) {
     return sql<MemberContribution>(
-      `select
-         m.id,
-         m.name,
-         m.email,
-         m.created_at::text as created_at,
-         count(p.id)::int as payment_count,
-         coalesce(sum(p.amount), 0)::text as contribution_total
-       from members m
-       left join payments p on p.member_id = m.id
+      `${base}
        where m.name ilike $1 or coalesce(m.email, '') ilike $1
        group by m.id
        order by lower(m.name)`,
@@ -31,15 +34,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
     );
   }
   return sql<MemberContribution>(
-    `select
-       m.id,
-       m.name,
-       m.email,
-       m.created_at::text as created_at,
-       count(p.id)::int as payment_count,
-       coalesce(sum(p.amount), 0)::text as contribution_total
-     from members m
-     left join payments p on p.member_id = m.id
+    `${base}
      group by m.id
      order by lower(m.name)`,
   );
@@ -55,24 +50,49 @@ export async function getMember(id: number): Promise<Member | null> {
 
 export async function memberContribution(id: number): Promise<string> {
   const rows = await sql<{ total: string }>(
-    `select coalesce(sum(amount), 0)::text as total from payments where member_id = $1`,
+    `select coalesce(sum(amount), 0)::text as total
+     from payments
+     where member_id = $1 and status = 'paid'`,
     [id],
   );
   return rows[0]?.total ?? "0";
 }
 
+export async function memberPaymentStats(id: number): Promise<{
+  payment_count: number;
+  contribution_count: number;
+}> {
+  const rows = await sql<{ payment_count: number; contribution_count: number }>(
+    `select
+       count(id)::int as payment_count,
+       count(case when status = 'paid' then 1 end)::int as contribution_count
+     from payments
+     where member_id = $1`,
+    [id],
+  );
+  return {
+    payment_count: Number(rows[0]?.payment_count ?? 0),
+    contribution_count: Number(rows[0]?.contribution_count ?? 0),
+  };
+}
+
+const paymentSelect = `
+  select
+    p.id,
+    p.title,
+    p.member_id,
+    p.amount::text as amount,
+    p.payment_date::text as payment_date,
+    p.status,
+    p.created_at::text as created_at,
+    m.name as member_name
+  from payments p
+  join members m on m.id = p.member_id
+`;
+
 export async function listPaymentsForMember(id: number): Promise<PaymentWithMember[]> {
   return sql<PaymentWithMember>(
-    `select
-       p.id,
-       p.title,
-       p.member_id,
-       p.amount::text as amount,
-       p.payment_date::text as payment_date,
-       p.created_at::text as created_at,
-       m.name as member_name
-     from payments p
-     join members m on m.id = p.member_id
+    `${paymentSelect}
      where p.member_id = $1
      order by p.payment_date desc, p.created_at desc`,
     [id],
@@ -83,16 +103,7 @@ export async function listPayments(query?: string): Promise<PaymentWithMember[]>
   const q = query?.trim() ?? "";
   if (q) {
     return sql<PaymentWithMember>(
-      `select
-         p.id,
-         p.title,
-         p.member_id,
-         p.amount::text as amount,
-         p.payment_date::text as payment_date,
-         p.created_at::text as created_at,
-         m.name as member_name
-       from payments p
-       join members m on m.id = p.member_id
+      `${paymentSelect}
        where p.title ilike $1 or m.name ilike $1
        order by p.payment_date desc, p.created_at desc
        limit 200`,
@@ -100,16 +111,7 @@ export async function listPayments(query?: string): Promise<PaymentWithMember[]>
     );
   }
   return sql<PaymentWithMember>(
-    `select
-       p.id,
-       p.title,
-       p.member_id,
-       p.amount::text as amount,
-       p.payment_date::text as payment_date,
-       p.created_at::text as created_at,
-       m.name as member_name
-     from payments p
-     join members m on m.id = p.member_id
+    `${paymentSelect}
      order by p.payment_date desc, p.created_at desc
      limit 200`,
   );

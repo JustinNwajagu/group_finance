@@ -44,6 +44,8 @@ Or use **Firebase App Hosting** with `apphosting.yaml` and connect the GitHub re
 | Collection | Purpose |
 | --- | --- |
 | `members` | Roster |
-| `payment_requests` | Payment titles |
+| `payment_requests` | Shared payment titles (min ₦, deadline, conclude) |
 | `payments` | Per-member pledge/paid rows |
 | `_counters` | Numeric id sequences |
+
+Full field list and why `payment_requests` is needed: [database-schema.md](./database-schema.md).

@@ -103,6 +103,87 @@ export async function reopenPaymentRequest(formData: FormData): Promise<void> {
   redirect("/payments?ok=reopened");
 }
 
+export async function recordMemberContribution(
+  formData: FormData,
+): Promise<void> {
+  await requireAdmin();
+
+  const requestId = Number(formData.get("payment_request_id"));
+  const memberId = Number(formData.get("member_id"));
+  const amountRaw = String(formData.get("amount") ?? "").trim();
+  const statusRaw = String(formData.get("status") ?? "pledge").trim();
+  const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
+  const amount = Number(amountRaw);
+  const status = statusRaw === "paid" ? "paid" : "pledge";
+
+  if (!Number.isFinite(requestId) || requestId <= 0) {
+    failPayments("Choose a payment title.");
+  }
+  if (!Number.isFinite(memberId) || memberId <= 0) {
+    failPayments("Choose a member.");
+  }
+  if (!Number.isFinite(amount) || amount < 0) {
+    failPayments("Enter a valid amount.");
+  }
+
+  const request = await sql<{ id: number; amount: string }>(
+    "select id, amount::text as amount from payment_requests where id = $1",
+    [requestId],
+  );
+  if (!request[0]) failPayments("Payment title not found.");
+
+  const member = await sql<{ id: number }>(
+    "select id from members where id = $1",
+    [memberId],
+  );
+  if (!member[0]) failPayments("Member not found.");
+
+  if (amount + 1e-9 < Number(request[0].amount)) {
+    failPayments(
+      `Amount must be at least the minimum (${request[0].amount}).`,
+    );
+  }
+
+  const paymentDate =
+    status === "paid"
+      ? /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
+        ? paymentDateRaw
+        : new Date().toISOString().slice(0, 10)
+      : /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
+        ? paymentDateRaw
+        : null;
+
+  const existing = await sql<{ id: number }>(
+    `select id from payments
+     where payment_request_id = $1 and member_id = $2
+     limit 1`,
+    [requestId, memberId],
+  );
+
+  if (existing[0]) {
+    await sql(
+      `update payments
+       set amount = $1,
+           status = $2,
+           payment_date = $3::date
+       where id = $4`,
+      [amount.toFixed(2), status, paymentDate, existing[0].id],
+    );
+  } else {
+    await sql(
+      `insert into payments
+         (payment_request_id, member_id, amount, status, payment_date)
+       values ($1, $2, $3, $4, $5::date)`,
+      [requestId, memberId, amount.toFixed(2), status, paymentDate],
+    );
+  }
+
+  revalidatePath("/payments");
+  revalidatePath("/members");
+  revalidatePath(`/members/${memberId}`);
+  redirect("/payments?ok=recorded");
+}
+
 export async function markPaymentPaid(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));

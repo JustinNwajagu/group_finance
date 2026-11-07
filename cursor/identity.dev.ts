@@ -1,8 +1,9 @@
 import type { DevViewer } from "./identity.js";
+
 export const DEV_VIEWER: DevViewer | null = {
-  sub: "user:member",
-  email: "member@example.com",
-  name: "Member Viewer",
+  sub: "user:dev",
+  email: "dev@example.com",
+  name: "Dev Viewer",
   teamId: 1,
-  teamRole: "member",
+  teamRole: "admin",
 };

@@ -16,7 +16,7 @@ export type ViewerContext = {
 
 async function findBySub(sub: string): Promise<AppUser | null> {
   const rows = await sql<AppUser>(
-    "select id, cursor_sub, email, name, role, created_at::text from app_users where cursor_sub = $1 limit 1",
+    "select id, cursor_sub, email, name, role, created_at::text as created_at from app_users where cursor_sub = $1 limit 1",
     [sub],
   );
   return rows[0] ?? null;
@@ -24,8 +24,16 @@ async function findBySub(sub: string): Promise<AppUser | null> {
 
 async function findByEmail(email: string): Promise<AppUser | null> {
   const rows = await sql<AppUser>(
-    "select id, cursor_sub, email, name, role, created_at::text from app_users where lower(email) = lower($1) limit 1",
+    "select id, cursor_sub, email, name, role, created_at::text as created_at from app_users where lower(email) = lower($1) limit 1",
     [email],
+  );
+  return rows[0] ?? null;
+}
+
+async function findById(id: number): Promise<AppUser | null> {
+  const rows = await sql<AppUser>(
+    "select id, cursor_sub, email, name, role, created_at::text as created_at from app_users where id = $1 limit 1",
+    [id],
   );
   return rows[0] ?? null;
 }
@@ -43,13 +51,19 @@ async function createUser(input: {
   name: string;
   role: AppRole;
 }): Promise<AppUser> {
-  const rows = await sql<AppUser>(
+  // Avoid RETURNING — not portable to Snowflake.
+  await sql(
     `insert into app_users (cursor_sub, email, name, role)
-     values ($1, $2, $3, $4)
-     returning id, cursor_sub, email, name, role, created_at::text`,
+     values ($1, $2, $3, $4)`,
     [input.cursor_sub, input.email, input.name, input.role],
   );
-  return rows[0]!;
+  if (input.cursor_sub) {
+    const bySub = await findBySub(input.cursor_sub);
+    if (bySub) return bySub;
+  }
+  const byEmail = await findByEmail(input.email);
+  if (!byEmail) throw new Error("Failed to create app user");
+  return byEmail;
 }
 
 export async function resolveViewer(): Promise<ViewerContext | null> {
@@ -66,14 +80,13 @@ export async function resolveViewer(): Promise<ViewerContext | null> {
   if (!access && identity.email.trim()) {
     const invited = await findByEmail(identity.email);
     if (invited && !invited.cursor_sub) {
-      const linked = await sql<AppUser>(
+      await sql(
         `update app_users
          set cursor_sub = $1, name = case when name = '' then $2 else name end
-         where id = $3
-         returning id, cursor_sub, email, name, role, created_at::text`,
+         where id = $3`,
         [identity.sub, name, invited.id],
       );
-      access = linked[0] ?? invited;
+      access = (await findById(invited.id)) ?? invited;
     }
   }
 
@@ -112,7 +125,9 @@ export async function requireSignedIn(): Promise<ViewerContext> {
   return viewer;
 }
 
-export async function requireAccess(): Promise<ViewerContext & { access: AppUser }> {
+export async function requireAccess(): Promise<
+  ViewerContext & { access: AppUser }
+> {
   const viewer = await requireSignedIn();
   if (!viewer.access || viewer.access.role === "pending") {
     redirect("/pending");
@@ -120,7 +135,9 @@ export async function requireAccess(): Promise<ViewerContext & { access: AppUser
   return viewer as ViewerContext & { access: AppUser };
 }
 
-export async function requireAdmin(): Promise<ViewerContext & { access: AppUser }> {
+export async function requireAdmin(): Promise<
+  ViewerContext & { access: AppUser }
+> {
   const viewer = await requireAccess();
   if (viewer.access.role !== "admin") {
     redirect("/members");

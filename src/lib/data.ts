@@ -3,7 +3,7 @@ import type { AppUser, Member, MemberContribution, PaymentWithMember } from "./t
 
 export async function listAppUsers(): Promise<AppUser[]> {
   return sql<AppUser>(
-    `select id, cursor_sub, email, name, role, created_at::text
+    `select id, cursor_sub, email, name, role, created_at::text as created_at
      from app_users
      order by
        case role when 'admin' then 0 when 'member' then 1 else 2 end,
@@ -19,7 +19,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
          m.id,
          m.name,
          m.email,
-         m.created_at::text,
+         m.created_at::text as created_at,
          count(p.id)::int as payment_count,
          coalesce(sum(p.amount), 0)::text as contribution_total
        from members m
@@ -35,7 +35,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
        m.id,
        m.name,
        m.email,
-       m.created_at::text,
+       m.created_at::text as created_at,
        count(p.id)::int as payment_count,
        coalesce(sum(p.amount), 0)::text as contribution_total
      from members m
@@ -47,7 +47,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
 
 export async function getMember(id: number): Promise<Member | null> {
   const rows = await sql<Member>(
-    `select id, name, email, created_at::text from members where id = $1`,
+    `select id, name, email, created_at::text as created_at from members where id = $1`,
     [id],
   );
   return rows[0] ?? null;
@@ -67,9 +67,9 @@ export async function listPaymentsForMember(id: number): Promise<PaymentWithMemb
        p.id,
        p.title,
        p.member_id,
-       p.amount::text,
-       p.payment_date::text,
-       p.created_at::text,
+       p.amount::text as amount,
+       p.payment_date::text as payment_date,
+       p.created_at::text as created_at,
        m.name as member_name
      from payments p
      join members m on m.id = p.member_id
@@ -87,9 +87,9 @@ export async function listPayments(query?: string): Promise<PaymentWithMember[]>
          p.id,
          p.title,
          p.member_id,
-         p.amount::text,
-         p.payment_date::text,
-         p.created_at::text,
+         p.amount::text as amount,
+         p.payment_date::text as payment_date,
+         p.created_at::text as created_at,
          m.name as member_name
        from payments p
        join members m on m.id = p.member_id
@@ -104,9 +104,9 @@ export async function listPayments(query?: string): Promise<PaymentWithMember[]>
        p.id,
        p.title,
        p.member_id,
-       p.amount::text,
-       p.payment_date::text,
-       p.created_at::text,
+       p.amount::text as amount,
+       p.payment_date::text as payment_date,
+       p.created_at::text as created_at,
        m.name as member_name
      from payments p
      join members m on m.id = p.member_id
@@ -117,6 +117,6 @@ export async function listPayments(query?: string): Promise<PaymentWithMember[]>
 
 export async function listMemberOptions(): Promise<Member[]> {
   return sql<Member>(
-    `select id, name, email, created_at::text from members order by lower(name)`,
+    `select id, name, email, created_at::text as created_at from members order by lower(name)`,
   );
 }

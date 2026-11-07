@@ -33,7 +33,8 @@ export default async function PaymentsPage({
         <div>
           <h1>Payments</h1>
           <p>
-            Fixed fields: title, member, amount, date, and recorded timestamp.
+            Amounts are in Nigerian Naira (₦). Fixed fields: title, member,
+            amount, date, and recorded timestamp.
           </p>
         </div>
         <Suspense fallback={null}>
@@ -117,7 +118,7 @@ export default async function PaymentsPage({
                 </label>
                 <div className="form-grid two">
                   <label className="field">
-                    Amount
+                    Amount (₦)
                     <input
                       name="amount"
                       type="number"

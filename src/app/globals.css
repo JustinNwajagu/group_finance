@@ -432,6 +432,40 @@ textarea {
   color: var(--ink-soft);
 }
 
+.payment-groups {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.payment-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.55rem;
+}
+
+.payment-group-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.payment-group-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.payment-group-meta .money {
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
 .stat-line {
   display: flex;
   flex-wrap: wrap;

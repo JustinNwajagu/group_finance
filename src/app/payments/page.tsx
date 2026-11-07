@@ -1,13 +1,13 @@
-import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { createPayment } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
 import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
+import { PaymentGroups } from "@/components/payment-groups";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMemberOptions, listPayments } from "@/lib/data";
-import { formatDate, formatMoney, formatTimestamp } from "@/lib/format";
+import { groupPaymentsByTitle } from "@/lib/group";
 
 export const instant = false;
 
@@ -25,6 +25,7 @@ export default async function PaymentsPage({
     listPayments(q),
     admin ? listMemberOptions() : Promise.resolve([]),
   ]);
+  const groups = groupPaymentsByTitle(payments);
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -33,8 +34,7 @@ export default async function PaymentsPage({
         <div>
           <h1>Payments</h1>
           <p>
-            Amounts are in Nigerian Naira (₦). Fixed fields: title, member,
-            amount, date, and recorded timestamp.
+            Amounts are in Nigerian Naira (₦). Payments are grouped by title.
           </p>
         </div>
         <Suspense fallback={null}>
@@ -50,43 +50,13 @@ export default async function PaymentsPage({
 
       <div className={admin ? "split split-2" : "stack"}>
         <section className="panel">
-          <h2>Recent payments</h2>
+          <h2>Payments by title</h2>
           {payments.length === 0 ? (
             <div className="hero-empty">
               {q ? "No payments match that filter." : "No payments recorded yet."}
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Title</th>
-                    <th>Member</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Recorded</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.title}</td>
-                      <td>
-                        <Link
-                          className="row-link"
-                          href={`/members/${p.member_id}`}
-                        >
-                          {p.member_name}
-                        </Link>
-                      </td>
-                      <td className="money">{formatMoney(p.amount)}</td>
-                      <td>{formatDate(p.payment_date)}</td>
-                      <td className="muted">{formatTimestamp(p.created_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <PaymentGroups groups={groups} showMember />
           )}
         </section>
 

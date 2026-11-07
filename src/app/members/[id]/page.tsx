@@ -2,13 +2,15 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { PaymentGroups } from "@/components/payment-groups";
 import { requireAccess } from "@/lib/auth";
 import {
   getMember,
   listPaymentsForMember,
   memberContribution,
 } from "@/lib/data";
-import { formatDate, formatMoney, formatTimestamp } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
+import { groupPaymentsByTitle } from "@/lib/group";
 
 export const instant = false;
 
@@ -28,6 +30,7 @@ export default async function MemberDetailPage({
     listPaymentsForMember(id),
     memberContribution(id),
   ]);
+  const groups = groupPaymentsByTitle(payments);
 
   return (
     <AppShell viewer={viewer} active="members">
@@ -52,32 +55,11 @@ export default async function MemberDetailPage({
       </div>
 
       <section className="panel">
-        <h2>Payments made</h2>
+        <h2>Payments by title</h2>
         {payments.length === 0 ? (
           <div className="hero-empty">No payments recorded for this member.</div>
         ) : (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Amount</th>
-                  <th>Date</th>
-                  <th>Recorded</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((p) => (
-                  <tr key={p.id}>
-                    <td>{p.title}</td>
-                    <td className="money">{formatMoney(p.amount)}</td>
-                    <td>{formatDate(p.payment_date)}</td>
-                    <td className="muted">{formatTimestamp(p.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PaymentGroups groups={groups} showMember={false} />
         )}
       </section>
     </AppShell>

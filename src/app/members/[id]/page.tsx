@@ -47,7 +47,7 @@ export default async function MemberDetailPage({
           <div className="stat-line">
             <div>
               <strong>{stats.payment_count}</strong>
-              <span>Payments</span>
+              <span>Requested payments</span>
             </div>
             <div>
               <strong>{stats.contribution_count}</strong>

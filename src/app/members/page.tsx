@@ -28,8 +28,8 @@ export default async function MembersPage({
         <div>
           <h1>Members</h1>
           <p>
-            Browse the roster and open a member for payments grouped by title.
-            Contributions are paid entries; payments include pledges.
+            Payments is the count of requested titles (same for everyone).
+            Contributions is how many of those titles each member has paid.
           </p>
         </div>
         <Suspense fallback={null}>

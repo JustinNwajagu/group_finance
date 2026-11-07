@@ -11,16 +11,26 @@ export async function listAppUsers(): Promise<AppUser[]> {
   );
 }
 
+/** Distinct payment titles (= requests that apply to every member). */
+export async function requestedPaymentCount(): Promise<number> {
+  const rows = await sql<{ count: string }>(
+    "select count(distinct title)::text as count from payments",
+  );
+  return Number(rows[0]?.count ?? 0);
+}
+
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
   const q = query?.trim() ?? "";
+  // payment_count is global (same for every member): distinct requested titles.
+  // contribution_count is per member: distinct titles they have paid toward.
   const base = `
     select
       m.id,
       m.name,
       m.email,
       m.created_at::text as created_at,
-      count(p.id)::int as payment_count,
-      count(case when p.status = 'paid' then 1 end)::int as contribution_count
+      (select count(distinct title)::int from payments) as payment_count,
+      count(distinct case when p.status = 'paid' then p.title end)::int as contribution_count
     from members m
     left join payments p on p.member_id = m.id
   `;
@@ -62,17 +72,18 @@ export async function memberPaymentStats(id: number): Promise<{
   payment_count: number;
   contribution_count: number;
 }> {
-  const rows = await sql<{ payment_count: number; contribution_count: number }>(
-    `select
-       count(id)::int as payment_count,
-       count(case when status = 'paid' then 1 end)::int as contribution_count
-     from payments
-     where member_id = $1`,
-    [id],
-  );
+  const [requested, contributed] = await Promise.all([
+    requestedPaymentCount(),
+    sql<{ count: string }>(
+      `select count(distinct title)::text as count
+       from payments
+       where member_id = $1 and status = 'paid'`,
+      [id],
+    ),
+  ]);
   return {
-    payment_count: Number(rows[0]?.payment_count ?? 0),
-    contribution_count: Number(rows[0]?.contribution_count ?? 0),
+    payment_count: requested,
+    contribution_count: Number(contributed[0]?.count ?? 0),
   };
 }
 

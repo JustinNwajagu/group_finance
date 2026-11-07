@@ -34,9 +34,9 @@ export default async function HomePage({
           <h1>Home</h1>
           <p>
             Roster overview. Payments is the count of requested titles (same for
-            everyone). Contributions is how many titles each member has a pledge
-            or paid record for. Open payments live under Payments; finished ones
-            under Archive.
+            everyone). Contributions is how many titles each member has{" "}
+            <strong>paid</strong> (pledges do not count). Open payments live
+            under Payments; finished ones under Archive.
           </p>
         </div>
         <Suspense fallback={null}>

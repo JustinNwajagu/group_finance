@@ -37,7 +37,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
       (
         select count(*)::int
         from payments p
-        where p.member_id = m.id
+        where p.member_id = m.id and p.status = 'paid'
       ) as contribution_count
     from members m
   `;
@@ -82,7 +82,7 @@ export async function memberPaymentStats(id: number): Promise<{
     sql<{ count: string }>(
       `select count(*)::text as count
        from payments
-       where member_id = $1`,
+       where member_id = $1 and status = 'paid'`,
       [id],
     ),
   ]);

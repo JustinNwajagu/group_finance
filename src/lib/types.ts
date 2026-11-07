@@ -55,7 +55,11 @@ export type MemberPaymentRow = Member & {
 
 export type ContributionLists = {
   request: PaymentRequest;
+  /** Paid only — pledges never count as contributed. */
   contributed: MemberPaymentRow[];
+  /** Recorded pledges (not yet paid). */
+  pledged: MemberPaymentRow[];
+  /** No payment row yet. */
   outstanding: MemberPaymentRow[];
   /** Sum of amounts with status pledge. */
   pledge_total: string;

@@ -167,7 +167,7 @@ export async function contributionListsForRequest(
   const request = await getPaymentRequest(requestId);
   if (!request) return null;
 
-  // Any recorded row (pledge or paid) counts as contributed.
+  // Contributed = paid only (same rule as Home Contributions and Realised).
   const contributed = await sql<import("./types").MemberPaymentRow>(
     `select
        m.id,
@@ -180,6 +180,24 @@ export async function contributionListsForRequest(
      from members m
      join payments p
        on p.member_id = m.id and p.payment_request_id = $1
+     where p.status = 'paid'
+     order by lower(m.name)`,
+    [requestId],
+  );
+
+  const pledged = await sql<import("./types").MemberPaymentRow>(
+    `select
+       m.id,
+       m.name,
+       m.email,
+       m.created_at::text as created_at,
+       p.id as payment_id,
+       p.status,
+       p.amount::text as amount
+     from members m
+     join payments p
+       on p.member_id = m.id and p.payment_request_id = $1
+     where p.status = 'pledge'
      order by lower(m.name)`,
     [requestId],
   );
@@ -217,6 +235,7 @@ export async function contributionListsForRequest(
   return {
     request,
     contributed,
+    pledged,
     outstanding,
     pledge_total: totals[0]?.pledge_total ?? "0",
     realised_total: totals[0]?.realised_total ?? "0",

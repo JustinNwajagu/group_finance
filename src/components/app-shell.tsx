@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
+import { BrandLogo } from "@/components/brand-logo";
 import type { ViewerContext } from "@/lib/auth";
-import { isAdmin } from "@/lib/auth";
+import { homePathForRole, isAdmin } from "@/lib/auth";
 
 export function AppShell({
   viewer,
@@ -13,11 +14,13 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const admin = isAdmin(viewer);
+  const homeHref = homePathForRole(viewer.access?.role ?? "member");
 
   return (
     <div className="shell">
       <header className="topbar">
-        <Link href="/" className="brand">
+        <Link href={homeHref} className="brand">
+          <BrandLogo size={36} />
           <span className="brand-mark">KLEF</span>
           <span className="brand-sub">Ledger</span>
         </Link>

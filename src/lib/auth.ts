@@ -117,4 +117,9 @@ export function isAdmin(viewer: ViewerContext): boolean {
   return viewer.access?.role === "admin";
 }
 
+/** Post-login landing: admins go to Payments, members to Home. */
+export function homePathForRole(role: AppRole): string {
+  return role === "admin" ? "/payments" : "/";
+}
+
 export { adminEmail };

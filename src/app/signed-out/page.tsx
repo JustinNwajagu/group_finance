@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 
 export const instant = false;
 
@@ -6,15 +7,15 @@ export default function SignedOutPage() {
   return (
     <div className="gate">
       <div className="gate-card">
-        <div className="brand-mark">KLEF</div>
-        <h1>Sign in required</h1>
+        <BrandLogo size={64} />
+        <h1>Signed out</h1>
         <p>
-          This ledger uses Firebase Authentication. Sign in with the account that
-          should access the group records.
-        </p>
-        <p>
-          <Link className="btn-primary" href="/login" style={{ display: "inline-block" }}>
-            Go to sign in
+          <Link
+            className="btn-primary"
+            href="/login"
+            style={{ display: "inline-block" }}
+          >
+            Sign in
           </Link>
         </p>
       </div>

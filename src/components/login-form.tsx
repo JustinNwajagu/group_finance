@@ -22,11 +22,6 @@ export function LoginForm({
   if (!firebaseConfig) {
     return (
       <form action={createDevSession} className="form-grid">
-        <p className="muted" style={{ margin: 0 }}>
-          Firebase is not configured on this machine. Use a local preview
-          session. Only <strong>{adminEmail}</strong> is admin; any other email
-          signs in as a member.
-        </p>
         <label className="field">
           Email
           <input
@@ -42,7 +37,7 @@ export function LoginForm({
           <input name="name" autoComplete="name" />
         </label>
         <button type="submit" className="btn-primary">
-          Continue locally
+          Continue
         </button>
       </form>
     );
@@ -54,7 +49,7 @@ export function LoginForm({
       setError(result.error);
       return;
     }
-    window.location.href = "/";
+    window.location.href = result.redirectTo;
   }
 
   function onEmailLogin(formData: FormData) {
@@ -87,10 +82,6 @@ export function LoginForm({
 
   return (
     <div className="form-grid">
-      <p className="muted" style={{ margin: 0 }}>
-        Sign in with Firebase. Admin access is limited to{" "}
-        <strong>{adminEmail}</strong>.
-      </p>
       {error ? (
         <p className="form-error" role="alert">
           {error}
@@ -118,7 +109,7 @@ export function LoginForm({
           />
         </label>
         <button type="submit" className="btn-primary" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in with email"}
+          {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
       <button
@@ -127,7 +118,7 @@ export function LoginForm({
         onClick={onGoogle}
         disabled={pending}
       >
-        Sign in with Google
+        Continue with Google
       </button>
     </div>
   );

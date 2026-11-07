@@ -184,7 +184,7 @@ export async function contributionListsForRequest(
     [requestId],
   );
 
-  // Yet to contribute = no payment row for this request yet.
+  // Yet to contribute / didn't contribute = no payment row for this request yet.
   const outstanding = await sql<import("./types").MemberPaymentRow>(
     `select
        m.id,
@@ -203,7 +203,19 @@ export async function contributionListsForRequest(
     [requestId],
   );
 
-  return { request, contributed, outstanding };
+  const realised = await sql<{ total: string }>(
+    `select coalesce(sum(amount), 0)::text as total
+     from payments
+     where payment_request_id = $1`,
+    [requestId],
+  );
+
+  return {
+    request,
+    contributed,
+    outstanding,
+    realised_total: realised[0]?.total ?? "0",
+  };
 }
 
 export async function listContributionBoards(

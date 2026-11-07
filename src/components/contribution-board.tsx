@@ -71,9 +71,13 @@ export function ContributionBoard({
   isAdmin: boolean;
   returnTo?: string;
 }) {
-  const { request, contributed, outstanding } = board;
+  const { request, contributed, outstanding, realised_total } = board;
   const concluded = Boolean(request.concluded_at);
   const today = new Date().toISOString().slice(0, 10);
+  const outstandingTitle = concluded ? "Didn't contribute" : "Yet to contribute";
+  const outstandingEmpty = concluded
+    ? "Everyone contributed."
+    : "Everyone has contributed.";
 
   return (
     <article className="contrib-board">
@@ -86,6 +90,10 @@ export function ContributionBoard({
             {concluded && request.concluded_at
               ? ` · Concluded ${formatDate(request.concluded_at.slice(0, 10))}`
               : " · Open"}
+          </p>
+          <p className="realised-line">
+            Realised <strong>{formatMoney(realised_total)}</strong>
+            <span className="muted"> · pledges + paid</span>
           </p>
         </div>
         <span className={concluded ? "badge badge-paid" : "badge badge-pledge"}>
@@ -154,9 +162,9 @@ export function ContributionBoard({
           }
         />
         <MemberList
-          title="Yet to contribute"
+          title={outstandingTitle}
           members={outstanding}
-          empty="Everyone has contributed."
+          empty={outstandingEmpty}
           renderExtra={
             isAdmin
               ? (m) => (

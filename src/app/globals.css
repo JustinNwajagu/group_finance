@@ -504,6 +504,18 @@ textarea {
   font-weight: 650;
 }
 
+.realised-line {
+  margin: 0.45rem 0 0;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.realised-line strong {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
 .contrib-split {
   display: grid;
   gap: 1rem;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { requireAccess } from "@/lib/auth";
@@ -14,6 +15,7 @@ export const instant = false;
 export default async function MemberDetailPage({
   params,
 }: PageProps<"/members/[id]">) {
+  await connection();
   const viewer = await requireAccess();
   const { id: raw } = await params;
   const id = Number(raw);

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { Suspense } from "react";
 import { createMember, importMembers } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
-import { ActionForm } from "@/components/forms";
 import { FilterBar } from "@/components/filter-bar";
+import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers } from "@/lib/data";
 import { formatMoney } from "@/lib/format";
@@ -13,9 +14,12 @@ export const instant = false;
 export default async function MembersPage({
   searchParams,
 }: PageProps<"/members">) {
+  await connection();
   const viewer = await requireAccess();
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
+  const error = typeof params.error === "string" ? params.error : undefined;
+  const ok = typeof params.ok === "string" ? params.ok : undefined;
   const members = await listMembers(q);
   const admin = isAdmin(viewer);
 
@@ -30,6 +34,15 @@ export default async function MembersPage({
           <FilterBar placeholder="Filter members…" />
         </Suspense>
       </div>
+
+      <Flash
+        ok={ok}
+        error={error}
+        messages={{
+          member: "Member added.",
+          import: "Import complete.",
+        }}
+      />
 
       <div className={admin ? "split split-2" : "stack"}>
         <section className="panel">
@@ -76,12 +89,7 @@ export default async function MembersPage({
           <div className="stack">
             <section className="panel">
               <h2>Add member</h2>
-              <ActionForm
-                action={createMember}
-                className="form-grid"
-                submitLabel="Add member"
-                successMessage="Member added."
-              >
+              <form action={createMember} className="form-grid">
                 <label className="field">
                   Name
                   <input name="name" required autoComplete="off" />
@@ -90,20 +98,17 @@ export default async function MembersPage({
                   Email (optional)
                   <input name="email" type="email" autoComplete="off" />
                 </label>
-              </ActionForm>
+                <button type="submit" className="btn-primary">
+                  Add member
+                </button>
+              </form>
             </section>
             <section className="panel">
               <h2>Import members</h2>
               <p className="muted" style={{ marginTop: 0 }}>
                 One per line: <code>Name</code> or <code>Name, email</code>.
               </p>
-              <ActionForm
-                action={importMembers}
-                className="form-grid"
-                submitLabel="Import"
-                pendingLabel="Importing…"
-                successMessage="Import complete."
-              >
+              <form action={importMembers} className="form-grid">
                 <label className="field">
                   CSV / list
                   <textarea
@@ -111,7 +116,10 @@ export default async function MembersPage({
                     placeholder={"Ada Lovelace, ada@example.com\nGrace Hopper"}
                   />
                 </label>
-              </ActionForm>
+                <button type="submit" className="btn-primary">
+                  Import
+                </button>
+              </form>
             </section>
           </div>
         ) : null}

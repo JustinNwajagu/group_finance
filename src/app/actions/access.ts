@@ -1,26 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import type { AppRole } from "@/lib/types";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
-
-export async function inviteUser(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
+export async function inviteUser(formData: FormData): Promise<void> {
   await requireAdmin();
   const email = String(formData.get("email") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const role = String(formData.get("role") ?? "member").trim() as AppRole;
 
-  if (!email || !email.includes("@")) {
-    return { ok: false, error: "Enter a valid email." };
-  }
+  const fail = (msg: string) => {
+    redirect("/access?error=" + encodeURIComponent(msg));
+  };
+
+  if (!email || !email.includes("@")) fail("Enter a valid email.");
   if (role !== "admin" && role !== "member") {
-    return { ok: false, error: "Role must be admin or member." };
+    fail("Role must be admin or member.");
   }
 
   const existing = await sql<{ id: number; role: string }>(
@@ -34,9 +32,9 @@ export async function inviteUser(
         [role, name, existing[0].id],
       );
       revalidatePath("/access");
-      return { ok: true };
+      redirect("/access?ok=1");
     }
-    return { ok: false, error: "That email already has access." };
+    fail("That email already has access.");
   }
 
   await sql(
@@ -45,23 +43,24 @@ export async function inviteUser(
     [email, name, role],
   );
   revalidatePath("/access");
-  return { ok: true };
+  redirect("/access?ok=1");
 }
 
-export async function setUserRole(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
+export async function setUserRole(formData: FormData): Promise<void> {
   const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const role = String(formData.get("role") ?? "").trim() as AppRole;
 
-  if (!Number.isFinite(id)) return { ok: false, error: "Invalid user." };
+  const fail = (msg: string) => {
+    redirect("/access?error=" + encodeURIComponent(msg));
+  };
+
+  if (!Number.isFinite(id)) fail("Invalid user.");
   if (role !== "admin" && role !== "member" && role !== "pending") {
-    return { ok: false, error: "Invalid role." };
+    fail("Invalid role.");
   }
   if (id === viewer.access.id && role !== "admin") {
-    return { ok: false, error: "You cannot remove your own admin role." };
+    fail("You cannot remove your own admin role.");
   }
 
   if (role !== "admin") {
@@ -70,11 +69,11 @@ export async function setUserRole(
       [id],
     );
     if (Number(admins[0]?.count ?? 0) === 0) {
-      return { ok: false, error: "Keep at least one admin." };
+      fail("Keep at least one admin.");
     }
   }
 
   await sql("update app_users set role = $1 where id = $2", [role, id]);
   revalidatePath("/access");
-  return { ok: true };
+  redirect("/access");
 }

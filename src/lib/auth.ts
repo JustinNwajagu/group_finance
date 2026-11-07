@@ -1,5 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { getIdentity } from "../../cursor/identity";
 import { sql } from "./db";
@@ -52,6 +53,7 @@ async function createUser(input: {
 }
 
 export async function resolveViewer(): Promise<ViewerContext | null> {
+  await connection();
   const identity = await getIdentity(await headers());
   if (!identity.verified) return null;
   if (identity.kind === "key") return null;

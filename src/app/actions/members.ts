@@ -1,34 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
-
-export async function createMember(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
+export async function createMember(formData: FormData): Promise<void> {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
 
-  if (!name) return { ok: false, error: "Name is required." };
+  if (!name) {
+    redirect("/members?error=" + encodeURIComponent("Name is required."));
+  }
 
-  await sql(
-    `insert into members (name, email) values ($1, $2)`,
-    [name, email || null],
-  );
+  await sql(`insert into members (name, email) values ($1, $2)`, [
+    name,
+    email || null,
+  ]);
   revalidatePath("/members");
   revalidatePath("/payments");
-  return { ok: true };
+  redirect("/members?ok=member");
 }
 
-export async function importMembers(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
+export async function importMembers(formData: FormData): Promise<void> {
   await requireAdmin();
   const raw = String(formData.get("csv") ?? "");
   const lines = raw
@@ -37,7 +32,10 @@ export async function importMembers(
     .filter(Boolean);
 
   if (lines.length === 0) {
-    return { ok: false, error: "Paste one member per line: Name, optional email." };
+    redirect(
+      "/members?error=" +
+        encodeURIComponent("Paste one member per line: Name, optional email."),
+    );
   }
 
   let imported = 0;
@@ -55,10 +53,12 @@ export async function importMembers(
   }
 
   if (imported === 0) {
-    return { ok: false, error: "No members found to import." };
+    redirect(
+      "/members?error=" + encodeURIComponent("No members found to import."),
+    );
   }
 
   revalidatePath("/members");
   revalidatePath("/payments");
-  return { ok: true };
+  redirect("/members?ok=import");
 }

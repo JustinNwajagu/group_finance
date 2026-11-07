@@ -1,9 +1,11 @@
+import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { resolveViewer } from "@/lib/auth";
 
 export const instant = false;
 
 export default async function HomePage() {
+  await connection();
   const viewer = await resolveViewer();
   if (!viewer) redirect("/signed-out");
   if (!viewer.access || viewer.access.role === "pending") redirect("/pending");

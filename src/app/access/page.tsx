@@ -1,14 +1,22 @@
+import { connection } from "next/server";
 import { inviteUser, setUserRole } from "@/app/actions/access";
 import { AppShell } from "@/components/app-shell";
-import { ActionForm, RoleForm } from "@/components/forms";
+import { Flash } from "@/components/flash";
+import { RoleForm } from "@/components/forms";
 import { requireAdmin } from "@/lib/auth";
 import { listAppUsers } from "@/lib/data";
 import { formatTimestamp } from "@/lib/format";
 
 export const instant = false;
 
-export default async function AccessPage() {
+export default async function AccessPage({
+  searchParams,
+}: PageProps<"/access">) {
+  await connection();
   const viewer = await requireAdmin();
+  const params = await searchParams;
+  const error = typeof params.error === "string" ? params.error : undefined;
+  const ok = typeof params.ok === "string" ? params.ok : undefined;
   const users = await listAppUsers();
 
   return (
@@ -22,6 +30,12 @@ export default async function AccessPage() {
           </p>
         </div>
       </div>
+
+      <Flash
+        ok={ok}
+        error={error}
+        messages={{ "1": "Access granted." }}
+      />
 
       <div className="split split-2">
         <section className="panel">
@@ -71,12 +85,7 @@ export default async function AccessPage() {
           <p className="muted" style={{ marginTop: 0 }}>
             Pre-grant access before someone signs in. Matching is by email.
           </p>
-          <ActionForm
-            action={inviteUser}
-            className="form-grid"
-            submitLabel="Grant access"
-            successMessage="Access granted."
-          >
+          <form action={inviteUser} className="form-grid">
             <label className="field">
               Email
               <input name="email" type="email" required autoComplete="off" />
@@ -92,7 +101,10 @@ export default async function AccessPage() {
                 <option value="admin">Admin</option>
               </select>
             </label>
-          </ActionForm>
+            <button type="submit" className="btn-primary">
+              Grant access
+            </button>
+          </form>
         </section>
       </div>
     </AppShell>

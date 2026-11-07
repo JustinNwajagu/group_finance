@@ -1,15 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
-
-export async function createPayment(
-  _prev: ActionResult | null,
-  formData: FormData,
-): Promise<ActionResult> {
+export async function createPayment(formData: FormData): Promise<void> {
   await requireAdmin();
 
   const title = String(formData.get("title") ?? "").trim();
@@ -18,22 +14,20 @@ export async function createPayment(
   const paymentDate = String(formData.get("payment_date") ?? "").trim();
   const amount = Number(amountRaw);
 
-  if (!title) return { ok: false, error: "Title is required." };
-  if (!Number.isFinite(memberId) || memberId <= 0) {
-    return { ok: false, error: "Choose a member." };
-  }
-  if (!Number.isFinite(amount) || amount < 0) {
-    return { ok: false, error: "Enter a valid amount." };
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) {
-    return { ok: false, error: "Choose a payment date." };
-  }
+  const fail = (msg: string) => {
+    redirect("/payments?error=" + encodeURIComponent(msg));
+  };
+
+  if (!title) fail("Title is required.");
+  if (!Number.isFinite(memberId) || memberId <= 0) fail("Choose a member.");
+  if (!Number.isFinite(amount) || amount < 0) fail("Enter a valid amount.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paymentDate)) fail("Choose a payment date.");
 
   const member = await sql<{ id: number }>(
     "select id from members where id = $1",
     [memberId],
   );
-  if (!member[0]) return { ok: false, error: "Member not found." };
+  if (!member[0]) fail("Member not found.");
 
   await sql(
     `insert into payments (title, member_id, amount, payment_date)
@@ -44,5 +38,5 @@ export async function createPayment(
   revalidatePath("/payments");
   revalidatePath("/members");
   revalidatePath(`/members/${memberId}`);
-  return { ok: true };
+  redirect("/payments?ok=1");
 }

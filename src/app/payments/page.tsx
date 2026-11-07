@@ -3,8 +3,8 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { createPayment } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
-import { ActionForm } from "@/components/forms";
 import { FilterBar } from "@/components/filter-bar";
+import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMemberOptions, listPayments } from "@/lib/data";
 import { formatDate, formatMoney, formatTimestamp } from "@/lib/format";
@@ -18,6 +18,8 @@ export default async function PaymentsPage({
   const viewer = await requireAccess();
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";
+  const error = typeof params.error === "string" ? params.error : undefined;
+  const ok = typeof params.ok === "string" ? params.ok : undefined;
   const admin = isAdmin(viewer);
   const [payments, members] = await Promise.all([
     listPayments(q),
@@ -38,6 +40,12 @@ export default async function PaymentsPage({
           <FilterBar placeholder="Filter by title or member…" />
         </Suspense>
       </div>
+
+      <Flash
+        ok={ok}
+        error={error}
+        messages={{ "1": "Payment recorded." }}
+      />
 
       <div className={admin ? "split split-2" : "stack"}>
         <section className="panel">
@@ -89,12 +97,7 @@ export default async function PaymentsPage({
                 Add a member first, then record a payment.
               </p>
             ) : (
-              <ActionForm
-                action={createPayment}
-                className="form-grid"
-                submitLabel="Record payment"
-                successMessage="Payment recorded."
-              >
+              <form action={createPayment} className="form-grid">
                 <label className="field">
                   Title
                   <input name="title" required autoComplete="off" />
@@ -134,7 +137,10 @@ export default async function PaymentsPage({
                     />
                   </label>
                 </div>
-              </ActionForm>
+                <button type="submit" className="btn-primary">
+                  Record payment
+                </button>
+              </form>
             )}
           </section>
         ) : null}

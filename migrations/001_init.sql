@@ -19,16 +19,29 @@ create table if not exists members (
 
 create index if not exists members_name_idx on members (lower(name));
 
-create table if not exists payments (
+create table if not exists payment_requests (
   id serial primary key,
   title text not null,
-  member_id integer not null references members (id),
   amount numeric(12, 2) not null check (amount >= 0),
-  payment_date date not null,
-  status text not null default 'pledge' check (status in ('pledge', 'paid')),
+  deadline date not null,
+  concluded_at timestamptz,
   created_at timestamptz not null default now()
 );
 
+create index if not exists payment_requests_open_idx
+  on payment_requests (concluded_at);
+
+create table if not exists payments (
+  id serial primary key,
+  payment_request_id integer not null references payment_requests (id),
+  member_id integer not null references members (id),
+  amount numeric(12, 2) not null check (amount >= 0),
+  payment_date date,
+  status text not null default 'pledge' check (status in ('pledge', 'paid')),
+  created_at timestamptz not null default now(),
+  unique (payment_request_id, member_id)
+);
+
 create index if not exists payments_member_id_idx on payments (member_id);
-create index if not exists payments_payment_date_idx on payments (payment_date desc);
+create index if not exists payments_request_id_idx on payments (payment_request_id);
 create index if not exists payments_status_idx on payments (status);

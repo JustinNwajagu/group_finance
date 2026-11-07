@@ -18,12 +18,22 @@ export type Member = {
   created_at: string;
 };
 
+export type PaymentRequest = {
+  id: number;
+  title: string;
+  amount: string;
+  deadline: string;
+  concluded_at: string | null;
+  created_at: string;
+};
+
 export type Payment = {
   id: number;
+  payment_request_id: number;
   title: string;
   member_id: number;
   amount: string;
-  payment_date: string;
+  payment_date: string | null;
   status: PaymentStatus;
   created_at: string;
 };
@@ -35,4 +45,14 @@ export type PaymentWithMember = Payment & {
 export type MemberContribution = Member & {
   payment_count: number;
   contribution_count: number;
+};
+
+export type MemberPaymentRow = Member & {
+  payment_id: number;
+};
+
+export type ContributionLists = {
+  request: PaymentRequest;
+  contributed: MemberPaymentRow[];
+  outstanding: MemberPaymentRow[];
 };

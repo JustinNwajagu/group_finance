@@ -64,7 +64,9 @@ export function PaymentGroups({
                         {p.status === "paid" ? "Paid" : "Pledge"}
                       </span>
                     </td>
-                    <td>{formatDate(p.payment_date)}</td>
+                    <td>
+                      {p.payment_date ? formatDate(p.payment_date) : "—"}
+                    </td>
                     <td className="muted">{formatTimestamp(p.created_at)}</td>
                     {isAdmin ? (
                       <td>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { ensureMemberOnOpenRequests } from "@/lib/data";
 import { sql } from "@/lib/db";
 
 export async function createMember(formData: FormData): Promise<void> {
@@ -18,6 +19,18 @@ export async function createMember(formData: FormData): Promise<void> {
     name,
     email || null,
   ]);
+
+  const created = await sql<{ id: number }>(
+    `select id from members
+     where name = $1 and coalesce(email, '') = coalesce($2, '')
+     order by id desc
+     limit 1`,
+    [name, email || null],
+  );
+  if (created[0]) {
+    await ensureMemberOnOpenRequests(created[0].id);
+  }
+
   revalidatePath("/members");
   revalidatePath("/payments");
   redirect("/members?ok=member");
@@ -39,6 +52,7 @@ export async function importMembers(formData: FormData): Promise<void> {
   }
 
   let imported = 0;
+  const ids: number[] = [];
   for (const line of lines) {
     if (/^name\s*,/i.test(line)) continue;
     const parts = line.split(",").map((p) => p.trim().replace(/^"|"$/g, ""));
@@ -49,6 +63,17 @@ export async function importMembers(formData: FormData): Promise<void> {
       name,
       email || null,
     ]);
+    const created = await sql<{ id: number }>(
+      `select id from members
+       where name = $1 and coalesce(email, '') = coalesce($2, '')
+       order by id desc
+       limit 1`,
+      [name, email || null],
+    );
+    if (created[0]) {
+      ids.push(created[0].id);
+      await ensureMemberOnOpenRequests(created[0].id);
+    }
     imported += 1;
   }
 

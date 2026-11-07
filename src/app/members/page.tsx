@@ -3,10 +3,15 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { createMember, importMembers } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
+import { ContributionBoard } from "@/components/contribution-board";
 import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
-import { listMembers } from "@/lib/data";
+import {
+  listContributionBoards,
+  listMembers,
+  requestedPaymentCount,
+} from "@/lib/data";
 
 export const instant = false;
 
@@ -19,8 +24,16 @@ export default async function MembersPage({
   const q = typeof params.q === "string" ? params.q : "";
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
-  const members = await listMembers(q);
   const admin = isAdmin(viewer);
+  const [members, paymentTotal, currentBoards, concludedBoards] =
+    await Promise.all([
+      listMembers(q),
+      requestedPaymentCount(),
+      listContributionBoards(true),
+      listContributionBoards(false).then((all) =>
+        all.filter((b) => b.request.concluded_at),
+      ),
+    ]);
 
   return (
     <AppShell viewer={viewer} active="members">
@@ -43,12 +56,21 @@ export default async function MembersPage({
         messages={{
           member: "Member added.",
           import: "Import complete.",
+          paid: "Marked as contributed.",
+          amended: "Contribution list updated.",
+          concluded: "Payment concluded.",
+          reopened: "Concluded date cleared.",
         }}
       />
 
-      <div className={admin ? "split split-2" : "stack"}>
+      <div className="stack">
         <section className="panel">
-          <h2>Roster</h2>
+          <div className="panel-heading-row">
+            <h2>Roster</h2>
+            <p className="panel-heading-meta">
+              Total payments <strong>{paymentTotal}</strong>
+            </p>
+          </div>
           {members.length === 0 ? (
             <div className="hero-empty">
               {q
@@ -85,8 +107,40 @@ export default async function MembersPage({
           )}
         </section>
 
+        <section className="panel">
+          <h2>Current contributions</h2>
+          {currentBoards.length === 0 ? (
+            <div className="hero-empty">
+              No open payment requests. Admins can create one on Payments.
+            </div>
+          ) : (
+            currentBoards.map((board) => (
+              <ContributionBoard
+                key={board.request.id}
+                board={board}
+                isAdmin={admin}
+                returnTo="/members"
+              />
+            ))
+          )}
+        </section>
+
+        {concludedBoards.length > 0 ? (
+          <section className="panel">
+            <h2>Concluded payments</h2>
+            {concludedBoards.map((board) => (
+              <ContributionBoard
+                key={board.request.id}
+                board={board}
+                isAdmin={admin}
+                returnTo="/members"
+              />
+            ))}
+          </section>
+        ) : null}
+
         {admin ? (
-          <div className="stack">
+          <div className="split split-2">
             <section className="panel">
               <h2>Add member</h2>
               <form action={createMember} className="form-grid">

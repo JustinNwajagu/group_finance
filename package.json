@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "firestore:bootstrap": "node scripts/bootstrap-firestore.mjs",
     "firebase:emulators": "echo Use Firebase console or emulators for Auth/Firestore"
   },
   "dependencies": {

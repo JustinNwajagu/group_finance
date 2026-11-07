@@ -75,3 +75,16 @@ payment_requests (1) ──< payments >── (1) members
 ## Summary recommendation
 
 Yes to **`members`** and **`payments`**. Also keep **`payment_requests`** as the third core table — it is what makes shared titles, deadlines, conclude/archive, and board totals work cleanly.
+
+## Creating them on Firebase
+
+Firestore has no `CREATE TABLE` — collections appear when the first document is written.
+
+From this repo, with Admin credentials set:
+
+```bash
+set -a && source .env.local && set +a
+npm run firestore:bootstrap
+```
+
+That writes schema markers and zeroed counters for the three collections. The agent VM can run this **only after** you add Firebase project credentials (service account + project id) to the environment.

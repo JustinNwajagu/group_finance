@@ -49,3 +49,15 @@ Or use **Firebase App Hosting** with `apphosting.yaml` and connect the GitHub re
 | `_counters` | Numeric id sequences |
 
 Full field list and why `payment_requests` is needed: [database-schema.md](./database-schema.md).
+
+### Bootstrap from this repo
+
+Once Admin credentials are in the environment (or `.env.local`):
+
+```bash
+# load env then:
+set -a && source .env.local && set +a
+npm run firestore:bootstrap
+```
+
+That creates `_schema` markers + `_counters` for `members`, `payment_requests`, and `payments`. Real rows are written by the app.

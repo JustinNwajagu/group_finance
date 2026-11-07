@@ -36,11 +36,11 @@ export default async function MemberDetailPage({
   const groups = groupPaymentsByTitle(payments);
 
   return (
-    <AppShell viewer={viewer} active="members">
+    <AppShell viewer={viewer} active="home">
       <div className="page-head">
         <div>
           <p className="muted" style={{ margin: 0 }}>
-            <Link href="/members">← Members</Link>
+            <Link href="/">← Home</Link>
           </p>
           <h1>{member.name}</h1>
           <p>{member.email || "No email on file"}</p>

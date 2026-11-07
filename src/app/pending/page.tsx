@@ -9,7 +9,7 @@ export default async function PendingPage() {
   const viewer = await resolveViewer();
   if (!viewer) redirect("/signed-out");
   if (viewer.access && viewer.access.role !== "pending") {
-    redirect("/members");
+    redirect("/");
   }
 
   return (
@@ -19,7 +19,7 @@ export default async function PendingPage() {
         <h1>Waiting for access</h1>
         <p>
           Signed in as <strong>{viewer.email}</strong>. An admin still needs to
-          grant you a role before you can browse members and payments.
+          grant you a role before you can browse Home, Payments, and Archive.
         </p>
       </div>
     </div>

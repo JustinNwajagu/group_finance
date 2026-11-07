@@ -20,6 +20,14 @@ function okReturn(returnTo: string, ok: string): never {
   redirect(`${base}?ok=${ok}`);
 }
 
+function revalidateDashboards(...extra: string[]) {
+  revalidatePath("/");
+  revalidatePath("/payments");
+  revalidatePath("/archive");
+  revalidatePath("/members");
+  for (const path of extra) revalidatePath(path);
+}
+
 export async function createPaymentRequest(formData: FormData): Promise<void> {
   await requireAdmin();
 
@@ -47,8 +55,7 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
     [title, amount.toFixed(2), deadline],
   );
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
+  revalidateDashboards();
   redirect("/payments?ok=1");
 }
 
@@ -56,6 +63,7 @@ export async function concludePaymentRequest(formData: FormData): Promise<void> 
   await requireAdmin();
   const id = Number(formData.get("id"));
   const concludedDate = String(formData.get("concluded_date") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/archive");
 
   if (!Number.isFinite(id) || id <= 0) failPayments("Invalid payment.");
 
@@ -70,9 +78,8 @@ export async function concludePaymentRequest(formData: FormData): Promise<void> 
     [when, id],
   );
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
-  redirect("/payments?ok=concluded");
+  revalidateDashboards();
+  okReturn(returnTo.startsWith("/archive") ? returnTo : "/archive", "concluded");
 }
 
 export async function reopenPaymentRequest(formData: FormData): Promise<void> {
@@ -85,8 +92,7 @@ export async function reopenPaymentRequest(formData: FormData): Promise<void> {
     [id],
   );
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
+  revalidateDashboards();
   redirect("/payments?ok=reopened");
 }
 
@@ -100,33 +106,35 @@ export async function recordMemberContribution(
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? "pledge").trim().toLowerCase();
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/payments");
   const amount = Number(amountRaw);
   const status = statusRaw === "paid" ? "paid" : "pledge";
 
   if (!Number.isFinite(requestId) || requestId <= 0) {
-    failPayments("Choose a payment title.");
+    failReturn(returnTo, "Choose a payment title.");
   }
   if (!Number.isFinite(memberId) || memberId <= 0) {
-    failPayments("Choose a member.");
+    failReturn(returnTo, "Choose a member.");
   }
   if (!Number.isFinite(amount) || amount < 0) {
-    failPayments("Enter a valid amount.");
+    failReturn(returnTo, "Enter a valid amount.");
   }
 
   const request = await sql<{ id: number; amount: string }>(
     "select id, amount::text as amount from payment_requests where id = $1",
     [requestId],
   );
-  if (!request[0]) failPayments("Payment title not found.");
+  if (!request[0]) failReturn(returnTo, "Payment title not found.");
 
   const member = await sql<{ id: number }>(
     "select id from members where id = $1",
     [memberId],
   );
-  if (!member[0]) failPayments("Member not found.");
+  if (!member[0]) failReturn(returnTo, "Member not found.");
 
   if (amount + 1e-9 < Number(request[0].amount)) {
-    failPayments(
+    failReturn(
+      returnTo,
       `Amount must be at least the minimum (${request[0].amount}).`,
     );
   }
@@ -172,13 +180,11 @@ export async function recordMemberContribution(
     [requestId, memberId],
   );
   if (!check[0] || (check[0].status !== "paid" && check[0].status !== "pledge")) {
-    failPayments("Could not save that contribution. Try again.");
+    failReturn(returnTo, "Could not save that contribution. Try again.");
   }
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
-  revalidatePath(`/members/${memberId}`);
-  redirect("/payments?ok=contributed");
+  revalidateDashboards(`/members/${memberId}`);
+  okReturn(returnTo, "contributed");
 }
 
 /**
@@ -277,9 +283,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
     }
   }
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
-  revalidatePath(`/members/${memberId}`);
+  revalidateDashboards(`/members/${memberId}`);
   okReturn(returnTo, "contributed");
 }
 
@@ -287,7 +291,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
 export async function markPaymentPaid(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
-  const returnTo = String(formData.get("return_to") ?? "/members");
+  const returnTo = String(formData.get("return_to") ?? `/members`);
 
   if (!Number.isFinite(id) || id <= 0) {
     failReturn(returnTo, "Invalid payment.");
@@ -309,9 +313,7 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
     [today, id],
   );
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
-  revalidatePath(`/members/${payment.member_id}`);
+  revalidateDashboards(`/members/${payment.member_id}`);
   okReturn(returnTo, "status");
 }
 
@@ -336,8 +338,6 @@ export async function clearMemberContribution(
 
   await sql(`delete from payments where id = $1`, [id]);
 
-  revalidatePath("/payments");
-  revalidatePath("/members");
-  revalidatePath(`/members/${payment.member_id}`);
+  revalidateDashboards(`/members/${payment.member_id}`);
   okReturn(returnTo, "cleared");
 }

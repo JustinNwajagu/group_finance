@@ -8,9 +8,9 @@ import { ContributionBoard } from "@/components/contribution-board";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
-  listAllPaymentRequests,
   listContributionBoards,
   listMemberOptions,
+  listOpenPaymentRequests,
 } from "@/lib/data";
 import { formatDate, formatMoney } from "@/lib/format";
 
@@ -26,12 +26,10 @@ export default async function PaymentsPage({
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const admin = isAdmin(viewer);
   const [boards, members, requests] = await Promise.all([
-    listContributionBoards(false),
+    listContributionBoards(true),
     admin ? listMemberOptions() : Promise.resolve([]),
-    admin ? listAllPaymentRequests() : Promise.resolve([]),
+    admin ? listOpenPaymentRequests() : Promise.resolve([]),
   ]);
-  const current = boards.filter((b) => !b.request.concluded_at);
-  const concluded = boards.filter((b) => b.request.concluded_at);
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -40,9 +38,8 @@ export default async function PaymentsPage({
         <div>
           <h1>Payments</h1>
           <p>
-            Create payment requests for the whole roster, then record each
-            member&apos;s contribution (including on concluded payments).
-            Amounts are in Nigerian Naira (₦).
+            Current open payment requests. Record pledges and paid amounts here.
+            Finished payments move to Archive. Amounts are in Nigerian Naira (₦).
           </p>
         </div>
       </div>
@@ -59,49 +56,29 @@ export default async function PaymentsPage({
           status: "Contribution status updated.",
           cleared: "Contribution cleared — member is outstanding again.",
           amended: "Contribution list updated.",
-          concluded: "Payment concluded.",
-          reopened: "Concluded date cleared.",
+          concluded: "Payment moved to Archive.",
+          reopened: "Payment reopened on Payments.",
         }}
       />
 
       <div className={admin ? "split split-2" : "stack"}>
-        <div className="stack">
-          <section className="panel">
-            <h2>Current contributions</h2>
-            {current.length === 0 ? (
-              <div className="hero-empty">No open payment requests.</div>
-            ) : (
-              <div className="contrib-boards">
-                {current.map((board) => (
-                  <ContributionBoard
-                    key={board.request.id}
-                    board={board}
-                    isAdmin={admin}
-                    returnTo="/payments"
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="panel">
-            <h2>Concluded payments</h2>
-            {concluded.length === 0 ? (
-              <div className="hero-empty">No concluded payments yet.</div>
-            ) : (
-              <div className="contrib-boards">
-                {concluded.map((board) => (
-                  <ContributionBoard
-                    key={board.request.id}
-                    board={board}
-                    isAdmin={admin}
-                    returnTo="/payments"
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+        <section className="panel">
+          <h2>Current payments</h2>
+          {boards.length === 0 ? (
+            <div className="hero-empty">No open payment requests.</div>
+          ) : (
+            <div className="contrib-boards">
+              {boards.map((board) => (
+                <ContributionBoard
+                  key={board.request.id}
+                  board={board}
+                  isAdmin={admin}
+                  returnTo="/payments"
+                />
+              ))}
+            </div>
+          )}
+        </section>
 
         {admin ? (
           <div className="stack">
@@ -110,11 +87,12 @@ export default async function PaymentsPage({
               {members.length === 0 || requests.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>
                   {members.length === 0
-                    ? "Add a member first."
+                    ? "Add a member on Home first."
                     : "Create a payment request first, then record contributions."}
                 </p>
               ) : (
                 <form action={recordMemberContribution} className="form-grid">
+                  <input type="hidden" name="return_to" value="/payments" />
                   <label className="field">
                     Payment title
                     <select name="payment_request_id" required defaultValue="">
@@ -123,9 +101,7 @@ export default async function PaymentsPage({
                       </option>
                       {requests.map((r) => (
                         <option key={r.id} value={r.id}>
-                          {r.title}
-                          {r.concluded_at ? " (concluded)" : " (current)"} · min{" "}
-                          {formatMoney(r.amount)} · due{" "}
+                          {r.title} · min {formatMoney(r.amount)} · due{" "}
                           {formatDate(r.deadline)}
                         </option>
                       ))}
@@ -166,12 +142,15 @@ export default async function PaymentsPage({
                   </div>
                   <label className="field">
                     Payment date (optional)
-                    <input name="payment_date" type="date" defaultValue={today} />
+                    <input
+                      name="payment_date"
+                      type="date"
+                      defaultValue={today}
+                    />
                   </label>
                   <p className="muted" style={{ margin: 0 }}>
-                    Works for current and concluded payments. Both{" "}
-                    <strong>Pledge</strong> and <strong>Paid</strong> count as
-                    contributed; you can switch status later on the board.
+                    Both pledge and paid count as contributed. Use Archive to
+                    amend concluded payments.
                   </p>
                   <button type="submit" className="btn-primary">
                     Save contribution
@@ -184,7 +163,7 @@ export default async function PaymentsPage({
               <h2>New payment</h2>
               {members.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>
-                  Add a member first, then create a payment request.
+                  Add a member on Home first, then create a payment request.
                 </p>
               ) : (
                 <form action={createPaymentRequest} className="form-grid">
@@ -213,8 +192,8 @@ export default async function PaymentsPage({
                     />
                   </label>
                   <p className="muted" style={{ margin: 0 }}>
-                    Creates the payment title for the roster. Members stay
-                    outstanding until you record a pledge or paid contribution.
+                    Creates the payment title. Members stay outstanding until
+                    you record a pledge or paid contribution.
                   </p>
                   <button type="submit" className="btn-primary">
                     Create payment

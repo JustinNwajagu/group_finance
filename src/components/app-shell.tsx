@@ -8,7 +8,7 @@ export function AppShell({
   children,
 }: {
   viewer: ViewerContext;
-  active: "members" | "payments" | "access";
+  active: "home" | "payments" | "archive" | "access";
   children: React.ReactNode;
 }) {
   const admin = isAdmin(viewer);
@@ -16,22 +16,28 @@ export function AppShell({
   return (
     <div className="shell">
       <header className="topbar">
-        <Link href="/members" className="brand">
+        <Link href="/" className="brand">
           <span className="brand-mark">KLEF</span>
           <span className="brand-sub">Ledger</span>
         </Link>
         <nav className="nav" aria-label="Primary">
           <Link
-            href="/members"
-            className={active === "members" ? "nav-link active" : "nav-link"}
+            href="/"
+            className={active === "home" ? "nav-link active" : "nav-link"}
           >
-            Members
+            Home
           </Link>
           <Link
             href="/payments"
             className={active === "payments" ? "nav-link active" : "nav-link"}
           >
             Payments
+          </Link>
+          <Link
+            href="/archive"
+            className={active === "archive" ? "nav-link active" : "nav-link"}
+          >
+            Archive
           </Link>
           {admin ? (
             <Link

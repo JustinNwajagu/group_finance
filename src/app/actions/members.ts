@@ -11,7 +11,7 @@ export async function createMember(formData: FormData): Promise<void> {
   const email = String(formData.get("email") ?? "").trim();
 
   if (!name) {
-    redirect("/members?error=" + encodeURIComponent("Name is required."));
+    redirect("/?error=" + encodeURIComponent("Name is required."));
   }
 
   await sql(`insert into members (name, email) values ($1, $2)`, [
@@ -19,9 +19,10 @@ export async function createMember(formData: FormData): Promise<void> {
     email || null,
   ]);
 
-  revalidatePath("/members");
+  revalidatePath("/");
   revalidatePath("/payments");
-  redirect("/members?ok=member");
+  revalidatePath("/archive");
+  redirect("/?ok=member");
 }
 
 export async function importMembers(formData: FormData): Promise<void> {
@@ -34,7 +35,7 @@ export async function importMembers(formData: FormData): Promise<void> {
 
   if (lines.length === 0) {
     redirect(
-      "/members?error=" +
+      "/?error=" +
         encodeURIComponent("Paste one member per line: Name, optional email."),
     );
   }
@@ -54,12 +55,11 @@ export async function importMembers(formData: FormData): Promise<void> {
   }
 
   if (imported === 0) {
-    redirect(
-      "/members?error=" + encodeURIComponent("No members found to import."),
-    );
+    redirect("/?error=" + encodeURIComponent("No members found to import."));
   }
 
-  revalidatePath("/members");
+  revalidatePath("/");
   revalidatePath("/payments");
-  redirect("/members?ok=import");
+  revalidatePath("/archive");
+  redirect("/?ok=import");
 }

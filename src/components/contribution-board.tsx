@@ -65,7 +65,7 @@ function MemberList({
 export function ContributionBoard({
   board,
   isAdmin,
-  returnTo = "/members",
+  returnTo = "/payments",
 }: {
   board: ContributionLists;
   isAdmin: boolean;
@@ -201,6 +201,7 @@ export function ContributionBoard({
               style={{ gap: "0.5rem", flexWrap: "wrap" }}
             >
               <input type="hidden" name="id" value={request.id} />
+              <input type="hidden" name="return_to" value="/archive" />
               <label className="field" style={{ margin: 0 }}>
                 Conclude date
                 <input

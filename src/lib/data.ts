@@ -161,11 +161,35 @@ export async function getPaymentRequest(id: number): Promise<PaymentRequest | nu
   return rows[0] ?? null;
 }
 
+/** Ensure every member has a payment row for this request (pledge at min amount). */
+export async function ensureMembersOnRequest(requestId: number): Promise<void> {
+  const request = await getPaymentRequest(requestId);
+  if (!request) return;
+  const missing = await sql<{ id: number }>(
+    `select m.id
+     from members m
+     where not exists (
+       select 1 from payments p
+       where p.payment_request_id = $1 and p.member_id = m.id
+     )`,
+    [requestId],
+  );
+  for (const member of missing) {
+    await sql(
+      `insert into payments (payment_request_id, member_id, amount, status)
+       values ($1, $2, $3, 'pledge')`,
+      [requestId, member.id, request.amount],
+    );
+  }
+}
+
 export async function contributionListsForRequest(
   requestId: number,
 ): Promise<ContributionLists | null> {
   const request = await getPaymentRequest(requestId);
   if (!request) return null;
+
+  await ensureMembersOnRequest(requestId);
 
   const contributed = await sql<import("./types").MemberPaymentRow>(
     `select
@@ -175,8 +199,9 @@ export async function contributionListsForRequest(
        m.created_at::text as created_at,
        p.id as payment_id
      from members m
-     join payments p on p.member_id = m.id
-     where p.payment_request_id = $1 and p.status = 'paid'
+     join payments p
+       on p.member_id = m.id and p.payment_request_id = $1
+     where p.status = 'paid'
      order by lower(m.name)`,
     [requestId],
   );
@@ -189,8 +214,9 @@ export async function contributionListsForRequest(
        m.created_at::text as created_at,
        p.id as payment_id
      from members m
-     join payments p on p.member_id = m.id
-     where p.payment_request_id = $1 and p.status <> 'paid'
+     join payments p
+       on p.member_id = m.id and p.payment_request_id = $1
+     where p.status <> 'paid'
      order by lower(m.name)`,
     [requestId],
   );

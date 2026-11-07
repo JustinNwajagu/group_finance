@@ -124,53 +124,57 @@ export function ContributionBoard({
             Admins can amend who contributed even after the concluded date.
           </p>
 
-          {outstanding.length > 0 ? (
+          {outstanding.some((m) => m.payment_id != null) ? (
             <div className="amend-row">
               <span className="muted" style={{ fontSize: "0.85rem" }}>
                 Mark contributed:
               </span>
-              {outstanding.map((m) => (
-                <form
-                  key={m.payment_id}
-                  action={markPaymentPaid}
-                  className="inline-form"
-                >
-                  <input type="hidden" name="id" value={m.payment_id} />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <button
-                    type="submit"
-                    className="btn-ghost"
-                    style={{ padding: "0.25rem 0.55rem" }}
+              {outstanding
+                .filter((m) => m.payment_id != null)
+                .map((m) => (
+                  <form
+                    key={m.payment_id}
+                    action={markPaymentPaid}
+                    className="inline-form"
                   >
-                    {m.name}
-                  </button>
-                </form>
-              ))}
+                    <input type="hidden" name="id" value={m.payment_id!} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button
+                      type="submit"
+                      className="btn-ghost"
+                      style={{ padding: "0.25rem 0.55rem" }}
+                    >
+                      {m.name}
+                    </button>
+                  </form>
+                ))}
             </div>
           ) : null}
 
-          {contributed.length > 0 ? (
+          {contributed.some((m) => m.payment_id != null) ? (
             <div className="amend-row">
               <span className="muted" style={{ fontSize: "0.85rem" }}>
                 Move to outstanding:
               </span>
-              {contributed.map((m) => (
-                <form
-                  key={m.payment_id}
-                  action={markPaymentPledge}
-                  className="inline-form"
-                >
-                  <input type="hidden" name="id" value={m.payment_id} />
-                  <input type="hidden" name="return_to" value={returnTo} />
-                  <button
-                    type="submit"
-                    className="btn-ghost"
-                    style={{ padding: "0.25rem 0.55rem" }}
+              {contributed
+                .filter((m) => m.payment_id != null)
+                .map((m) => (
+                  <form
+                    key={m.payment_id}
+                    action={markPaymentPledge}
+                    className="inline-form"
                   >
-                    {m.name}
-                  </button>
-                </form>
-              ))}
+                    <input type="hidden" name="id" value={m.payment_id!} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <button
+                      type="submit"
+                      className="btn-ghost"
+                      style={{ padding: "0.25rem 0.55rem" }}
+                    >
+                      {m.name}
+                    </button>
+                  </form>
+                ))}
             </div>
           ) : null}
         </div>

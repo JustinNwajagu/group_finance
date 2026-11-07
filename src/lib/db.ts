@@ -1,4 +1,5 @@
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import snowflake from "snowflake-sdk";
 
@@ -15,7 +16,10 @@ const snowflakeConfigured =
   Boolean(process.env.SNOWFLAKE_SCHEMA?.trim());
 
 let snowflakeConn: Promise<SnowflakeConn> | undefined;
-let local: Promise<PGlite> | undefined;
+
+type GlobalDb = typeof globalThis & {
+  __klefPglite?: Promise<PGlite>;
+};
 
 export function dbBackend(): "snowflake" | "local" {
   return snowflakeConfigured ? "snowflake" : "local";
@@ -94,8 +98,11 @@ async function getSnowflake(): Promise<SnowflakeConn> {
 }
 
 async function startLocal(): Promise<PGlite> {
-  const db = new PGlite();
-  // Top-level *.sql only — Snowflake scripts live under migrations/snowflake/
+  const dataDir = path.join(process.cwd(), "data", "pglite");
+  await mkdir(dataDir, { recursive: true });
+  // On-disk + globalThis: Next server actions and RSC can load separate
+  // module copies; in-memory PGlite would otherwise split writes from reads.
+  const db = new PGlite(dataDir);
   const topLevel = (await readdir("migrations").catch(() => []))
     .filter((f) => f.endsWith(".sql"))
     .sort();
@@ -105,10 +112,19 @@ async function startLocal(): Promise<PGlite> {
   return db;
 }
 
+async function getLocal(): Promise<PGlite> {
+  const g = globalThis as GlobalDb;
+  g.__klefPglite ??= startLocal().catch((error: unknown) => {
+    g.__klefPglite = undefined;
+    throw error;
+  });
+  return g.__klefPglite;
+}
+
 /**
  * Run a parameterized query.
  * - Snowflake when SNOWFLAKE_* secrets are set (shared durable store).
- * - In-memory PGlite locally when they are not (sample data only; not shared).
+ * - On-disk PGlite locally when they are not (survives HMR; process-local).
  */
 export async function sql<T = Record<string, unknown>>(
   text: string,
@@ -120,9 +136,5 @@ export async function sql<T = Record<string, unknown>>(
     return snowflakeExecute<T>(connection, sqlText, binds);
   }
 
-  local ??= startLocal().catch((error: unknown) => {
-    local = undefined;
-    throw error;
-  });
-  return (await (await local).query<T>(text, params)).rows;
+  return (await (await getLocal()).query<T>(text, params)).rows;
 }

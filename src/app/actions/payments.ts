@@ -111,10 +111,11 @@ export async function recordMemberContribution(
   const requestId = Number(formData.get("payment_request_id"));
   const memberId = Number(formData.get("member_id"));
   const amountRaw = String(formData.get("amount") ?? "").trim();
-  const statusRaw = String(formData.get("status") ?? "pledge").trim();
+  // Contribution form means "mark contributed" unless admin explicitly picks pledge.
+  const statusRaw = String(formData.get("status") ?? "paid").trim().toLowerCase();
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
   const amount = Number(amountRaw);
-  const status = statusRaw === "paid" ? "paid" : "pledge";
+  const status = statusRaw === "pledge" ? "pledge" : "paid";
 
   if (!Number.isFinite(requestId) || requestId <= 0) {
     failPayments("Choose a payment title.");
@@ -167,7 +168,7 @@ export async function recordMemberContribution(
            status = $2,
            payment_date = $3::date
        where id = $4`,
-      [amount.toFixed(2), status, paymentDate, existing[0].id],
+      [amount.toFixed(2), status, paymentDate, Number(existing[0].id)],
     );
   } else {
     await sql(
@@ -178,10 +179,27 @@ export async function recordMemberContribution(
     );
   }
 
+  // Confirm the row is paid when that was requested — catch silent no-op updates.
+  if (status === "paid") {
+    const check = await sql<{ status: string }>(
+      `select status from payments
+       where payment_request_id = $1 and member_id = $2
+       limit 1`,
+      [requestId, memberId],
+    );
+    if (check[0]?.status !== "paid") {
+      failPayments("Could not mark that member as contributed. Try again.");
+    }
+  }
+
   revalidatePath("/payments");
   revalidatePath("/members");
   revalidatePath(`/members/${memberId}`);
-  redirect("/payments?ok=recorded");
+  redirect(
+    status === "paid"
+      ? "/payments?ok=contributed"
+      : "/payments?ok=pledged",
+  );
 }
 
 export async function markPaymentPaid(formData: FormData): Promise<void> {

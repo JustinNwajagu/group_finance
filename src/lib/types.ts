@@ -48,7 +48,7 @@ export type MemberContribution = Member & {
 };
 
 export type MemberPaymentRow = Member & {
-  payment_id: number;
+  payment_id: number | null;
 };
 
 export type ContributionLists = {

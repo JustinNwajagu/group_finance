@@ -52,7 +52,9 @@ export default async function PaymentsPage({
         error={error}
         messages={{
           "1": "Payment request created for all members.",
-          recorded: "Member contribution saved.",
+          recorded: "Member marked as contributed.",
+          contributed: "Member marked as contributed.",
+          pledged: "Pledge amount saved (not yet contributed).",
           paid: "Marked as contributed.",
           amended: "Contribution list updated.",
           concluded: "Payment concluded.",
@@ -161,8 +163,9 @@ export default async function PaymentsPage({
                     <input name="payment_date" type="date" defaultValue={today} />
                   </label>
                   <p className="muted" style={{ margin: 0 }}>
-                    Works for current and concluded payments. Saves or updates
-                    that member&apos;s row (amount and pledge/paid).
+                    Works for current and concluded payments. Status{" "}
+                    <strong>Paid</strong> moves the member into Contributed for
+                    that title; Pledge only updates the amount.
                   </p>
                   <button type="submit" className="btn-primary">
                     Save contribution

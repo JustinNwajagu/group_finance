@@ -1,0 +1,12 @@
+# Firebase App Hosting — set secrets in the Firebase console / CLI.
+# https://firebase.google.com/docs/app-hosting
+
+runConfig:
+  runtime: nodejs22
+
+env:
+  - variable: ADMIN_EMAIL
+    value: justin.nwajagu@gmail.com
+    availability:
+      - BUILD
+      - RUNTIME

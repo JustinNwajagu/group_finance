@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Server (Firebase Admin / Next.js) is the only writer.
+    // Clients authenticate via Firebase Auth but do not talk to Firestore directly.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

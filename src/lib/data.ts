@@ -1,164 +1,112 @@
-import { sql } from "./db";
 import type {
-  AppUser,
   ContributionLists,
   Member,
   MemberContribution,
+  MemberPaymentRow,
   PaymentRequest,
   PaymentWithMember,
 } from "./types";
+import {
+  getMemberById,
+  getPaymentRequestById,
+  listAllMembers,
+  listAllPaymentRequestRows,
+  listAllPaymentRows,
+} from "./store";
 
-export async function listAppUsers(): Promise<AppUser[]> {
-  return sql<AppUser>(
-    `select id, cursor_sub, email, name, role, created_at::text as created_at
-     from app_users
-     order by
-       case role when 'admin' then 0 when 'member' then 1 else 2 end,
-       lower(email)`,
-  );
+function byName(a: { name: string }, b: { name: string }) {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 }
 
 export async function requestedPaymentCount(): Promise<number> {
-  const rows = await sql<{ count: string }>(
-    "select count(*)::text as count from payment_requests",
-  );
-  return Number(rows[0]?.count ?? 0);
+  return (await listAllPaymentRequestRows()).length;
 }
 
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
-  const q = query?.trim() ?? "";
-  const base = `
-    select
-      m.id,
-      m.name,
-      m.email,
-      m.created_at::text as created_at,
-      (select count(*)::int from payment_requests) as payment_count,
-      (
-        select count(*)::int
-        from payments p
-        where p.member_id = m.id and p.status = 'paid'
-      ) as contribution_count
-    from members m
-  `;
-  if (q) {
-    return sql<MemberContribution>(
-      `${base}
-       where m.name ilike $1 or coalesce(m.email, '') ilike $1
-       order by lower(m.name)`,
-      [`%${q}%`],
-    );
-  }
-  return sql<MemberContribution>(
-    `${base}
-     order by lower(m.name)`,
-  );
+  const q = query?.trim().toLowerCase() ?? "";
+  const [members, requests, payments] = await Promise.all([
+    listAllMembers(),
+    listAllPaymentRequestRows(),
+    listAllPaymentRows(),
+  ]);
+  const paymentCount = requests.length;
+  return members
+    .filter((m) => {
+      if (!q) return true;
+      return (
+        m.name.toLowerCase().includes(q) ||
+        (m.email ?? "").toLowerCase().includes(q)
+      );
+    })
+    .map((m) => ({
+      ...m,
+      payment_count: paymentCount,
+      contribution_count: payments.filter(
+        (p) => p.member_id === m.id && p.status === "paid",
+      ).length,
+    }))
+    .sort(byName);
 }
 
 export async function getMember(id: number): Promise<Member | null> {
-  const rows = await sql<Member>(
-    `select id, name, email, created_at::text as created_at from members where id = $1`,
-    [id],
-  );
-  return rows[0] ?? null;
+  return getMemberById(id);
 }
 
 export async function memberContribution(id: number): Promise<string> {
-  const rows = await sql<{ total: string }>(
-    `select coalesce(sum(amount), 0)::text as total
-     from payments
-     where member_id = $1 and status = 'paid'`,
-    [id],
-  );
-  return rows[0]?.total ?? "0";
+  const payments = await listAllPaymentRows();
+  const total = payments
+    .filter((p) => p.member_id === id && p.status === "paid")
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  return total.toFixed(2);
 }
 
 export async function memberPaymentStats(id: number): Promise<{
   payment_count: number;
   contribution_count: number;
 }> {
-  const [requested, contributed] = await Promise.all([
+  const [payment_count, payments] = await Promise.all([
     requestedPaymentCount(),
-    sql<{ count: string }>(
-      `select count(*)::text as count
-       from payments
-       where member_id = $1 and status = 'paid'`,
-      [id],
-    ),
+    listAllPaymentRows(),
   ]);
   return {
-    payment_count: requested,
-    contribution_count: Number(contributed[0]?.count ?? 0),
+    payment_count,
+    contribution_count: payments.filter(
+      (p) => p.member_id === id && p.status === "paid",
+    ).length,
   };
 }
 
 export async function listMemberOptions(): Promise<Member[]> {
-  return sql<Member>(
-    `select id, name, email, created_at::text as created_at from members order by lower(name)`,
-  );
+  return listAllMembers();
 }
 
 export async function listOpenPaymentRequests(): Promise<PaymentRequest[]> {
-  return sql<PaymentRequest>(
-    `select
-       id,
-       title,
-       amount::text as amount,
-       deadline::text as deadline,
-       concluded_at::text as concluded_at,
-       created_at::text as created_at
-     from payment_requests
-     where concluded_at is null
-     order by deadline asc, id asc`,
-  );
+  return (await listAllPaymentRequestRows())
+    .filter((r) => !r.concluded_at)
+    .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.id - b.id);
 }
 
 export async function listConcludedPaymentRequests(): Promise<PaymentRequest[]> {
-  return sql<PaymentRequest>(
-    `select
-       id,
-       title,
-       amount::text as amount,
-       deadline::text as deadline,
-       concluded_at::text as concluded_at,
-       created_at::text as created_at
-     from payment_requests
-     where concluded_at is not null
-     order by concluded_at desc, id desc`,
-  );
+  return (await listAllPaymentRequestRows())
+    .filter((r) => r.concluded_at)
+    .sort((a, b) =>
+      (b.concluded_at ?? "").localeCompare(a.concluded_at ?? ""),
+    );
 }
 
 export async function listAllPaymentRequests(): Promise<PaymentRequest[]> {
-  return sql<PaymentRequest>(
-    `select
-       id,
-       title,
-       amount::text as amount,
-       deadline::text as deadline,
-       concluded_at::text as concluded_at,
-       created_at::text as created_at
-     from payment_requests
-     order by
-       case when concluded_at is null then 0 else 1 end,
-       deadline asc,
-       id desc`,
-  );
+  return (await listAllPaymentRequestRows()).sort((a, b) => {
+    const ao = a.concluded_at ? 1 : 0;
+    const bo = b.concluded_at ? 1 : 0;
+    if (ao !== bo) return ao - bo;
+    return a.deadline.localeCompare(b.deadline) || b.id - a.id;
+  });
 }
 
-export async function getPaymentRequest(id: number): Promise<PaymentRequest | null> {
-  const rows = await sql<PaymentRequest>(
-    `select
-       id,
-       title,
-       amount::text as amount,
-       deadline::text as deadline,
-       concluded_at::text as concluded_at,
-       created_at::text as created_at
-     from payment_requests
-     where id = $1`,
-    [id],
-  );
-  return rows[0] ?? null;
+export async function getPaymentRequest(
+  id: number,
+): Promise<PaymentRequest | null> {
+  return getPaymentRequestById(id);
 }
 
 export async function contributionListsForRequest(
@@ -167,78 +115,53 @@ export async function contributionListsForRequest(
   const request = await getPaymentRequest(requestId);
   if (!request) return null;
 
-  // Contributed = paid only (same rule as Home Contributions and Realised).
-  const contributed = await sql<import("./types").MemberPaymentRow>(
-    `select
-       m.id,
-       m.name,
-       m.email,
-       m.created_at::text as created_at,
-       p.id as payment_id,
-       p.status,
-       p.amount::text as amount
-     from members m
-     join payments p
-       on p.member_id = m.id and p.payment_request_id = $1
-     where p.status = 'paid'
-     order by lower(m.name)`,
-    [requestId],
-  );
+  const [members, payments] = await Promise.all([
+    listAllMembers(),
+    listAllPaymentRows(),
+  ]);
+  const forRequest = payments.filter((p) => p.payment_request_id === requestId);
+  const byMember = new Map(forRequest.map((p) => [p.member_id, p]));
 
-  const pledged = await sql<import("./types").MemberPaymentRow>(
-    `select
-       m.id,
-       m.name,
-       m.email,
-       m.created_at::text as created_at,
-       p.id as payment_id,
-       p.status,
-       p.amount::text as amount
-     from members m
-     join payments p
-       on p.member_id = m.id and p.payment_request_id = $1
-     where p.status = 'pledge'
-     order by lower(m.name)`,
-    [requestId],
-  );
+  const contributed: MemberPaymentRow[] = [];
+  const pledged: MemberPaymentRow[] = [];
+  const outstanding: MemberPaymentRow[] = [];
 
-  // Yet to contribute / didn't contribute = no payment row for this request yet.
-  const outstanding = await sql<import("./types").MemberPaymentRow>(
-    `select
-       m.id,
-       m.name,
-       m.email,
-       m.created_at::text as created_at,
-       null::int as payment_id,
-       null::text as status,
-       null::text as amount
-     from members m
-     where not exists (
-       select 1 from payments p
-       where p.payment_request_id = $1 and p.member_id = m.id
-     )
-     order by lower(m.name)`,
-    [requestId],
-  );
+  for (const m of [...members].sort(byName)) {
+    const p = byMember.get(m.id);
+    if (!p) {
+      outstanding.push({
+        ...m,
+        payment_id: null,
+        status: null,
+        amount: null,
+      });
+      continue;
+    }
+    const row: MemberPaymentRow = {
+      ...m,
+      payment_id: p.id,
+      status: p.status,
+      amount: p.amount,
+    };
+    if (p.status === "paid") contributed.push(row);
+    else pledged.push(row);
+  }
 
-  const totals = await sql<{ pledge_total: string; realised_total: string }>(
-    `select
-       coalesce(sum(case when status = 'pledge' then amount else 0 end), 0)::text
-         as pledge_total,
-       coalesce(sum(case when status = 'paid' then amount else 0 end), 0)::text
-         as realised_total
-     from payments
-     where payment_request_id = $1`,
-    [requestId],
-  );
+  let pledgeTotal = 0;
+  let realisedTotal = 0;
+  for (const p of forRequest) {
+    const n = Number(p.amount);
+    if (p.status === "pledge") pledgeTotal += n;
+    else if (p.status === "paid") realisedTotal += n;
+  }
 
   return {
     request,
     contributed,
     pledged,
     outstanding,
-    pledge_total: totals[0]?.pledge_total ?? "0",
-    realised_total: totals[0]?.realised_total ?? "0",
+    pledge_total: pledgeTotal.toFixed(2),
+    realised_total: realisedTotal.toFixed(2),
   };
 }
 
@@ -256,57 +179,66 @@ export async function listContributionBoards(
   return boards;
 }
 
-const paymentSelect = `
-  select
-    p.id,
-    p.payment_request_id,
-    r.title,
-    p.member_id,
-    p.amount::text as amount,
-    p.payment_date::text as payment_date,
-    p.status,
-    p.created_at::text as created_at,
-    m.name as member_name
-  from payments p
-  join payment_requests r on r.id = p.payment_request_id
-  join members m on m.id = p.member_id
-`;
-
-export async function listPaymentsForMember(id: number): Promise<PaymentWithMember[]> {
-  return sql<PaymentWithMember>(
-    `${paymentSelect}
-     where p.member_id = $1
-     order by r.deadline desc, p.created_at desc`,
-    [id],
-  );
-}
-
-export async function listPayments(query?: string): Promise<PaymentWithMember[]> {
-  const q = query?.trim() ?? "";
-  if (q) {
-    return sql<PaymentWithMember>(
-      `${paymentSelect}
-       where r.title ilike $1 or m.name ilike $1
-       order by r.deadline desc, p.created_at desc
-       limit 500`,
-      [`%${q}%`],
-    );
-  }
-  return sql<PaymentWithMember>(
-    `${paymentSelect}
-     order by r.deadline desc, p.created_at desc
-     limit 500`,
-  );
-}
-
-export async function listPaymentsForRequest(
-  requestId: number,
+export async function listPaymentsForMember(
+  id: number,
 ): Promise<PaymentWithMember[]> {
-  return sql<PaymentWithMember>(
-    `${paymentSelect}
-     where p.payment_request_id = $1
-     order by lower(m.name)`,
-    [requestId],
-  );
+  const [payments, requests, members] = await Promise.all([
+    listAllPaymentRows(),
+    listAllPaymentRequestRows(),
+    listAllMembers(),
+  ]);
+  const reqById = new Map(requests.map((r) => [r.id, r]));
+  const memById = new Map(members.map((m) => [m.id, m]));
+  return payments
+    .filter((p) => p.member_id === id)
+    .map((p) => {
+      const r = reqById.get(p.payment_request_id);
+      const m = memById.get(p.member_id);
+      return {
+        ...p,
+        title: r?.title ?? "Payment",
+        member_name: m?.name ?? "Member",
+      };
+    })
+    .sort((a, b) => {
+      const da = reqById.get(a.payment_request_id)?.deadline ?? "";
+      const db = reqById.get(b.payment_request_id)?.deadline ?? "";
+      return db.localeCompare(da) || b.created_at.localeCompare(a.created_at);
+    });
 }
 
+export async function listPayments(
+  query?: string,
+): Promise<PaymentWithMember[]> {
+  const q = query?.trim().toLowerCase() ?? "";
+  const [payments, requests, members] = await Promise.all([
+    listAllPaymentRows(),
+    listAllPaymentRequestRows(),
+    listAllMembers(),
+  ]);
+  const reqById = new Map(requests.map((r) => [r.id, r]));
+  const memById = new Map(members.map((m) => [m.id, m]));
+  return payments
+    .map((p) => {
+      const r = reqById.get(p.payment_request_id);
+      const m = memById.get(p.member_id);
+      return {
+        ...p,
+        title: r?.title ?? "Payment",
+        member_name: m?.name ?? "Member",
+      };
+    })
+    .filter((p) => {
+      if (!q) return true;
+      return (
+        p.title.toLowerCase().includes(q) ||
+        p.member_name.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      const da = reqById.get(a.payment_request_id)?.deadline ?? "";
+      const db = reqById.get(b.payment_request_id)?.deadline ?? "";
+      return db.localeCompare(da) || b.created_at.localeCompare(a.created_at);
+    })
+    .slice(0, 500);
+}

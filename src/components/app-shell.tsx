@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { signOut } from "@/app/actions/auth";
 import type { ViewerContext } from "@/lib/auth";
 import { isAdmin } from "@/lib/auth";
 
@@ -54,6 +55,15 @@ export function AppShell({
             {viewer.access?.role ?? "guest"}
             {viewer.simulated ? " · local preview" : ""}
           </span>
+          <form action={signOut} style={{ margin: 0 }}>
+            <button
+              type="submit"
+              className="btn-ghost"
+              style={{ padding: "0.2rem 0.55rem", fontSize: "0.8rem" }}
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </header>
       <main className="main">{children}</main>

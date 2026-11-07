@@ -4,18 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/migrate.mjs",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "migrate": "node scripts/migrate.mjs"
+    "firebase:emulators": "echo Use Firebase console or emulators for Auth/Firestore"
   },
   "dependencies": {
-    "@electric-sql/pglite": "^0.5.15",
+    "firebase": "^13.2.0",
+    "firebase-admin": "^14.5.0",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "server-only": "^0.0.1",
-    "snowflake-sdk": "^3.4.1"
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

@@ -4,7 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { listMemberOptions } from "@/lib/data";
-import { sql } from "@/lib/db";
+import {
+  createPaymentRequestRow,
+  createPaymentRow,
+  deletePaymentRow,
+  findPaymentForMemberRequest,
+  getPaymentById,
+  getPaymentRequestById,
+  getMemberById,
+  updatePaymentRequestRow,
+  updatePaymentRow,
+} from "@/lib/store";
 
 function failPayments(msg: string): never {
   redirect("/payments?error=" + encodeURIComponent(msg));
@@ -47,14 +57,7 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
     failPayments("Add a member first, then create a payment.");
   }
 
-  // Title only — members stay outstanding until an admin records a contribution
-  // (pledge or paid). Both statuses count as contributed.
-  await sql(
-    `insert into payment_requests (title, amount, deadline)
-     values ($1, $2, $3::date)`,
-    [title, amount.toFixed(2), deadline],
-  );
-
+  await createPaymentRequestRow({ title, amount, deadline });
   revalidateDashboards();
   redirect("/payments?ok=1");
 }
@@ -71,13 +74,7 @@ export async function concludePaymentRequest(formData: FormData): Promise<void> 
     ? `${concludedDate}T12:00:00.000Z`
     : new Date().toISOString();
 
-  await sql(
-    `update payment_requests
-     set concluded_at = $1::timestamptz
-     where id = $2`,
-    [when, id],
-  );
-
+  await updatePaymentRequestRow(id, { concluded_at: when });
   revalidateDashboards();
   okReturn(returnTo.startsWith("/archive") ? returnTo : "/archive", "concluded");
 }
@@ -87,11 +84,7 @@ export async function reopenPaymentRequest(formData: FormData): Promise<void> {
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || id <= 0) failPayments("Invalid payment.");
 
-  await sql(
-    `update payment_requests set concluded_at = null where id = $1`,
-    [id],
-  );
-
+  await updatePaymentRequestRow(id, { concluded_at: null });
   revalidateDashboards();
   redirect("/payments?ok=reopened");
 }
@@ -120,22 +113,16 @@ export async function recordMemberContribution(
     failReturn(returnTo, "Enter a valid amount.");
   }
 
-  const request = await sql<{ id: number; amount: string }>(
-    "select id, amount::text as amount from payment_requests where id = $1",
-    [requestId],
-  );
-  if (!request[0]) failReturn(returnTo, "Payment title not found.");
+  const request = await getPaymentRequestById(requestId);
+  if (!request) failReturn(returnTo, "Payment title not found.");
 
-  const member = await sql<{ id: number }>(
-    "select id from members where id = $1",
-    [memberId],
-  );
-  if (!member[0]) failReturn(returnTo, "Member not found.");
+  const member = await getMemberById(memberId);
+  if (!member) failReturn(returnTo, "Member not found.");
 
-  if (amount + 1e-9 < Number(request[0].amount)) {
+  if (amount + 1e-9 < Number(request.amount)) {
     failReturn(
       returnTo,
-      `Amount must be at least the minimum (${request[0].amount}).`,
+      `Amount must be at least the minimum (${request.amount}).`,
     );
   }
 
@@ -148,50 +135,27 @@ export async function recordMemberContribution(
         ? paymentDateRaw
         : null;
 
-  const existing = await sql<{ id: number }>(
-    `select id from payments
-     where payment_request_id = $1 and member_id = $2
-     limit 1`,
-    [requestId, memberId],
-  );
-
-  if (existing[0]) {
-    await sql(
-      `update payments
-       set amount = $1,
-           status = $2,
-           payment_date = $3::date
-       where id = $4`,
-      [amount.toFixed(2), status, paymentDate, Number(existing[0].id)],
-    );
+  const existing = await findPaymentForMemberRequest(requestId, memberId);
+  if (existing) {
+    await updatePaymentRow(existing.id, {
+      amount: amount.toFixed(2),
+      status,
+      payment_date: paymentDate,
+    });
   } else {
-    await sql(
-      `insert into payments
-         (payment_request_id, member_id, amount, status, payment_date)
-       values ($1, $2, $3, $4, $5::date)`,
-      [requestId, memberId, amount.toFixed(2), status, paymentDate],
-    );
-  }
-
-  const check = await sql<{ status: string }>(
-    `select status from payments
-     where payment_request_id = $1 and member_id = $2
-     limit 1`,
-    [requestId, memberId],
-  );
-  if (!check[0] || (check[0].status !== "paid" && check[0].status !== "pledge")) {
-    failReturn(returnTo, "Could not save that contribution. Try again.");
+    await createPaymentRow({
+      payment_request_id: requestId,
+      member_id: memberId,
+      amount,
+      status,
+      payment_date: paymentDate,
+    });
   }
 
   revalidateDashboards(`/members/${memberId}`);
   okReturn(returnTo, "contributed");
 }
 
-/**
- * Create or update a contribution from the board dialog.
- * Requires amount (≥ payment minimum). Used for Add pledge / Mark paid /
- * status switches so admins always enter the member's amount.
- */
 export async function saveBoardContribution(formData: FormData): Promise<void> {
   await requireAdmin();
   const requestId = Number(formData.get("payment_request_id"));
@@ -215,24 +179,18 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
     failReturn(returnTo, "Enter a valid amount.");
   }
 
-  const request = await sql<{ id: number; amount: string }>(
-    "select id, amount::text as amount from payment_requests where id = $1",
-    [requestId],
-  );
-  if (!request[0]) failReturn(returnTo, "Payment not found.");
+  const request = await getPaymentRequestById(requestId);
+  if (!request) failReturn(returnTo, "Payment not found.");
 
-  if (amount + 1e-9 < Number(request[0].amount)) {
+  if (amount + 1e-9 < Number(request.amount)) {
     failReturn(
       returnTo,
-      `Amount must be at least the minimum (${request[0].amount}).`,
+      `Amount must be at least the minimum (${request.amount}).`,
     );
   }
 
-  const member = await sql<{ id: number }>(
-    "select id from members where id = $1",
-    [memberId],
-  );
-  if (!member[0]) failReturn(returnTo, "Member not found.");
+  const member = await getMemberById(memberId);
+  if (!member) failReturn(returnTo, "Member not found.");
 
   const paymentDate =
     status === "paid"
@@ -244,42 +202,29 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
         : null;
 
   if (Number.isFinite(paymentId) && paymentId > 0) {
-    const existing = await sql<{ id: number; member_id: number }>(
-      "select id, member_id from payments where id = $1",
-      [paymentId],
-    );
-    if (!existing[0]) failReturn(returnTo, "Contribution not found.");
-    await sql(
-      `update payments
-       set amount = $1,
-           status = $2,
-           payment_date = $3::date
-       where id = $4`,
-      [amount.toFixed(2), status, paymentDate, paymentId],
-    );
+    const existing = await getPaymentById(paymentId);
+    if (!existing) failReturn(returnTo, "Contribution not found.");
+    await updatePaymentRow(paymentId, {
+      amount: amount.toFixed(2),
+      status,
+      payment_date: paymentDate,
+    });
   } else {
-    const existing = await sql<{ id: number }>(
-      `select id from payments
-       where payment_request_id = $1 and member_id = $2
-       limit 1`,
-      [requestId, memberId],
-    );
-    if (existing[0]) {
-      await sql(
-        `update payments
-         set amount = $1,
-             status = $2,
-             payment_date = $3::date
-         where id = $4`,
-        [amount.toFixed(2), status, paymentDate, Number(existing[0].id)],
-      );
+    const existing = await findPaymentForMemberRequest(requestId, memberId);
+    if (existing) {
+      await updatePaymentRow(existing.id, {
+        amount: amount.toFixed(2),
+        status,
+        payment_date: paymentDate,
+      });
     } else {
-      await sql(
-        `insert into payments
-           (payment_request_id, member_id, amount, status, payment_date)
-         values ($1, $2, $3, $4, $5::date)`,
-        [requestId, memberId, amount.toFixed(2), status, paymentDate],
-      );
+      await createPaymentRow({
+        payment_request_id: requestId,
+        member_id: memberId,
+        amount,
+        status,
+        payment_date: paymentDate,
+      });
     }
   }
 
@@ -287,7 +232,6 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
   okReturn(returnTo, "contributed");
 }
 
-/** Status-only flip used on member detail payment tables. */
 export async function markPaymentPaid(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
@@ -297,27 +241,19 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
     failReturn(returnTo, "Invalid payment.");
   }
 
-  const rows = await sql<{ id: number; member_id: number }>(
-    "select id, member_id from payments where id = $1",
-    [id],
-  );
-  const payment = rows[0];
+  const payment = await getPaymentById(id);
   if (!payment) failReturn(returnTo, "Payment not found.");
 
   const today = new Date().toISOString().slice(0, 10);
-  await sql(
-    `update payments
-     set status = 'paid',
-         payment_date = coalesce(payment_date, $1::date)
-     where id = $2`,
-    [today, id],
-  );
+  await updatePaymentRow(id, {
+    status: "paid",
+    payment_date: payment.payment_date || today,
+  });
 
   revalidateDashboards(`/members/${payment.member_id}`);
   okReturn(returnTo, "status");
 }
 
-/** Remove a contribution record so the member returns to outstanding. */
 export async function clearMemberContribution(
   formData: FormData,
 ): Promise<void> {
@@ -329,15 +265,10 @@ export async function clearMemberContribution(
     failReturn(returnTo, "Invalid payment.");
   }
 
-  const rows = await sql<{ id: number; member_id: number }>(
-    "select id, member_id from payments where id = $1",
-    [id],
-  );
-  const payment = rows[0];
+  const payment = await getPaymentById(id);
   if (!payment) failReturn(returnTo, "Payment not found.");
 
-  await sql(`delete from payments where id = $1`, [id]);
-
+  await deletePaymentRow(id);
   revalidateDashboards(`/members/${payment.member_id}`);
   okReturn(returnTo, "cleared");
 }

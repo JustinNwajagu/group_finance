@@ -1,10 +1,13 @@
 import "server-only";
-import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
-import { getIdentity } from "../../cursor/identity";
-import { sql } from "./db";
+import { adminAuth } from "./firebase-admin";
+import { adminEmail, firebaseAdminConfigured, isAdminEmail } from "./config";
 import type { AppRole, AppUser } from "./types";
+
+export const SESSION_COOKIE = "__session";
+export const DEV_SESSION_COOKIE = "klef_dev_session";
 
 export type ViewerContext = {
   sub: string;
@@ -14,114 +17,83 @@ export type ViewerContext = {
   access: AppUser | null;
 };
 
-async function findBySub(sub: string): Promise<AppUser | null> {
-  const rows = await sql<AppUser>(
-    "select id, cursor_sub, email, name, role, created_at::text as created_at from app_users where cursor_sub = $1 limit 1",
-    [sub],
-  );
-  return rows[0] ?? null;
+function roleForEmail(email: string): AppRole {
+  return isAdminEmail(email) ? "admin" : "member";
 }
 
-async function findByEmail(email: string): Promise<AppUser | null> {
-  const rows = await sql<AppUser>(
-    "select id, cursor_sub, email, name, role, created_at::text as created_at from app_users where lower(email) = lower($1) limit 1",
-    [email],
-  );
-  return rows[0] ?? null;
-}
-
-async function findById(id: number): Promise<AppUser | null> {
-  const rows = await sql<AppUser>(
-    "select id, cursor_sub, email, name, role, created_at::text as created_at from app_users where id = $1 limit 1",
-    [id],
-  );
-  return rows[0] ?? null;
-}
-
-async function adminCount(): Promise<number> {
-  const rows = await sql<{ count: string }>(
-    "select count(*)::text as count from app_users where role = 'admin'",
-  );
-  return Number(rows[0]?.count ?? 0);
-}
-
-async function createUser(input: {
-  cursor_sub: string | null;
+function viewerFromIdentity(input: {
+  sub: string;
   email: string;
   name: string;
-  role: AppRole;
-}): Promise<AppUser> {
-  // Avoid RETURNING — not portable to Snowflake.
-  await sql(
-    `insert into app_users (cursor_sub, email, name, role)
-     values ($1, $2, $3, $4)`,
-    [input.cursor_sub, input.email, input.name, input.role],
-  );
-  if (input.cursor_sub) {
-    const bySub = await findBySub(input.cursor_sub);
-    if (bySub) return bySub;
-  }
-  const byEmail = await findByEmail(input.email);
-  if (!byEmail) throw new Error("Failed to create app user");
-  return byEmail;
-}
-
-export async function resolveViewer(): Promise<ViewerContext | null> {
-  await connection();
-  const identity = await getIdentity(await headers());
-  if (!identity.verified) return null;
-  if (identity.kind === "key") return null;
-
-  const email = identity.email.trim() || `${identity.sub}@users.local`;
-  const name = identity.name.trim() || email;
-
-  let access = await findBySub(identity.sub);
-
-  if (!access && identity.email.trim()) {
-    const invited = await findByEmail(identity.email);
-    if (invited && !invited.cursor_sub) {
-      await sql(
-        `update app_users
-         set cursor_sub = $1, name = case when name = '' then $2 else name end
-         where id = $3`,
-        [identity.sub, name, invited.id],
-      );
-      access = (await findById(invited.id)) ?? invited;
-    }
-  }
-
-  if (!access) {
-    if ((await adminCount()) === 0) {
-      access = await createUser({
-        cursor_sub: identity.sub,
-        email,
-        name,
-        role: "admin",
-      });
-    } else {
-      access = await createUser({
-        cursor_sub: identity.sub,
-        email,
-        name,
-        role: "pending",
-      });
-    }
-  }
-
+  simulated: boolean;
+}): ViewerContext {
+  const email = input.email.trim().toLowerCase();
+  const role = roleForEmail(email);
+  const access: AppUser = {
+    id: 0,
+    cursor_sub: input.sub,
+    email,
+    name: input.name.trim() || email,
+    role,
+    created_at: new Date().toISOString(),
+  };
   return {
-    sub: identity.sub,
-    email: access.email || email,
-    name: access.name || name,
-    simulated: identity.simulated === true,
+    sub: input.sub,
+    email,
+    name: access.name,
+    simulated: input.simulated,
     access,
   };
 }
 
+export async function resolveViewer(): Promise<ViewerContext | null> {
+  await connection();
+  const jar = await cookies();
+
+  if (firebaseAdminConfigured()) {
+    const session = jar.get(SESSION_COOKIE)?.value;
+    if (!session) return null;
+    const auth = adminAuth();
+    if (!auth) return null;
+    try {
+      const decoded = await auth.verifySessionCookie(session, true);
+      const email = (decoded.email ?? "").trim();
+      if (!email) return null;
+      return viewerFromIdentity({
+        sub: decoded.uid,
+        email,
+        name: (decoded.name as string | undefined) || email,
+        simulated: false,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  // Local preview without Firebase credentials — session set via /login.
+  const raw = jar.get(DEV_SESSION_COOKIE)?.value;
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      email?: string;
+      name?: string;
+      sub?: string;
+    };
+    if (!parsed.email) return null;
+    return viewerFromIdentity({
+      sub: parsed.sub || `local:${parsed.email}`,
+      email: parsed.email,
+      name: parsed.name || parsed.email,
+      simulated: true,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function requireSignedIn(): Promise<ViewerContext> {
   const viewer = await resolveViewer();
-  if (!viewer) {
-    redirect("/signed-out");
-  }
+  if (!viewer) redirect("/login");
   return viewer;
 }
 
@@ -129,9 +101,7 @@ export async function requireAccess(): Promise<
   ViewerContext & { access: AppUser }
 > {
   const viewer = await requireSignedIn();
-  if (!viewer.access || viewer.access.role === "pending") {
-    redirect("/pending");
-  }
+  if (!viewer.access) redirect("/login");
   return viewer as ViewerContext & { access: AppUser };
 }
 
@@ -139,12 +109,12 @@ export async function requireAdmin(): Promise<
   ViewerContext & { access: AppUser }
 > {
   const viewer = await requireAccess();
-  if (viewer.access.role !== "admin") {
-    redirect("/");
-  }
+  if (viewer.access.role !== "admin") redirect("/");
   return viewer;
 }
 
 export function isAdmin(viewer: ViewerContext): boolean {
   return viewer.access?.role === "admin";
 }
+
+export { adminEmail };

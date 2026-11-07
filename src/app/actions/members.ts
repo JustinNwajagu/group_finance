@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { createMember } from "@/lib/store";
 
-export async function createMember(formData: FormData): Promise<void> {
+export async function createMemberAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
@@ -14,10 +14,7 @@ export async function createMember(formData: FormData): Promise<void> {
     redirect("/?error=" + encodeURIComponent("Name is required."));
   }
 
-  await sql(`insert into members (name, email) values ($1, $2)`, [
-    name,
-    email || null,
-  ]);
+  await createMember({ name, email: email || null });
 
   revalidatePath("/");
   revalidatePath("/payments");
@@ -47,10 +44,7 @@ export async function importMembers(formData: FormData): Promise<void> {
     const name = parts[0] ?? "";
     const email = parts[1] ?? "";
     if (!name) continue;
-    await sql(`insert into members (name, email) values ($1, $2)`, [
-      name,
-      email || null,
-    ]);
+    await createMember({ name, email: email || null });
     imported += 1;
   }
 
@@ -63,3 +57,6 @@ export async function importMembers(formData: FormData): Promise<void> {
   revalidatePath("/archive");
   redirect("/?ok=import");
 }
+
+/** @deprecated use createMemberAction — kept for existing form imports */
+export { createMemberAction as createMember };

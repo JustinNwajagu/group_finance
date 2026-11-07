@@ -1,23 +1,16 @@
 import { connection } from "next/server";
-import { inviteUser, setUserRole } from "@/app/actions/access";
+import { signOut } from "@/app/actions/auth";
 import { AppShell } from "@/components/app-shell";
-import { Flash } from "@/components/flash";
-import { RoleForm } from "@/components/forms";
-import { requireAdmin } from "@/lib/auth";
-import { listAppUsers } from "@/lib/data";
-import { formatTimestamp } from "@/lib/format";
+import { requireAdmin, adminEmail } from "@/lib/auth";
+import { storeBackend } from "@/lib/store";
+import { firebaseAdminConfigured, firebaseClientConfig } from "@/lib/config";
 
 export const instant = false;
 
-export default async function AccessPage({
-  searchParams,
-}: PageProps<"/access">) {
+export default async function AccessPage() {
   await connection();
   const viewer = await requireAdmin();
-  const params = await searchParams;
-  const error = typeof params.error === "string" ? params.error : undefined;
-  const ok = typeof params.ok === "string" ? params.ok : undefined;
-  const users = await listAppUsers();
+  const backend = await storeBackend();
 
   return (
     <AppShell viewer={viewer} active="access">
@@ -25,84 +18,42 @@ export default async function AccessPage({
         <div>
           <h1>Access</h1>
           <p>
-            Grant app access and assign admin or member roles. Pending visitors
-            appear after their first sign-in.
+            Authentication and data run on Firebase. Only one mailbox is admin;
+            every other signed-in user is a member.
           </p>
         </div>
       </div>
 
-      <Flash
-        ok={ok}
-        error={error}
-        messages={{ "1": "Access granted." }}
-      />
-
-      <div className="split split-2">
+      <div className="stack">
         <section className="panel">
-          <h2>People</h2>
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Person</th>
-                  <th>Role</th>
-                  <th>Added</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <div>{u.name || u.email}</div>
-                      <div className="muted" style={{ fontSize: "0.85rem" }}>
-                        {u.email}
-                        {!u.cursor_sub ? " · invited" : ""}
-                      </div>
-                    </td>
-                    <td>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "0.5rem",
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span className={`badge badge-${u.role}`}>{u.role}</span>
-                        <RoleForm action={setUserRole} id={u.id} role={u.role} />
-                      </div>
-                    </td>
-                    <td className="muted">{formatTimestamp(u.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <h2>Admin mailbox</h2>
+          <p style={{ marginTop: 0 }}>
+            <strong>{adminEmail()}</strong>
+          </p>
+          <p className="muted">
+            Set with the <code>ADMIN_EMAIL</code> environment variable. Signed-in
+            users whose email does not match this address get the member role
+            automatically.
+          </p>
         </section>
 
         <section className="panel">
-          <h2>Invite by email</h2>
-          <p className="muted" style={{ marginTop: 0 }}>
-            Pre-grant access before someone signs in. Matching is by email.
+          <h2>This session</h2>
+          <p style={{ marginTop: 0 }}>
+            {viewer.name} · {viewer.email} · {viewer.access?.role}
+            {viewer.simulated ? " · local preview" : ""}
           </p>
-          <form action={inviteUser} className="form-grid">
-            <label className="field">
-              Email
-              <input name="email" type="email" required autoComplete="off" />
-            </label>
-            <label className="field">
-              Name (optional)
-              <input name="name" autoComplete="off" />
-            </label>
-            <label className="field">
-              Role
-              <select name="role" defaultValue="member">
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
+          <p className="muted">
+            Auth:{" "}
+            {firebaseAdminConfigured() && firebaseClientConfig()
+              ? "Firebase"
+              : "local preview (Firebase credentials not set)"}
+            <br />
+            Database: {backend === "firestore" ? "Cloud Firestore" : "local file store"}
+          </p>
+          <form action={signOut}>
             <button type="submit" className="btn-primary">
-              Grant access
+              Sign out
             </button>
           </form>
         </section>

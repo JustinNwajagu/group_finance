@@ -103,6 +103,12 @@ async function firestoreNextId(collection: string): Promise<number> {
   return id;
 }
 
+/** Skip bootstrap markers / non-row docs in Firestore collections. */
+function isAppRow(data: Record<string, unknown> | undefined): boolean {
+  if (!data || data._meta === true) return false;
+  return Number.isFinite(Number(data.id));
+}
+
 export async function storeBackend(): Promise<"firestore" | "local"> {
   return useFirestore() ? "firestore" : "local";
 }
@@ -140,8 +146,11 @@ export async function listAllMembers(): Promise<MemberRow[]> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("members").get();
     return snap.docs
-      .map((d) => d.data() as MemberRow)
-      .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+      .map((d) => d.data())
+      .filter((d): d is MemberRow => isAppRow(d as Record<string, unknown>))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      );
   }
   const db = await loadLocal();
   return [...db.members].sort((a, b) =>
@@ -150,9 +159,12 @@ export async function listAllMembers(): Promise<MemberRow[]> {
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {
+  if (!Number.isFinite(id) || id <= 0) return null;
   if (useFirestore()) {
     const snap = await adminDb()!.collection("members").doc(String(id)).get();
-    return snap.exists ? (snap.data() as MemberRow) : null;
+    if (!snap.exists) return null;
+    const data = snap.data() as Record<string, unknown>;
+    return isAppRow(data) ? (data as unknown as MemberRow) : null;
   }
   const db = await loadLocal();
   return db.members.find((m) => m.id === id) ?? null;
@@ -188,7 +200,11 @@ export async function createPaymentRequestRow(input: {
 export async function listAllPaymentRequestRows(): Promise<PaymentRequestRow[]> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("payment_requests").get();
-    return snap.docs.map((d) => d.data() as PaymentRequestRow);
+    return snap.docs
+      .map((d) => d.data())
+      .filter((d): d is PaymentRequestRow =>
+        isAppRow(d as Record<string, unknown>),
+      );
   }
   const db = await loadLocal();
   return [...db.payment_requests];
@@ -197,12 +213,15 @@ export async function listAllPaymentRequestRows(): Promise<PaymentRequestRow[]> 
 export async function getPaymentRequestById(
   id: number,
 ): Promise<PaymentRequestRow | null> {
+  if (!Number.isFinite(id) || id <= 0) return null;
   if (useFirestore()) {
     const snap = await adminDb()!
       .collection("payment_requests")
       .doc(String(id))
       .get();
-    return snap.exists ? (snap.data() as PaymentRequestRow) : null;
+    if (!snap.exists) return null;
+    const data = snap.data() as Record<string, unknown>;
+    return isAppRow(data) ? (data as unknown as PaymentRequestRow) : null;
   }
   const db = await loadLocal();
   return db.payment_requests.find((r) => r.id === id) ?? null;
@@ -229,16 +248,21 @@ export async function updatePaymentRequestRow(
 export async function listAllPaymentRows(): Promise<PaymentRow[]> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("payments").get();
-    return snap.docs.map((d) => d.data() as PaymentRow);
+    return snap.docs
+      .map((d) => d.data())
+      .filter((d): d is PaymentRow => isAppRow(d as Record<string, unknown>));
   }
   const db = await loadLocal();
   return [...db.payments];
 }
 
 export async function getPaymentById(id: number): Promise<PaymentRow | null> {
+  if (!Number.isFinite(id) || id <= 0) return null;
   if (useFirestore()) {
     const snap = await adminDb()!.collection("payments").doc(String(id)).get();
-    return snap.exists ? (snap.data() as PaymentRow) : null;
+    if (!snap.exists) return null;
+    const data = snap.data() as Record<string, unknown>;
+    return isAppRow(data) ? (data as unknown as PaymentRow) : null;
   }
   const db = await loadLocal();
   return db.payments.find((p) => p.id === id) ?? null;

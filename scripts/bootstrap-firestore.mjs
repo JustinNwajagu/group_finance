@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Creates Firestore collections used by KLEF Ledger:
+ * Ensures Firestore counters for KLEF Ledger:
  *   members, payment_requests, payments, _counters
  *
- * Requires Admin credentials in the environment:
- *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
+ * Does not write placeholder docs into data collections (those were
+ * incorrectly treated as rows). Collections appear on first real write.
  *
- * Usage:
- *   node scripts/bootstrap-firestore.mjs
+ * Requires Admin credentials:
+ *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
  */
 
 import { cert, getApps, initializeApp } from "firebase-admin/app";
@@ -32,24 +32,7 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
-
-const collections = [
-  {
-    name: "members",
-    sample: false,
-    note: "Roster documents: { id, name, email, created_at }",
-  },
-  {
-    name: "payment_requests",
-    sample: false,
-    note: "Titles: { id, title, amount, deadline, concluded_at, created_at }",
-  },
-  {
-    name: "payments",
-    sample: false,
-    note: "Rows: { id, payment_request_id, member_id, amount, status, payment_date, created_at }",
-  },
-];
+const collections = ["members", "payment_requests", "payments"];
 
 async function ensureCounter(name) {
   const ref = db.collection("_counters").doc(name);
@@ -62,30 +45,21 @@ async function ensureCounter(name) {
   }
 }
 
-async function ensureMeta(collection, note) {
+async function removeLegacySchema(collection) {
   const ref = db.collection(collection).doc("_schema");
   const snap = await ref.get();
-  const payload = {
-    _meta: true,
-    description: note,
-    bootstrapped_at: new Date().toISOString(),
-  };
-  if (!snap.exists) {
-    await ref.set(payload);
-    console.log(`  created ${collection}/_schema`);
-  } else {
-    await ref.set(payload, { merge: true });
-    console.log(`  updated ${collection}/_schema`);
+  if (snap.exists) {
+    await ref.delete();
+    console.log(`  removed legacy ${collection}/_schema`);
   }
 }
 
 console.log(`Bootstrapping Firestore for project ${projectId}…`);
-for (const c of collections) {
-  console.log(`\n${c.name}`);
-  await ensureMeta(c.name, c.note);
-  await ensureCounter(c.name);
+for (const name of collections) {
+  console.log(`\n${name}`);
+  await removeLegacySchema(name);
+  await ensureCounter(name);
 }
 
-console.log("\nDone. Collections are ready (Firestore creates them on first write).");
-console.log("App writes real member/payment docs via the Admin SDK; clients cannot.");
+console.log("\nDone. Counters ready; app creates real rows on use.");
 process.exit(0);

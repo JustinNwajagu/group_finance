@@ -9,7 +9,8 @@ export function formatMoney(value: string | number): string {
   }).format(n);
 }
 
-export function formatDate(value: string): string {
+export function formatDate(value: string | null | undefined): string {
+  if (!value) return "—";
   const raw = value.includes("T") ? value : `${value}T12:00:00`;
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) return value;
@@ -20,7 +21,8 @@ export function formatDate(value: string): string {
   }).format(d);
 }
 
-export function formatTimestamp(value: string): string {
+export function formatTimestamp(value: string | null | undefined): string {
+  if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return new Intl.DateTimeFormat("en-NG", {

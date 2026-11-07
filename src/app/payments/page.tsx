@@ -51,11 +51,13 @@ export default async function PaymentsPage({
         ok={ok}
         error={error}
         messages={{
-          "1": "Payment request created for all members.",
+          "1": "Payment request created. Record each member's contribution next.",
           recorded: "Member marked as contributed.",
           contributed: "Member marked as contributed.",
-          pledged: "Pledge amount saved (not yet contributed).",
-          paid: "Marked as contributed.",
+          pledged: "Member marked as contributed (pledge).",
+          paid: "Status set to paid.",
+          status: "Contribution status updated.",
+          cleared: "Contribution cleared — member is outstanding again.",
           amended: "Contribution list updated.",
           concluded: "Payment concluded.",
           reopened: "Concluded date cleared.",
@@ -152,9 +154,9 @@ export default async function PaymentsPage({
                     </label>
                     <label className="field">
                       Status
-                      <select name="status" defaultValue="paid">
-                        <option value="paid">Paid</option>
+                      <select name="status" defaultValue="pledge">
                         <option value="pledge">Pledge</option>
+                        <option value="paid">Paid</option>
                       </select>
                     </label>
                   </div>
@@ -163,9 +165,9 @@ export default async function PaymentsPage({
                     <input name="payment_date" type="date" defaultValue={today} />
                   </label>
                   <p className="muted" style={{ margin: 0 }}>
-                    Works for current and concluded payments. Status{" "}
-                    <strong>Paid</strong> moves the member into Contributed for
-                    that title; Pledge only updates the amount.
+                    Works for current and concluded payments. Both{" "}
+                    <strong>Pledge</strong> and <strong>Paid</strong> count as
+                    contributed; you can switch status later on the board.
                   </p>
                   <button type="submit" className="btn-primary">
                     Save contribution
@@ -207,9 +209,8 @@ export default async function PaymentsPage({
                     />
                   </label>
                   <p className="muted" style={{ margin: 0 }}>
-                    Creates a pledge at the minimum amount for every member.
-                    Use Record member contribution to set actual amounts or mark
-                    paid.
+                    Creates the payment title for the roster. Members stay
+                    outstanding until you record a pledge or paid contribution.
                   </p>
                   <button type="submit" className="btn-primary">
                     Create payment

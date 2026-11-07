@@ -42,7 +42,8 @@ export default async function MembersPage({
           <h1>Members</h1>
           <p>
             Payments is the count of requested titles (same for everyone).
-            Contributions is how many of those titles each member has paid.
+            Contributions is how many of those titles each member has a pledge
+            or paid record for.
           </p>
         </div>
         <Suspense fallback={null}>
@@ -56,7 +57,10 @@ export default async function MembersPage({
         messages={{
           member: "Member added.",
           import: "Import complete.",
-          paid: "Marked as contributed.",
+          paid: "Status set to paid.",
+          status: "Contribution status updated.",
+          contributed: "Member marked as contributed.",
+          cleared: "Contribution cleared — member is outstanding again.",
           amended: "Contribution list updated.",
           concluded: "Payment concluded.",
           reopened: "Concluded date cleared.",

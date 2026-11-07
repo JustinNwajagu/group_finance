@@ -1,5 +1,8 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
+  addBoardContribution,
+  clearMemberContribution,
   concludePaymentRequest,
   markPaymentPaid,
   markPaymentPledge,
@@ -12,10 +15,12 @@ function MemberList({
   title,
   members,
   empty,
+  renderExtra,
 }: {
   title: string;
   members: MemberPaymentRow[];
   empty: string;
+  renderExtra?: (m: MemberPaymentRow) => ReactNode;
 }) {
   return (
     <div className="contrib-list">
@@ -37,6 +42,20 @@ function MemberList({
                 {m.name}
               </Link>
               {m.email ? <span className="muted"> · {m.email}</span> : null}
+              {m.status ? (
+                <span
+                  className={
+                    m.status === "paid" ? "badge badge-paid" : "badge badge-pledge"
+                  }
+                  style={{ marginLeft: "0.4rem" }}
+                >
+                  {m.status === "paid" ? "Paid" : "Pledge"}
+                </span>
+              ) : null}
+              {m.amount ? (
+                <span className="muted"> · {formatMoney(m.amount)}</span>
+              ) : null}
+              {renderExtra?.(m)}
             </li>
           ))}
         </ul>
@@ -81,11 +100,107 @@ export function ContributionBoard({
           title="Contributed"
           members={contributed}
           empty="No contributions yet."
+          renderExtra={
+            isAdmin
+              ? (m) =>
+                  m.payment_id != null ? (
+                    <span
+                      className="amend-row"
+                      style={{ display: "inline-flex", marginLeft: "0.5rem" }}
+                    >
+                      {m.status === "pledge" ? (
+                        <form action={markPaymentPaid} className="inline-form">
+                          <input type="hidden" name="id" value={m.payment_id} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+                          <button
+                            type="submit"
+                            className="btn-ghost"
+                            style={{ padding: "0.15rem 0.45rem" }}
+                          >
+                            Mark paid
+                          </button>
+                        </form>
+                      ) : (
+                        <form action={markPaymentPledge} className="inline-form">
+                          <input type="hidden" name="id" value={m.payment_id} />
+                          <input type="hidden" name="return_to" value={returnTo} />
+                          <button
+                            type="submit"
+                            className="btn-ghost"
+                            style={{ padding: "0.15rem 0.45rem" }}
+                          >
+                            Mark pledge
+                          </button>
+                        </form>
+                      )}
+                      <form
+                        action={clearMemberContribution}
+                        className="inline-form"
+                      >
+                        <input type="hidden" name="id" value={m.payment_id} />
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <button
+                          type="submit"
+                          className="btn-ghost"
+                          style={{ padding: "0.15rem 0.45rem" }}
+                        >
+                          Clear
+                        </button>
+                      </form>
+                    </span>
+                  ) : null
+              : undefined
+          }
         />
         <MemberList
           title="Yet to contribute"
           members={outstanding}
           empty="Everyone has contributed."
+          renderExtra={
+            isAdmin
+              ? (m) => (
+                  <span
+                    className="amend-row"
+                    style={{ display: "inline-flex", marginLeft: "0.5rem" }}
+                  >
+                    <form action={addBoardContribution} className="inline-form">
+                      <input
+                        type="hidden"
+                        name="payment_request_id"
+                        value={request.id}
+                      />
+                      <input type="hidden" name="member_id" value={m.id} />
+                      <input type="hidden" name="status" value="pledge" />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <button
+                        type="submit"
+                        className="btn-ghost"
+                        style={{ padding: "0.15rem 0.45rem" }}
+                      >
+                        Add pledge
+                      </button>
+                    </form>
+                    <form action={addBoardContribution} className="inline-form">
+                      <input
+                        type="hidden"
+                        name="payment_request_id"
+                        value={request.id}
+                      />
+                      <input type="hidden" name="member_id" value={m.id} />
+                      <input type="hidden" name="status" value="paid" />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <button
+                        type="submit"
+                        className="btn-ghost"
+                        style={{ padding: "0.15rem 0.45rem" }}
+                      >
+                        Mark paid
+                      </button>
+                    </form>
+                  </span>
+                )
+              : undefined
+          }
         />
       </div>
 
@@ -121,62 +236,9 @@ export function ContributionBoard({
           )}
 
           <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-            Admins can amend who contributed even after the concluded date.
+            Pledge and paid both count as contributed. Admins can switch status
+            on each record, or clear it to move someone back to outstanding.
           </p>
-
-          {outstanding.some((m) => m.payment_id != null) ? (
-            <div className="amend-row">
-              <span className="muted" style={{ fontSize: "0.85rem" }}>
-                Mark contributed:
-              </span>
-              {outstanding
-                .filter((m) => m.payment_id != null)
-                .map((m) => (
-                  <form
-                    key={m.payment_id}
-                    action={markPaymentPaid}
-                    className="inline-form"
-                  >
-                    <input type="hidden" name="id" value={m.payment_id!} />
-                    <input type="hidden" name="return_to" value={returnTo} />
-                    <button
-                      type="submit"
-                      className="btn-ghost"
-                      style={{ padding: "0.25rem 0.55rem" }}
-                    >
-                      {m.name}
-                    </button>
-                  </form>
-                ))}
-            </div>
-          ) : null}
-
-          {contributed.some((m) => m.payment_id != null) ? (
-            <div className="amend-row">
-              <span className="muted" style={{ fontSize: "0.85rem" }}>
-                Move to outstanding:
-              </span>
-              {contributed
-                .filter((m) => m.payment_id != null)
-                .map((m) => (
-                  <form
-                    key={m.payment_id}
-                    action={markPaymentPledge}
-                    className="inline-form"
-                  >
-                    <input type="hidden" name="id" value={m.payment_id!} />
-                    <input type="hidden" name="return_to" value={returnTo} />
-                    <button
-                      type="submit"
-                      className="btn-ghost"
-                      style={{ padding: "0.25rem 0.55rem" }}
-                    >
-                      {m.name}
-                    </button>
-                  </form>
-                ))}
-            </div>
-          ) : null}
         </div>
       ) : null}
     </article>

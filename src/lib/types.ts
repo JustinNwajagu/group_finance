@@ -49,6 +49,8 @@ export type MemberContribution = Member & {
 
 export type MemberPaymentRow = Member & {
   payment_id: number | null;
+  status: PaymentStatus | null;
+  amount: string | null;
 };
 
 export type ContributionLists = {

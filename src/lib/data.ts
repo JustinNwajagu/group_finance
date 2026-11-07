@@ -37,7 +37,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
       (
         select count(*)::int
         from payments p
-        where p.member_id = m.id and p.status = 'paid'
+        where p.member_id = m.id
       ) as contribution_count
     from members m
   `;
@@ -82,7 +82,7 @@ export async function memberPaymentStats(id: number): Promise<{
     sql<{ count: string }>(
       `select count(*)::text as count
        from payments
-       where member_id = $1 and status = 'paid'`,
+       where member_id = $1`,
       [id],
     ),
   ]);
@@ -161,62 +161,44 @@ export async function getPaymentRequest(id: number): Promise<PaymentRequest | nu
   return rows[0] ?? null;
 }
 
-/** Ensure every member has a payment row for this request (pledge at min amount). */
-export async function ensureMembersOnRequest(requestId: number): Promise<void> {
-  const request = await getPaymentRequest(requestId);
-  if (!request) return;
-  const missing = await sql<{ id: number }>(
-    `select m.id
-     from members m
-     where not exists (
-       select 1 from payments p
-       where p.payment_request_id = $1 and p.member_id = m.id
-     )`,
-    [requestId],
-  );
-  for (const member of missing) {
-    await sql(
-      `insert into payments (payment_request_id, member_id, amount, status)
-       values ($1, $2, $3, 'pledge')`,
-      [requestId, member.id, request.amount],
-    );
-  }
-}
-
 export async function contributionListsForRequest(
   requestId: number,
 ): Promise<ContributionLists | null> {
   const request = await getPaymentRequest(requestId);
   if (!request) return null;
 
-  await ensureMembersOnRequest(requestId);
-
+  // Any recorded row (pledge or paid) counts as contributed.
   const contributed = await sql<import("./types").MemberPaymentRow>(
     `select
        m.id,
        m.name,
        m.email,
        m.created_at::text as created_at,
-       p.id as payment_id
+       p.id as payment_id,
+       p.status,
+       p.amount::text as amount
      from members m
      join payments p
        on p.member_id = m.id and p.payment_request_id = $1
-     where p.status = 'paid'
      order by lower(m.name)`,
     [requestId],
   );
 
+  // Yet to contribute = no payment row for this request yet.
   const outstanding = await sql<import("./types").MemberPaymentRow>(
     `select
        m.id,
        m.name,
        m.email,
        m.created_at::text as created_at,
-       p.id as payment_id
+       null::int as payment_id,
+       null::text as status,
+       null::text as amount
      from members m
-     join payments p
-       on p.member_id = m.id and p.payment_request_id = $1
-     where p.status <> 'paid'
+     where not exists (
+       select 1 from payments p
+       where p.payment_request_id = $1 and p.member_id = m.id
+     )
      order by lower(m.name)`,
     [requestId],
   );
@@ -292,21 +274,3 @@ export async function listPaymentsForRequest(
   );
 }
 
-/** Ensure every member has a pledge row for each open payment request. */
-export async function ensureMemberOnOpenRequests(memberId: number): Promise<void> {
-  const open = await listOpenPaymentRequests();
-  for (const request of open) {
-    const existing = await sql<{ id: number }>(
-      `select id from payments
-       where payment_request_id = $1 and member_id = $2
-       limit 1`,
-      [request.id, memberId],
-    );
-    if (existing[0]) continue;
-    await sql(
-      `insert into payments (payment_request_id, member_id, amount, status)
-       values ($1, $2, $3, 'pledge')`,
-      [request.id, memberId, request.amount],
-    );
-  }
-}

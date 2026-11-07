@@ -10,8 +10,14 @@ function failPayments(msg: string): never {
   redirect("/payments?error=" + encodeURIComponent(msg));
 }
 
-function failMembers(msg: string): never {
-  redirect("/members?error=" + encodeURIComponent(msg));
+function failReturn(returnTo: string, msg: string): never {
+  const base = returnTo.startsWith("/") ? returnTo.split("?")[0] : "/payments";
+  redirect(`${base}?error=${encodeURIComponent(msg)}`);
+}
+
+function okReturn(returnTo: string, ok: string): never {
+  const base = returnTo.startsWith("/") ? returnTo.split("?")[0] : "/payments";
+  redirect(`${base}?ok=${ok}`);
 }
 
 export async function createPaymentRequest(formData: FormData): Promise<void> {
@@ -33,35 +39,16 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
     failPayments("Add a member first, then create a payment.");
   }
 
+  // Title only — members stay outstanding until an admin records a contribution
+  // (pledge or paid). Both statuses count as contributed.
   await sql(
     `insert into payment_requests (title, amount, deadline)
      values ($1, $2, $3::date)`,
     [title, amount.toFixed(2), deadline],
   );
 
-  const created = await sql<{ id: number }>(
-    `select id from payment_requests
-     where title = $1 and deadline = $2::date
-     order by id desc
-     limit 1`,
-    [title, deadline],
-  );
-  const requestId = created[0]?.id;
-  if (!requestId) failPayments("Failed to create payment request.");
-
-  for (const member of members) {
-    await sql(
-      `insert into payments (payment_request_id, member_id, amount, status)
-       values ($1, $2, $3, 'pledge')`,
-      [requestId, member.id, amount.toFixed(2)],
-    );
-  }
-
   revalidatePath("/payments");
   revalidatePath("/members");
-  for (const member of members) {
-    revalidatePath(`/members/${member.id}`);
-  }
   redirect("/payments?ok=1");
 }
 
@@ -111,11 +98,10 @@ export async function recordMemberContribution(
   const requestId = Number(formData.get("payment_request_id"));
   const memberId = Number(formData.get("member_id"));
   const amountRaw = String(formData.get("amount") ?? "").trim();
-  // Contribution form means "mark contributed" unless admin explicitly picks pledge.
-  const statusRaw = String(formData.get("status") ?? "paid").trim().toLowerCase();
+  const statusRaw = String(formData.get("status") ?? "pledge").trim().toLowerCase();
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
   const amount = Number(amountRaw);
-  const status = statusRaw === "pledge" ? "pledge" : "paid";
+  const status = statusRaw === "paid" ? "paid" : "pledge";
 
   if (!Number.isFinite(requestId) || requestId <= 0) {
     failPayments("Choose a payment title.");
@@ -179,27 +165,68 @@ export async function recordMemberContribution(
     );
   }
 
-  // Confirm the row is paid when that was requested — catch silent no-op updates.
-  if (status === "paid") {
-    const check = await sql<{ status: string }>(
-      `select status from payments
-       where payment_request_id = $1 and member_id = $2
-       limit 1`,
-      [requestId, memberId],
-    );
-    if (check[0]?.status !== "paid") {
-      failPayments("Could not mark that member as contributed. Try again.");
-    }
+  const check = await sql<{ status: string }>(
+    `select status from payments
+     where payment_request_id = $1 and member_id = $2
+     limit 1`,
+    [requestId, memberId],
+  );
+  if (!check[0] || (check[0].status !== "paid" && check[0].status !== "pledge")) {
+    failPayments("Could not save that contribution. Try again.");
   }
 
   revalidatePath("/payments");
   revalidatePath("/members");
   revalidatePath(`/members/${memberId}`);
-  redirect(
-    status === "paid"
-      ? "/payments?ok=contributed"
-      : "/payments?ok=pledged",
+  redirect("/payments?ok=contributed");
+}
+
+/** Quick-add a min-amount contribution (pledge or paid) for an outstanding member. */
+export async function addBoardContribution(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const requestId = Number(formData.get("payment_request_id"));
+  const memberId = Number(formData.get("member_id"));
+  const statusRaw = String(formData.get("status") ?? "pledge").trim().toLowerCase();
+  const status = statusRaw === "paid" ? "paid" : "pledge";
+  const returnTo = String(formData.get("return_to") ?? "/payments");
+
+  if (!Number.isFinite(requestId) || requestId <= 0) {
+    failReturn(returnTo, "Invalid payment.");
+  }
+  if (!Number.isFinite(memberId) || memberId <= 0) {
+    failReturn(returnTo, "Invalid member.");
+  }
+
+  const request = await sql<{ id: number; amount: string }>(
+    "select id, amount::text as amount from payment_requests where id = $1",
+    [requestId],
   );
+  if (!request[0]) failReturn(returnTo, "Payment not found.");
+
+  const existing = await sql<{ id: number }>(
+    `select id from payments
+     where payment_request_id = $1 and member_id = $2
+     limit 1`,
+    [requestId, memberId],
+  );
+  if (existing[0]) {
+    failReturn(returnTo, "That member already has a contribution on this payment.");
+  }
+
+  const paymentDate =
+    status === "paid" ? new Date().toISOString().slice(0, 10) : null;
+
+  await sql(
+    `insert into payments
+       (payment_request_id, member_id, amount, status, payment_date)
+     values ($1, $2, $3, $4, $5::date)`,
+    [requestId, memberId, request[0].amount, status, paymentDate],
+  );
+
+  revalidatePath("/payments");
+  revalidatePath("/members");
+  revalidatePath(`/members/${memberId}`);
+  okReturn(returnTo, "contributed");
 }
 
 export async function markPaymentPaid(formData: FormData): Promise<void> {
@@ -208,7 +235,7 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
   const returnTo = String(formData.get("return_to") ?? "/payments");
 
   if (!Number.isFinite(id) || id <= 0) {
-    redirect(returnTo.split("?")[0] + "?error=" + encodeURIComponent("Invalid payment."));
+    failReturn(returnTo, "Invalid payment.");
   }
 
   const rows = await sql<{ id: number; member_id: number }>(
@@ -216,9 +243,7 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
     [id],
   );
   const payment = rows[0];
-  if (!payment) {
-    redirect(returnTo.split("?")[0] + "?error=" + encodeURIComponent("Payment not found."));
-  }
+  if (!payment) failReturn(returnTo, "Payment not found.");
 
   const today = new Date().toISOString().slice(0, 10);
   await sql(
@@ -232,8 +257,7 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
   revalidatePath("/payments");
   revalidatePath("/members");
   revalidatePath(`/members/${payment.member_id}`);
-  const base = returnTo.startsWith("/") ? returnTo.split("?")[0] : "/payments";
-  redirect(`${base}?ok=paid`);
+  okReturn(returnTo, "status");
 }
 
 export async function markPaymentPledge(formData: FormData): Promise<void> {
@@ -242,7 +266,7 @@ export async function markPaymentPledge(formData: FormData): Promise<void> {
   const returnTo = String(formData.get("return_to") ?? "/payments");
 
   if (!Number.isFinite(id) || id <= 0) {
-    failMembers("Invalid payment.");
+    failReturn(returnTo, "Invalid payment.");
   }
 
   const rows = await sql<{ id: number; member_id: number }>(
@@ -250,7 +274,7 @@ export async function markPaymentPledge(formData: FormData): Promise<void> {
     [id],
   );
   const payment = rows[0];
-  if (!payment) failMembers("Payment not found.");
+  if (!payment) failReturn(returnTo, "Payment not found.");
 
   await sql(
     `update payments set status = 'pledge' where id = $1`,
@@ -260,6 +284,32 @@ export async function markPaymentPledge(formData: FormData): Promise<void> {
   revalidatePath("/payments");
   revalidatePath("/members");
   revalidatePath(`/members/${payment.member_id}`);
-  const base = returnTo.startsWith("/") ? returnTo.split("?")[0] : "/members";
-  redirect(`${base}?ok=amended`);
+  okReturn(returnTo, "status");
+}
+
+/** Remove a contribution record so the member returns to outstanding. */
+export async function clearMemberContribution(
+  formData: FormData,
+): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const returnTo = String(formData.get("return_to") ?? "/payments");
+
+  if (!Number.isFinite(id) || id <= 0) {
+    failReturn(returnTo, "Invalid payment.");
+  }
+
+  const rows = await sql<{ id: number; member_id: number }>(
+    "select id, member_id from payments where id = $1",
+    [id],
+  );
+  const payment = rows[0];
+  if (!payment) failReturn(returnTo, "Payment not found.");
+
+  await sql(`delete from payments where id = $1`, [id]);
+
+  revalidatePath("/payments");
+  revalidatePath("/members");
+  revalidatePath(`/members/${payment.member_id}`);
+  okReturn(returnTo, "cleared");
 }

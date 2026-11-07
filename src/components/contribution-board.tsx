@@ -1,13 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
-  addBoardContribution,
   clearMemberContribution,
   concludePaymentRequest,
-  markPaymentPaid,
-  markPaymentPledge,
   reopenPaymentRequest,
 } from "@/app/actions/payments";
+import { ContributeDialog } from "@/components/contribute-dialog";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { ContributionLists, MemberPaymentRow } from "@/lib/types";
 
@@ -109,29 +107,32 @@ export function ContributionBoard({
                       style={{ display: "inline-flex", marginLeft: "0.5rem" }}
                     >
                       {m.status === "pledge" ? (
-                        <form action={markPaymentPaid} className="inline-form">
-                          <input type="hidden" name="id" value={m.payment_id} />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <button
-                            type="submit"
-                            className="btn-ghost"
-                            style={{ padding: "0.15rem 0.45rem" }}
-                          >
-                            Mark paid
-                          </button>
-                        </form>
+                        <ContributeDialog
+                          requestId={request.id}
+                          requestTitle={request.title}
+                          minAmount={request.amount}
+                          memberId={m.id}
+                          memberName={m.name}
+                          returnTo={returnTo}
+                          paymentId={m.payment_id}
+                          defaultAmount={m.amount}
+                          defaultStatus="paid"
+                          defaultDate={today}
+                          triggerLabel="Mark paid"
+                        />
                       ) : (
-                        <form action={markPaymentPledge} className="inline-form">
-                          <input type="hidden" name="id" value={m.payment_id} />
-                          <input type="hidden" name="return_to" value={returnTo} />
-                          <button
-                            type="submit"
-                            className="btn-ghost"
-                            style={{ padding: "0.15rem 0.45rem" }}
-                          >
-                            Mark pledge
-                          </button>
-                        </form>
+                        <ContributeDialog
+                          requestId={request.id}
+                          requestTitle={request.title}
+                          minAmount={request.amount}
+                          memberId={m.id}
+                          memberName={m.name}
+                          returnTo={returnTo}
+                          paymentId={m.payment_id}
+                          defaultAmount={m.amount}
+                          defaultStatus="pledge"
+                          triggerLabel="Mark pledge"
+                        />
                       )}
                       <form
                         action={clearMemberContribution}
@@ -163,40 +164,27 @@ export function ContributionBoard({
                     className="amend-row"
                     style={{ display: "inline-flex", marginLeft: "0.5rem" }}
                   >
-                    <form action={addBoardContribution} className="inline-form">
-                      <input
-                        type="hidden"
-                        name="payment_request_id"
-                        value={request.id}
-                      />
-                      <input type="hidden" name="member_id" value={m.id} />
-                      <input type="hidden" name="status" value="pledge" />
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <button
-                        type="submit"
-                        className="btn-ghost"
-                        style={{ padding: "0.15rem 0.45rem" }}
-                      >
-                        Add pledge
-                      </button>
-                    </form>
-                    <form action={addBoardContribution} className="inline-form">
-                      <input
-                        type="hidden"
-                        name="payment_request_id"
-                        value={request.id}
-                      />
-                      <input type="hidden" name="member_id" value={m.id} />
-                      <input type="hidden" name="status" value="paid" />
-                      <input type="hidden" name="return_to" value={returnTo} />
-                      <button
-                        type="submit"
-                        className="btn-ghost"
-                        style={{ padding: "0.15rem 0.45rem" }}
-                      >
-                        Mark paid
-                      </button>
-                    </form>
+                    <ContributeDialog
+                      requestId={request.id}
+                      requestTitle={request.title}
+                      minAmount={request.amount}
+                      memberId={m.id}
+                      memberName={m.name}
+                      returnTo={returnTo}
+                      defaultStatus="pledge"
+                      triggerLabel="Add pledge"
+                    />
+                    <ContributeDialog
+                      requestId={request.id}
+                      requestTitle={request.title}
+                      minAmount={request.amount}
+                      memberId={m.id}
+                      memberName={m.name}
+                      returnTo={returnTo}
+                      defaultStatus="paid"
+                      defaultDate={today}
+                      triggerLabel="Mark paid"
+                    />
                   </span>
                 )
               : undefined
@@ -236,8 +224,8 @@ export function ContributionBoard({
           )}
 
           <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-            Pledge and paid both count as contributed. Admins can switch status
-            on each record, or clear it to move someone back to outstanding.
+            Add pledge / Mark paid opens a form for amount (and date when paid).
+            Clear removes the record so the member is outstanding again.
           </p>
         </div>
       ) : null}

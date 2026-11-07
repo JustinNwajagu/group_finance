@@ -118,28 +118,32 @@ export default async function MembersPage({
               No open payment requests. Admins can create one on Payments.
             </div>
           ) : (
-            currentBoards.map((board) => (
-              <ContributionBoard
-                key={board.request.id}
-                board={board}
-                isAdmin={admin}
-                returnTo="/members"
-              />
-            ))
+            <div className="contrib-boards">
+              {currentBoards.map((board) => (
+                <ContributionBoard
+                  key={board.request.id}
+                  board={board}
+                  isAdmin={admin}
+                  returnTo="/members"
+                />
+              ))}
+            </div>
           )}
         </section>
 
         {concludedBoards.length > 0 ? (
           <section className="panel">
             <h2>Concluded payments</h2>
-            {concludedBoards.map((board) => (
-              <ContributionBoard
-                key={board.request.id}
-                board={board}
-                isAdmin={admin}
-                returnTo="/members"
-              />
-            ))}
+            <div className="contrib-boards">
+              {concludedBoards.map((board) => (
+                <ContributionBoard
+                  key={board.request.id}
+                  board={board}
+                  isAdmin={admin}
+                  returnTo="/members"
+                />
+              ))}
+            </div>
           </section>
         ) : null}
 

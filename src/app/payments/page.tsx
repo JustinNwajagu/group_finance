@@ -71,14 +71,16 @@ export default async function PaymentsPage({
             {current.length === 0 ? (
               <div className="hero-empty">No open payment requests.</div>
             ) : (
-              current.map((board) => (
-                <ContributionBoard
-                  key={board.request.id}
-                  board={board}
-                  isAdmin={admin}
-                  returnTo="/payments"
-                />
-              ))
+              <div className="contrib-boards">
+                {current.map((board) => (
+                  <ContributionBoard
+                    key={board.request.id}
+                    board={board}
+                    isAdmin={admin}
+                    returnTo="/payments"
+                  />
+                ))}
+              </div>
             )}
           </section>
 
@@ -87,14 +89,16 @@ export default async function PaymentsPage({
             {concluded.length === 0 ? (
               <div className="hero-empty">No concluded payments yet.</div>
             ) : (
-              concluded.map((board) => (
-                <ContributionBoard
-                  key={board.request.id}
-                  board={board}
-                  isAdmin={admin}
-                  returnTo="/payments"
-                />
-              ))
+              <div className="contrib-boards">
+                {concluded.map((board) => (
+                  <ContributionBoard
+                    key={board.request.id}
+                    board={board}
+                    isAdmin={admin}
+                    returnTo="/payments"
+                  />
+                ))}
+              </div>
             )}
           </section>
         </div>

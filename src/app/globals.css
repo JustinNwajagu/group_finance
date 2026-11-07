@@ -467,14 +467,23 @@ textarea {
   font-weight: 650;
 }
 
-.contrib-board {
-  padding: 1rem 0;
-  border-top: 1px solid var(--line);
+.contrib-boards {
+  display: grid;
+  gap: 1.15rem;
+  margin-top: 0.35rem;
 }
 
-.contrib-board:first-child {
-  border-top: 0;
-  padding-top: 0;
+.contrib-board {
+  padding: 1.05rem 1.15rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.72) 0%, rgba(236, 244, 241, 0.55) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+.contrib-board + .contrib-board {
+  margin-top: 0;
 }
 
 .contrib-board-head {
@@ -483,13 +492,15 @@ textarea {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-bottom: 0.85rem;
+  margin: 0 0 0.95rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--line);
 }
 
 .contrib-board-head h3 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.2rem;
   font-weight: 650;
 }
 
@@ -509,6 +520,53 @@ textarea {
   font-size: 0.95rem;
 }
 
+.contrib-dialog {
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: transparent;
+  max-width: min(28rem, calc(100vw - 2rem));
+  width: 100%;
+  box-shadow: var(--shadow);
+}
+
+.contrib-dialog::backdrop {
+  background: rgba(20, 32, 51, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+.contrib-dialog-panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.15rem 1.25rem 1.25rem;
+  background:
+    linear-gradient(180deg, #f8fbfc 0%, #f1f6f8 100%);
+  border-radius: 14px;
+}
+
+.contrib-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.contrib-dialog-head h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.contrib-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
 .name-list {
   list-style: none;
   margin: 0;
@@ -521,8 +579,15 @@ textarea {
   margin-top: 1rem;
   display: grid;
   gap: 0.75rem;
-  padding-top: 0.85rem;
+  padding-top: 0.9rem;
   border-top: 1px dashed var(--line);
+}
+
+.contrib-split .contrib-list {
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(20, 32, 51, 0.06);
 }
 
 .amend-row {

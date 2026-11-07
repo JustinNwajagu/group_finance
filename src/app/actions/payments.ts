@@ -181,20 +181,32 @@ export async function recordMemberContribution(
   redirect("/payments?ok=contributed");
 }
 
-/** Quick-add a min-amount contribution (pledge or paid) for an outstanding member. */
-export async function addBoardContribution(formData: FormData): Promise<void> {
+/**
+ * Create or update a contribution from the board dialog.
+ * Requires amount (≥ payment minimum). Used for Add pledge / Mark paid /
+ * status switches so admins always enter the member's amount.
+ */
+export async function saveBoardContribution(formData: FormData): Promise<void> {
   await requireAdmin();
   const requestId = Number(formData.get("payment_request_id"));
   const memberId = Number(formData.get("member_id"));
+  const paymentIdRaw = String(formData.get("payment_id") ?? "").trim();
+  const paymentId = paymentIdRaw ? Number(paymentIdRaw) : NaN;
+  const amountRaw = String(formData.get("amount") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? "pledge").trim().toLowerCase();
-  const status = statusRaw === "paid" ? "paid" : "pledge";
+  const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/payments");
+  const status = statusRaw === "paid" ? "paid" : "pledge";
+  const amount = Number(amountRaw);
 
   if (!Number.isFinite(requestId) || requestId <= 0) {
     failReturn(returnTo, "Invalid payment.");
   }
   if (!Number.isFinite(memberId) || memberId <= 0) {
     failReturn(returnTo, "Invalid member.");
+  }
+  if (!Number.isFinite(amount) || amount < 0) {
+    failReturn(returnTo, "Enter a valid amount.");
   }
 
   const request = await sql<{ id: number; amount: string }>(
@@ -203,25 +215,67 @@ export async function addBoardContribution(formData: FormData): Promise<void> {
   );
   if (!request[0]) failReturn(returnTo, "Payment not found.");
 
-  const existing = await sql<{ id: number }>(
-    `select id from payments
-     where payment_request_id = $1 and member_id = $2
-     limit 1`,
-    [requestId, memberId],
-  );
-  if (existing[0]) {
-    failReturn(returnTo, "That member already has a contribution on this payment.");
+  if (amount + 1e-9 < Number(request[0].amount)) {
+    failReturn(
+      returnTo,
+      `Amount must be at least the minimum (${request[0].amount}).`,
+    );
   }
 
-  const paymentDate =
-    status === "paid" ? new Date().toISOString().slice(0, 10) : null;
-
-  await sql(
-    `insert into payments
-       (payment_request_id, member_id, amount, status, payment_date)
-     values ($1, $2, $3, $4, $5::date)`,
-    [requestId, memberId, request[0].amount, status, paymentDate],
+  const member = await sql<{ id: number }>(
+    "select id from members where id = $1",
+    [memberId],
   );
+  if (!member[0]) failReturn(returnTo, "Member not found.");
+
+  const paymentDate =
+    status === "paid"
+      ? /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
+        ? paymentDateRaw
+        : new Date().toISOString().slice(0, 10)
+      : /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
+        ? paymentDateRaw
+        : null;
+
+  if (Number.isFinite(paymentId) && paymentId > 0) {
+    const existing = await sql<{ id: number; member_id: number }>(
+      "select id, member_id from payments where id = $1",
+      [paymentId],
+    );
+    if (!existing[0]) failReturn(returnTo, "Contribution not found.");
+    await sql(
+      `update payments
+       set amount = $1,
+           status = $2,
+           payment_date = $3::date
+       where id = $4`,
+      [amount.toFixed(2), status, paymentDate, paymentId],
+    );
+  } else {
+    const existing = await sql<{ id: number }>(
+      `select id from payments
+       where payment_request_id = $1 and member_id = $2
+       limit 1`,
+      [requestId, memberId],
+    );
+    if (existing[0]) {
+      await sql(
+        `update payments
+         set amount = $1,
+             status = $2,
+             payment_date = $3::date
+         where id = $4`,
+        [amount.toFixed(2), status, paymentDate, Number(existing[0].id)],
+      );
+    } else {
+      await sql(
+        `insert into payments
+           (payment_request_id, member_id, amount, status, payment_date)
+         values ($1, $2, $3, $4, $5::date)`,
+        [requestId, memberId, amount.toFixed(2), status, paymentDate],
+      );
+    }
+  }
 
   revalidatePath("/payments");
   revalidatePath("/members");
@@ -229,10 +283,11 @@ export async function addBoardContribution(formData: FormData): Promise<void> {
   okReturn(returnTo, "contributed");
 }
 
+/** Status-only flip used on member detail payment tables. */
 export async function markPaymentPaid(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
-  const returnTo = String(formData.get("return_to") ?? "/payments");
+  const returnTo = String(formData.get("return_to") ?? "/members");
 
   if (!Number.isFinite(id) || id <= 0) {
     failReturn(returnTo, "Invalid payment.");
@@ -252,33 +307,6 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
          payment_date = coalesce(payment_date, $1::date)
      where id = $2`,
     [today, id],
-  );
-
-  revalidatePath("/payments");
-  revalidatePath("/members");
-  revalidatePath(`/members/${payment.member_id}`);
-  okReturn(returnTo, "status");
-}
-
-export async function markPaymentPledge(formData: FormData): Promise<void> {
-  await requireAdmin();
-  const id = Number(formData.get("id"));
-  const returnTo = String(formData.get("return_to") ?? "/payments");
-
-  if (!Number.isFinite(id) || id <= 0) {
-    failReturn(returnTo, "Invalid payment.");
-  }
-
-  const rows = await sql<{ id: number; member_id: number }>(
-    "select id, member_id from payments where id = $1",
-    [id],
-  );
-  const payment = rows[0];
-  if (!payment) failReturn(returnTo, "Payment not found.");
-
-  await sql(
-    `update payments set status = 'pledge' where id = $1`,
-    [id],
   );
 
   revalidatePath("/payments");

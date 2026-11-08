@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useTransition } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
@@ -32,6 +39,7 @@ export function LoginForm({
   const [requestEmail, setRequestEmail] = useState("");
   const [requestNotice, setRequestNotice] = useState<string | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   if (!firebaseConfig) {
     return (
@@ -75,11 +83,17 @@ export function LoginForm({
     setRequestOpen(true);
   }
 
-  function onEmailLogin(formData: FormData) {
+  function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
     setRequestNotice(null);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
+    const email = emailInputRef.current?.value.trim() ?? "";
+    const password = passwordInputRef.current?.value ?? "";
+    if (!email || !password) {
+      setError("Enter your email and password.");
+      return;
+    }
+
     startTransition(async () => {
       try {
         const auth = getFirebaseAuth(firebaseConfig!);
@@ -87,7 +101,6 @@ export function LoginForm({
         await finish(await cred.user.getIdToken(), email);
       } catch (err) {
         const code = firebaseCode(err);
-        // Firebase often collapses unknown-user + wrong-password into one code.
         if (
           code === "auth/invalid-credential" ||
           code === "auth/user-not-found" ||
@@ -103,7 +116,7 @@ export function LoginForm({
               openRequestFor(email);
             }
           } catch {
-            setError("Sign-in failed. Check your details and try again.");
+            setError("No account found for this email. You can request access.");
             openRequestFor(email);
           }
           return;
@@ -149,7 +162,7 @@ export function LoginForm({
           {requestNotice}
         </p>
       ) : null}
-      <form action={onEmailLogin} className="form-grid">
+      <form onSubmit={handleEmailSubmit} className="form-grid">
         <label className="field">
           Email
           <input
@@ -164,6 +177,7 @@ export function LoginForm({
         <label className="field">
           Password
           <input
+            ref={passwordInputRef}
             name="password"
             type="password"
             required
@@ -237,13 +251,16 @@ function AccessRequestDialog({
     }
   }, [open]);
 
-  function onSubmit(formData: FormData) {
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setError(null);
+    const form = event.currentTarget;
+    const data = new FormData(form);
     startTransition(async () => {
       const result = await submitAccessRequest({
-        email: String(formData.get("email") ?? ""),
-        name: String(formData.get("name") ?? ""),
-        phone: String(formData.get("phone") ?? ""),
+        email: String(data.get("email") ?? ""),
+        name: String(data.get("name") ?? ""),
+        phone: String(data.get("phone") ?? ""),
       });
       if (!result.ok) {
         setError(result.error);
@@ -267,7 +284,7 @@ function AccessRequestDialog({
         if (e.target === dialogRef.current) onClose();
       }}
     >
-      <form action={onSubmit} className="contrib-dialog-panel">
+      <form onSubmit={onSubmit} className="contrib-dialog-panel">
         <div className="contrib-dialog-head">
           <h3 id={titleId}>Request an account</h3>
           <button type="button" className="btn-ghost" onClick={onClose}>
@@ -275,7 +292,8 @@ function AccessRequestDialog({
           </button>
         </div>
         <p className="muted" style={{ margin: 0 }}>
-          An admin must approve your request before you can access KLEF 13.
+          An admin must approve your request and link it to a member before you
+          can access KLEF 13.
         </p>
         {error ? (
           <p className="form-error" role="alert">

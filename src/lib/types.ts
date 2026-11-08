@@ -2,9 +2,6 @@ export type AppRole = "admin" | "member" | "pending";
 
 export type PaymentStatus = "pledge" | "paid";
 
-/** Mutually exclusive payment categories stored on requests + payments. */
-export type PaymentType = "contribution" | "dues";
-
 export type AppUser = {
   id: number;
   cursor_sub: string | null;
@@ -24,29 +21,25 @@ export type Member = {
   created_at: string;
 };
 
+/** Contribution payment request (separate from dues schedules). */
 export type PaymentRequest = {
   id: number;
-  type: PaymentType;
   title: string;
   amount: string;
   deadline: string;
-  /** Set for dues years (Jan–Dec schedule). */
-  year: number | null;
   concluded_at: string | null;
   created_at: string;
 };
 
+/** Contribution payment row (separate from dues payments). */
 export type Payment = {
   id: number;
-  type: PaymentType;
   payment_request_id: number;
   title: string;
   member_id: number;
   amount: string;
   payment_date: string | null;
   status: PaymentStatus;
-  /** Dues only: calendar months (1–12) covered by this payment. */
-  covered_months: number[] | null;
   created_at: string;
 };
 
@@ -59,10 +52,13 @@ export type MemberContribution = Member & {
   payment_count: number;
   /** Contribution titles this member has paid (excludes dues). */
   contribution_count: number;
-  /** Dues months paid in the active dues year (excludes contributions). */
+  /**
+   * Dues progress across opened years: each year is 1.0 when fully paid;
+   * partial months count as months/12 (e.g. 3 months → 0.25).
+   */
   dues_count: number;
-  /** Active dues year used for dues_count, if any. */
-  dues_year: number | null;
+  /** Number of dues years opened (denominator, like payment_count). */
+  dues_years_count: number;
 };
 
 export type MemberPaymentRow = Member & {

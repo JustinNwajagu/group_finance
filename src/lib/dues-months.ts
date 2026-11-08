@@ -44,6 +44,25 @@ export function takeNextUnpaidMonths(
   return out;
 }
 
+/**
+ * Fractional dues credit for one year: monthsPaid/12.
+ * A fully paid year counts as 1.
+ */
+export function duesYearFraction(monthsPaid: number): number {
+  const n = Math.max(0, Math.min(12, Math.round(monthsPaid)));
+  return n / 12;
+}
+
+/** Display fractional dues totals without noisy trailing zeros. */
+export function formatDuesCount(value: number): string {
+  if (!Number.isFinite(value)) return "0";
+  const rounded = Math.round(value * 1000) / 1000;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded
+    .toFixed(3)
+    .replace(/\.?0+$/, "");
+}
+
 /** Compact label for covered months, e.g. "Jan–Mar" or "Jan, Mar". */
 export function formatCoveredMonths(months: number[]): string {
   const labels = [...months]

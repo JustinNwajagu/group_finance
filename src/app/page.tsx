@@ -7,6 +7,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers, requestedPaymentCount } from "@/lib/data";
+import { formatDuesCount } from "@/lib/dues-months";
 
 export const instant = false;
 
@@ -33,11 +34,10 @@ export default async function HomePage({
         <div>
           <h1>Home</h1>
           <p>
-            Roster overview. <strong>Contributions</strong> is how many
-            contribution titles each member has paid (pledges do not count).{" "}
-            <strong>Dues</strong> is months paid in the active dues year
-            (Jan–Dec). The two counts are separate — dues never count as
-            contributions and vice versa.
+            Roster overview. <strong>Contributions</strong> is paid contribution
+            titles (pledges do not count). <strong>Dues</strong> treats each
+            opened year as 1 — partial months count as a fraction (3 months =
+            0.25). The two counts are separate and stored in different tables.
           </p>
         </div>
         <Suspense fallback={null}>
@@ -60,10 +60,10 @@ export default async function HomePage({
             <h2>Roster</h2>
             <p className="panel-heading-meta">
               Contribution titles <strong>{paymentTotal}</strong>
-              {members[0]?.dues_year != null ? (
+              {members[0]?.dues_years_count ? (
                 <>
                   {" "}
-                  · Dues year <strong>{members[0].dues_year}</strong>
+                  · Dues years <strong>{members[0].dues_years_count}</strong>
                 </>
               ) : null}
             </p>
@@ -101,10 +101,12 @@ export default async function HomePage({
                         <span className="muted">/{m.payment_count}</span>
                       </td>
                       <td className="num">
-                        {m.dues_year != null ? (
+                        {m.dues_years_count > 0 ? (
                           <>
-                            {m.dues_count}
-                            <span className="muted">/12</span>
+                            {formatDuesCount(m.dues_count)}
+                            <span className="muted">
+                              /{m.dues_years_count}
+                            </span>
                           </>
                         ) : (
                           <span className="muted">—</span>

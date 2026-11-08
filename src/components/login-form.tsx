@@ -87,15 +87,23 @@ export function LoginForm({
         await finish(await cred.user.getIdToken(), email);
       } catch (err) {
         const code = firebaseCode(err);
+        // Firebase often collapses unknown-user + wrong-password into one code.
         if (
           code === "auth/invalid-credential" ||
           code === "auth/user-not-found" ||
           code === "auth/wrong-password" ||
-          code === "auth/invalid-email"
+          code === "auth/invalid-email" ||
+          code === "auth/invalid-login-credentials" ||
+          !code
         ) {
-          const classified = await classifyLoginFailure(email);
-          setError(classified.message);
-          if (classified.kind === "no_account") {
+          try {
+            const classified = await classifyLoginFailure(email);
+            setError(classified.message);
+            if (classified.kind === "no_account") {
+              openRequestFor(email);
+            }
+          } catch {
+            setError("Sign-in failed. Check your details and try again.");
             openRequestFor(email);
           }
           return;

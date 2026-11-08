@@ -9,16 +9,22 @@ export async function createMemberAction(formData: FormData): Promise<void> {
   await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
 
   if (!name) {
     redirect("/?error=" + encodeURIComponent("Name is required."));
   }
 
-  await createMember({ name, email: email || null });
+  await createMember({
+    name,
+    email: email || null,
+    phone: phone || null,
+  });
 
   revalidatePath("/");
   revalidatePath("/payments");
   revalidatePath("/archive");
+  revalidatePath("/access");
   redirect("/?ok=member");
 }
 
@@ -33,7 +39,9 @@ export async function importMembers(formData: FormData): Promise<void> {
   if (lines.length === 0) {
     redirect(
       "/?error=" +
-        encodeURIComponent("Paste one member per line: Name, optional email."),
+        encodeURIComponent(
+          "Paste one member per line: Name, optional email, optional phone.",
+        ),
     );
   }
 
@@ -43,8 +51,13 @@ export async function importMembers(formData: FormData): Promise<void> {
     const parts = line.split(",").map((p) => p.trim().replace(/^"|"$/g, ""));
     const name = parts[0] ?? "";
     const email = parts[1] ?? "";
+    const phone = parts[2] ?? "";
     if (!name) continue;
-    await createMember({ name, email: email || null });
+    await createMember({
+      name,
+      email: email || null,
+      phone: phone || null,
+    });
     imported += 1;
   }
 
@@ -55,6 +68,7 @@ export async function importMembers(formData: FormData): Promise<void> {
   revalidatePath("/");
   revalidatePath("/payments");
   revalidatePath("/archive");
+  revalidatePath("/access");
   redirect("/?ok=import");
 }
 

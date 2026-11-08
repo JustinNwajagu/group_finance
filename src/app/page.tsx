@@ -110,6 +110,14 @@ export default async function HomePage({
                   Email (optional)
                   <input name="email" type="email" autoComplete="off" />
                 </label>
+                <label className="field">
+                  Phone (optional)
+                  <input name="phone" type="tel" autoComplete="off" />
+                </label>
+                <p className="muted" style={{ margin: 0 }}>
+                  Adding a member does not create a login. Logins are approved
+                  separately on Access.
+                </p>
                 <button type="submit" className="btn-primary">
                   Add member
                 </button>
@@ -118,14 +126,18 @@ export default async function HomePage({
             <section className="panel">
               <h2>Import members</h2>
               <p className="muted" style={{ marginTop: 0 }}>
-                One per line: <code>Name</code> or <code>Name, email</code>.
+                One per line: <code>Name</code>, optional{" "}
+                <code>email</code>, optional <code>phone</code>. Import does not
+                grant login access.
               </p>
               <form action={importMembers} className="form-grid">
                 <label className="field">
                   CSV / list
                   <textarea
                     name="csv"
-                    placeholder={"Ada Lovelace, ada@example.com\nGrace Hopper"}
+                    placeholder={
+                      "Ada Lovelace, ada@example.com, +2348000000000\nGrace Hopper"
+                    }
                   />
                 </label>
                 <button type="submit" className="btn-primary">

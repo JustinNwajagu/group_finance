@@ -3,7 +3,15 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { adminAuth, adminDb } from "./firebase-admin";
 import { useFirestore } from "./config";
-import { createMember, listAllMembers } from "./store";
+import {
+  countLinkedLogins,
+  countMembers,
+  createMember,
+  getMemberById,
+  listMembersWithoutLogin,
+  updateMemberRow,
+  type MemberRow,
+} from "./store";
 
 export type AccessRequestStatus = "pending" | "approved" | "rejected";
 
@@ -13,6 +21,7 @@ export type AccessRequestRow = {
   name: string;
   phone: string;
   status: AccessRequestStatus;
+  member_id: number | null;
   created_at: string;
   decided_at: string | null;
 };
@@ -55,6 +64,23 @@ function isRow(data: Record<string, unknown> | undefined): boolean {
   return Number.isFinite(Number(data.id));
 }
 
+function normalizeRequest(raw: Record<string, unknown>): AccessRequestRow | null {
+  if (!isRow(raw)) return null;
+  return {
+    id: Number(raw.id),
+    email: String(raw.email ?? "").toLowerCase(),
+    name: String(raw.name ?? ""),
+    phone: String(raw.phone ?? ""),
+    status: (raw.status as AccessRequestStatus) ?? "pending",
+    member_id:
+      raw.member_id == null || raw.member_id === ""
+        ? null
+        : Number(raw.member_id),
+    created_at: String(raw.created_at ?? ""),
+    decided_at: (raw.decided_at as string | null) ?? null,
+  };
+}
+
 async function nextId(): Promise<number> {
   if (useFirestore()) {
     const db = adminDb()!;
@@ -88,6 +114,7 @@ export async function createAccessRequest(input: {
     name,
     phone,
     status: "pending",
+    member_id: null,
     created_at,
     decided_at: null,
   };
@@ -109,12 +136,12 @@ export async function listAccessRequests(
   if (useFirestore()) {
     const snap = await adminDb()!.collection("access_requests").get();
     rows = snap.docs
-      .map((d) => d.data())
-      .filter((d): d is AccessRequestRow =>
-        isRow(d as Record<string, unknown>),
-      );
+      .map((d) => normalizeRequest(d.data() as Record<string, unknown>))
+      .filter((d): d is AccessRequestRow => d != null);
   } else {
-    rows = [...(await loadLocal()).requests];
+    rows = (await loadLocal()).requests
+      .map((r) => normalizeRequest(r as unknown as Record<string, unknown>))
+      .filter((d): d is AccessRequestRow => d != null);
   }
   if (status) rows = rows.filter((r) => r.status === status);
   return rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -130,10 +157,12 @@ export async function getAccessRequestById(
       .doc(String(id))
       .get();
     if (!snap.exists) return null;
-    const data = snap.data() as Record<string, unknown>;
-    return isRow(data) ? (data as unknown as AccessRequestRow) : null;
+    return normalizeRequest(snap.data() as Record<string, unknown>);
   }
-  return (await loadLocal()).requests.find((r) => r.id === id) ?? null;
+  const found = (await loadLocal()).requests.find((r) => r.id === id);
+  return found
+    ? normalizeRequest(found as unknown as Record<string, unknown>)
+    : null;
 }
 
 export async function findPendingOrApprovedByEmail(
@@ -167,20 +196,21 @@ export async function emailIsApproved(email: string): Promise<boolean> {
   return rows.some((r) => r.email === target && r.status === "approved");
 }
 
-export async function updateAccessRequestStatus(
+export async function updateAccessRequest(
   id: number,
-  status: Exclude<AccessRequestStatus, "pending">,
+  patch: Partial<
+    Pick<AccessRequestRow, "status" | "decided_at" | "member_id">
+  >,
 ): Promise<AccessRequestRow | null> {
   const existing = await getAccessRequestById(id);
   if (!existing) return null;
-  const decided_at = new Date().toISOString();
-  const next = { ...existing, status, decided_at };
+  const next = { ...existing, ...patch };
 
   if (useFirestore()) {
     await adminDb()!
       .collection("access_requests")
       .doc(String(id))
-      .set({ status, decided_at }, { merge: true });
+      .set(patch, { merge: true });
     return next;
   }
   const db = await loadLocal();
@@ -191,26 +221,72 @@ export async function updateAccessRequestStatus(
   return next;
 }
 
-/** Create Auth user + roster member when an admin approves a request. */
+export async function loginCapacity(): Promise<{
+  members: number;
+  logins: number;
+  remaining: number;
+}> {
+  const [members, logins] = await Promise.all([
+    countMembers(),
+    countLinkedLogins(),
+  ]);
+  return { members, logins, remaining: Math.max(0, members - logins) };
+}
+
+/**
+ * Create Auth login and link to an existing member, or create a new member.
+ * Login count cannot exceed member count.
+ */
 export async function provisionApprovedUser(
   request: AccessRequestRow,
-): Promise<{ passwordResetLink: string | null }> {
+  choice:
+    | { mode: "link"; memberId: number }
+    | { mode: "create" },
+): Promise<{ passwordResetLink: string | null; member: MemberRow }> {
+  const capacity = await loginCapacity();
+
+  let member: MemberRow | null = null;
+
+  if (choice.mode === "link") {
+    member = await getMemberById(choice.memberId);
+    if (!member) {
+      throw new Error("Selected member was not found.");
+    }
+    if (member.auth_uid) {
+      throw new Error("That member already has a login linked.");
+    }
+    if (capacity.remaining < 1) {
+      throw new Error(
+        "All members already have logins. Add a member before approving more accounts.",
+      );
+    }
+  } else {
+    // Creating a member increases roster by 1 and login by 1 — always capacity-safe.
+    member = await createMember({
+      name: request.name,
+      email: request.email,
+      phone: request.phone,
+    });
+  }
+
   const auth = adminAuth();
   let passwordResetLink: string | null = null;
+  let authUid: string | null = null;
 
   if (auth) {
     try {
-      await auth.getUserByEmail(request.email);
+      const existing = await auth.getUserByEmail(request.email);
+      authUid = existing.uid;
     } catch {
       const crypto = await import("node:crypto");
-      const temp =
-        crypto.randomBytes(18).toString("base64url") + "Aa1!";
-      await auth.createUser({
+      const temp = crypto.randomBytes(18).toString("base64url") + "Aa1!";
+      const created = await auth.createUser({
         email: request.email,
         password: temp,
         displayName: request.name,
         emailVerified: false,
       });
+      authUid = created.uid;
     }
     try {
       passwordResetLink = await auth.generatePasswordResetLink(request.email);
@@ -219,13 +295,20 @@ export async function provisionApprovedUser(
     }
   }
 
-  const members = await listAllMembers();
-  const already = members.some(
-    (m) => (m.email ?? "").toLowerCase() === request.email,
-  );
-  if (!already) {
-    await createMember({ name: request.name, email: request.email });
-  }
+  await updateMemberRow(member.id, {
+    auth_uid: authUid,
+    login_email: request.email,
+    email: member.email || request.email,
+    phone: member.phone || request.phone || null,
+  });
 
-  return { passwordResetLink };
+  const linked = (await getMemberById(member.id)) ?? {
+    ...member,
+    auth_uid: authUid,
+    login_email: request.email,
+  };
+
+  return { passwordResetLink, member: linked };
 }
+
+export { listMembersWithoutLogin };

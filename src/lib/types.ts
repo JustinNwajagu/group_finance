@@ -15,6 +15,9 @@ export type Member = {
   id: number;
   name: string;
   email: string | null;
+  phone: string | null;
+  auth_uid: string | null;
+  login_email: string | null;
   created_at: string;
 };
 

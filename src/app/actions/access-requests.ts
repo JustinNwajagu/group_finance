@@ -10,8 +10,9 @@ import {
   findPendingOrApprovedByEmail,
   getAccessRequestById,
   listAccessRequests,
+  loginCapacity,
   provisionApprovedUser,
-  updateAccessRequestStatus,
+  updateAccessRequest,
 } from "@/lib/access-requests";
 
 export type LoginFailureKind =
@@ -108,7 +109,8 @@ export async function submitAccessRequest(input: {
   if (existing?.status === "approved") {
     return {
       ok: false,
-      error: "This email was already approved. Check your inbox to set a password.",
+      error:
+        "This email was already approved. Check with your admin for the password link.",
     };
   }
 
@@ -122,29 +124,63 @@ export async function approveAccessRequest(
 ): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
-  if (!Number.isFinite(id)) return;
+  const mode = String(formData.get("link_mode") ?? "").trim();
+  const memberId = Number(formData.get("member_id"));
+
+  if (!Number.isFinite(id)) {
+    redirect("/access?error=" + encodeURIComponent("Invalid request."));
+  }
 
   const request = await getAccessRequestById(id);
-  if (!request || request.status !== "pending") return;
+  if (!request || request.status !== "pending") {
+    redirect("/access?error=" + encodeURIComponent("Request is not pending."));
+  }
 
-  await updateAccessRequestStatus(id, "approved");
-  const { passwordResetLink } = await provisionApprovedUser(request);
-
-  revalidatePath("/access");
-  revalidatePath("/");
-  if (passwordResetLink) {
+  if (mode !== "link" && mode !== "create") {
     redirect(
-      "/access?ok=approved&link=" + encodeURIComponent(passwordResetLink),
+      "/access?error=" +
+        encodeURIComponent("Choose link to a member or create a new member."),
     );
   }
-  redirect("/access?ok=approved");
+
+  try {
+    const result = await provisionApprovedUser(
+      request,
+      mode === "link"
+        ? { mode: "link", memberId }
+        : { mode: "create" },
+    );
+
+    await updateAccessRequest(id, {
+      status: "approved",
+      decided_at: new Date().toISOString(),
+      member_id: result.member.id,
+    });
+
+    revalidatePath("/access");
+    revalidatePath("/");
+    if (result.passwordResetLink) {
+      redirect(
+        "/access?ok=approved&link=" +
+          encodeURIComponent(result.passwordResetLink),
+      );
+    }
+    redirect("/access?ok=approved");
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not approve this request.";
+    redirect("/access?error=" + encodeURIComponent(message));
+  }
 }
 
 export async function rejectAccessRequest(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id)) return;
-  await updateAccessRequestStatus(id, "rejected");
+  await updateAccessRequest(id, {
+    status: "rejected",
+    decided_at: new Date().toISOString(),
+  });
   revalidatePath("/access");
   redirect("/access?ok=rejected");
 }
@@ -153,4 +189,9 @@ export async function loadPendingAccessRequests() {
   const viewer = await requireAdmin();
   if (!isAdmin(viewer)) return [];
   return listAccessRequests("pending");
+}
+
+export async function getLoginCapacityAction() {
+  await requireAdmin();
+  return loginCapacity();
 }

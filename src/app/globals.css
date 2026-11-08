@@ -603,6 +603,15 @@ textarea {
   font-weight: 650;
 }
 
+.access-request-card {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
 .contrib-dialog-actions {
   display: flex;
   justify-content: flex-end;

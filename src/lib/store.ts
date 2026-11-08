@@ -9,6 +9,11 @@ export type MemberRow = {
   id: number;
   name: string;
   email: string | null;
+  phone: string | null;
+  /** Firebase Auth uid when this roster member has a login. */
+  auth_uid: string | null;
+  /** Login email if different from contact email. */
+  login_email: string | null;
   created_at: string;
 };
 
@@ -116,46 +121,95 @@ export async function storeBackend(): Promise<"firestore" | "local"> {
 export async function createMember(input: {
   name: string;
   email: string | null;
+  phone?: string | null;
 }): Promise<MemberRow> {
   const created_at = nowIso();
+  const rowBase = {
+    name: input.name,
+    email: input.email,
+    phone: input.phone?.trim() || null,
+    auth_uid: null as string | null,
+    login_email: null as string | null,
+    created_at,
+  };
   if (useFirestore()) {
     const id = await firestoreNextId("members");
-    const row: MemberRow = {
-      id,
-      name: input.name,
-      email: input.email,
-      created_at,
-    };
+    const row: MemberRow = { id, ...rowBase };
     await adminDb()!.collection("members").doc(String(id)).set(row);
     return row;
   }
   const db = await loadLocal();
   const id = await nextLocalId(db, "members");
-  const row: MemberRow = {
-    id,
-    name: input.name,
-    email: input.email,
-    created_at,
-  };
+  const row: MemberRow = { id, ...rowBase };
   db.members.push(row);
   await saveLocal(db);
   return row;
+}
+
+export async function updateMemberRow(
+  id: number,
+  patch: Partial<
+    Pick<MemberRow, "name" | "email" | "phone" | "auth_uid" | "login_email">
+  >,
+): Promise<void> {
+  if (!Number.isFinite(id) || id <= 0) return;
+  if (useFirestore()) {
+    await adminDb()!
+      .collection("members")
+      .doc(String(id))
+      .set(patch, { merge: true });
+    return;
+  }
+  const db = await loadLocal();
+  const row = db.members.find((m) => m.id === id);
+  if (!row) return;
+  Object.assign(row, patch);
+  await saveLocal(db);
+}
+
+/** Roster members that do not yet have a linked login. */
+export async function listMembersWithoutLogin(): Promise<MemberRow[]> {
+  return (await listAllMembers()).filter((m) => !m.auth_uid);
+}
+
+export async function countMembers(): Promise<number> {
+  return (await listAllMembers()).length;
+}
+
+export async function countLinkedLogins(): Promise<number> {
+  return (await listAllMembers()).filter((m) => Boolean(m.auth_uid)).length;
+}
+
+function normalizeMember(raw: Record<string, unknown>): MemberRow | null {
+  if (!isAppRow(raw)) return null;
+  return {
+    id: Number(raw.id),
+    name: String(raw.name ?? ""),
+    email: (raw.email as string | null) ?? null,
+    phone: (raw.phone as string | null) ?? null,
+    auth_uid: (raw.auth_uid as string | null) ?? null,
+    login_email: (raw.login_email as string | null) ?? null,
+    created_at: String(raw.created_at ?? ""),
+  };
 }
 
 export async function listAllMembers(): Promise<MemberRow[]> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("members").get();
     return snap.docs
-      .map((d) => d.data())
-      .filter((d): d is MemberRow => isAppRow(d as Record<string, unknown>))
+      .map((d) => normalizeMember(d.data() as Record<string, unknown>))
+      .filter((d): d is MemberRow => d != null)
       .sort((a, b) =>
         a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
       );
   }
   const db = await loadLocal();
-  return [...db.members].sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-  );
+  return [...db.members]
+    .map((m) => normalizeMember(m as unknown as Record<string, unknown>)!)
+    .filter(Boolean)
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {
@@ -163,11 +217,13 @@ export async function getMemberById(id: number): Promise<MemberRow | null> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("members").doc(String(id)).get();
     if (!snap.exists) return null;
-    const data = snap.data() as Record<string, unknown>;
-    return isAppRow(data) ? (data as unknown as MemberRow) : null;
+    return normalizeMember(snap.data() as Record<string, unknown>);
   }
   const db = await loadLocal();
-  return db.members.find((m) => m.id === id) ?? null;
+  const found = db.members.find((m) => m.id === id);
+  return found
+    ? normalizeMember(found as unknown as Record<string, unknown>)
+    : null;
 }
 
 export async function createPaymentRequestRow(input: {

@@ -7,6 +7,7 @@ import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers, requestedPaymentCount } from "@/lib/data";
+import { listDuesSchedules } from "@/lib/dues-data";
 import { formatDuesCount } from "@/lib/dues-months";
 
 export const instant = false;
@@ -23,9 +24,10 @@ export default async function HomePage({
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const admin = isAdmin(viewer);
-  const [members, paymentTotal] = await Promise.all([
+  const [members, contributionCount, duesYearCount] = await Promise.all([
     listMembers(q),
     requestedPaymentCount(),
+    listDuesSchedules().then((rows) => rows.length),
   ]);
 
   return (
@@ -59,13 +61,9 @@ export default async function HomePage({
           <div className="panel-heading-row">
             <h2>Roster</h2>
             <p className="panel-heading-meta">
-              Contribution titles <strong>{paymentTotal}</strong>
-              {members[0]?.dues_years_count ? (
-                <>
-                  {" "}
-                  · Dues years <strong>{members[0].dues_years_count}</strong>
-                </>
-              ) : null}
+              Contributions count <strong>{contributionCount}</strong>
+              {" · "}
+              Dues count <strong>{duesYearCount}</strong>
             </p>
           </div>
           {members.length === 0 ? (

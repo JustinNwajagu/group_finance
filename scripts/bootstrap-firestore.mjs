@@ -1,17 +1,40 @@
 #!/usr/bin/env node
 /**
- * Ensures Firestore counters for KLEF Ledger:
- *   members, payment_requests, payments, _counters
+ * Ensures Firestore counters + visible collection stubs for KLEF 13:
+ *   members, payment_requests, payments, dues_schedules, dues_payments
  *
- * Does not write placeholder docs into data collections (those were
- * incorrectly treated as rows). Collections appear on first real write.
+ * Stub docs use `_meta: true` so the app never treats them as data rows.
  *
  * Requires Admin credentials:
  *   FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY
  */
 
+import { readFileSync } from "node:fs";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+
+function loadEnv() {
+  try {
+    const raw = readFileSync(new URL("../.env.local", import.meta.url), "utf8");
+    for (const line of raw.split(/\n/)) {
+      if (!line || line.startsWith("#") || !line.includes("=")) continue;
+      const i = line.indexOf("=");
+      const key = line.slice(0, i);
+      let value = line.slice(i + 1);
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      process.env[key] ??= value;
+    }
+  } catch {
+    // env may already be exported
+  }
+}
+
+loadEnv();
 
 const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
@@ -32,7 +55,34 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
-const collections = ["members", "payment_requests", "payments"];
+
+/** Data collections the app uses (contributions vs dues are split). */
+const collections = [
+  {
+    name: "members",
+    note: "Roster members (title + name; login linked later).",
+  },
+  {
+    name: "payment_requests",
+    note: "Contribution payment titles (not dues).",
+  },
+  {
+    name: "payments",
+    note: "Contribution payment rows (pledge/paid).",
+  },
+  {
+    name: "dues_schedules",
+    note: "Dues years (Jan–Dec) with fixed monthly amount.",
+  },
+  {
+    name: "dues_payments",
+    note: "Dues payments with covered_months.",
+  },
+  {
+    name: "access_requests",
+    note: "Pending / decided login access requests.",
+  },
+];
 
 async function ensureCounter(name) {
   const ref = db.collection("_counters").doc(name);
@@ -45,21 +95,29 @@ async function ensureCounter(name) {
   }
 }
 
-async function removeLegacySchema(collection) {
-  const ref = db.collection(collection).doc("_schema");
+async function ensureCollectionStub(name, note) {
+  const ref = db.collection(name).doc("_init");
   const snap = await ref.get();
-  if (snap.exists) {
-    await ref.delete();
-    console.log(`  removed legacy ${collection}/_schema`);
+  const payload = {
+    _meta: true,
+    note,
+    created_at: new Date().toISOString(),
+  };
+  if (!snap.exists) {
+    await ref.set(payload);
+    console.log(`  created ${name}/_init (collection visible in console)`);
+  } else {
+    await ref.set(payload, { merge: true });
+    console.log(`  exists  ${name}/_init`);
   }
 }
 
 console.log(`Bootstrapping Firestore for project ${projectId}…`);
-for (const name of collections) {
+for (const { name, note } of collections) {
   console.log(`\n${name}`);
-  await removeLegacySchema(name);
   await ensureCounter(name);
+  await ensureCollectionStub(name, note);
 }
 
-console.log("\nDone. Counters ready; app creates real rows on use.");
+console.log("\nDone. Counters + dues/contribution collections are ready.");
 process.exit(0);

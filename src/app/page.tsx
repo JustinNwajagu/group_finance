@@ -72,6 +72,7 @@ export default async function HomePage({
               <table className="data">
                 <thead>
                   <tr>
+                    <th className="num">#</th>
                     <th>Member</th>
                     <th>Email</th>
                     <th>Payments</th>
@@ -79,8 +80,9 @@ export default async function HomePage({
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
+                  {members.map((m, index) => (
                     <tr key={m.id}>
+                      <td className="num muted">{index + 1}</td>
                       <td>
                         <Link className="row-link" href={`/members/${m.id}`}>
                           {m.name}

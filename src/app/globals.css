@@ -282,6 +282,14 @@ table.data a.row-link:hover {
   text-decoration: underline;
 }
 
+table.data th.num,
+table.data td.num {
+  width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .money {
   font-variant-numeric: tabular-nums;
   font-weight: 600;

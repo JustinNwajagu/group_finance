@@ -6,6 +6,7 @@ import type {
   PaymentRequest,
   PaymentWithMember,
 } from "./types";
+import { compareMembersByName } from "./member-sort";
 import {
   getMemberById,
   getPaymentRequestById,
@@ -14,9 +15,7 @@ import {
   listAllPaymentRows,
 } from "./store";
 
-function byName(a: { name: string }, b: { name: string }) {
-  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-}
+const byName = compareMembersByName;
 
 export async function requestedPaymentCount(): Promise<number> {
   return (await listAllPaymentRequestRows()).length;

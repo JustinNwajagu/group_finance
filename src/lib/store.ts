@@ -4,6 +4,7 @@ import path from "node:path";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { useFirestore } from "./config";
+import { compareMembersByName } from "./member-sort";
 import type { PaymentStatus } from "./types";
 
 export type MemberRow = {
@@ -234,17 +235,13 @@ export async function listAllMembers(): Promise<MemberRow[]> {
     return snap.docs
       .map((d) => normalizeMember(d.data() as Record<string, unknown>))
       .filter((d): d is MemberRow => d != null)
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-      );
+      .sort(compareMembersByName);
   }
   const db = await loadLocal();
   return [...db.members]
     .map((m) => normalizeMember(m as unknown as Record<string, unknown>)!)
     .filter(Boolean)
-    .sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-    );
+    .sort(compareMembersByName);
 }
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {

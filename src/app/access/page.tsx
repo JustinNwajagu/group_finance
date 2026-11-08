@@ -30,14 +30,12 @@ export default async function AccessPage({
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const error = typeof params.error === "string" ? params.error : undefined;
   const link = typeof params.link === "string" ? params.link : undefined;
-  const [pending, recent, unlinkable, withLogin, capacity] = await Promise.all([
+  const [pending, unlinkable, withLogin, capacity] = await Promise.all([
     listAccessRequests("pending"),
-    listAccessRequests(),
     listMembersWithoutLogin(),
     listMembersWithLogin(),
     loginCapacity(),
   ]);
-  const decided = recent.filter((r) => r.status !== "pending").slice(0, 20);
   const atLoginCap = capacity.remaining < 1;
 
   return (
@@ -205,42 +203,6 @@ export default async function AccessPage({
                             </button>
                           </form>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="panel">
-          <h2>Recent decisions</h2>
-          {decided.length === 0 ? (
-            <p className="muted" style={{ margin: 0 }}>
-              No approvals or rejections yet.
-            </p>
-          ) : (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Status</th>
-                    <th>Member</th>
-                    <th>Decided</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {decided.map((r) => (
-                    <tr key={r.id}>
-                      <td>{r.name}</td>
-                      <td>{r.email}</td>
-                      <td>{r.status}</td>
-                      <td>{r.member_id ?? "—"}</td>
-                      <td>
-                        {r.decided_at ? formatTimestamp(r.decided_at) : "—"}
                       </td>
                     </tr>
                   ))}

@@ -6,6 +6,7 @@ import { requireAdmin, isAdmin } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/config";
 import {
   createAccessRequest,
+  deleteAccessRequest,
   deleteMemberLogin,
   emailHasAuthAccount,
   findPendingOrApprovedByEmail,
@@ -237,10 +238,6 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id)) return;
   const request = await getAccessRequestById(id);
-  await updateAccessRequest(id, {
-    status: "rejected",
-    decided_at: new Date().toISOString(),
-  });
 
   // Remove unused Auth credentials created at request time.
   if (request?.email) {
@@ -255,6 +252,9 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
       }
     }
   }
+
+  // Do not keep rejection history.
+  await deleteAccessRequest(id);
 
   revalidatePath("/access");
   redirect("/access?ok=rejected");

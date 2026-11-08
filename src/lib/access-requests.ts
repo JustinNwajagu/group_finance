@@ -221,6 +221,17 @@ export async function updateAccessRequest(
   return next;
 }
 
+export async function deleteAccessRequest(id: number): Promise<void> {
+  if (!Number.isFinite(id) || id <= 0) return;
+  if (useFirestore()) {
+    await adminDb()!.collection("access_requests").doc(String(id)).delete();
+    return;
+  }
+  const db = await loadLocal();
+  db.requests = db.requests.filter((r) => r.id !== id);
+  await saveLocal(db);
+}
+
 export async function loginCapacity(): Promise<{
   members: number;
   logins: number;
@@ -353,8 +364,8 @@ export async function deleteMemberLogin(memberId: number): Promise<void> {
     login_email: null,
   });
 
-  // Mark any approved access request for this login as rejected so they
-  // cannot sign in again until a new approval.
+  // Remove the approved access record so they cannot sign in again
+  // until a new request is approved.
   if (member.login_email) {
     const rows = await listAccessRequests();
     const match = rows.find(
@@ -363,10 +374,7 @@ export async function deleteMemberLogin(memberId: number): Promise<void> {
         r.status === "approved",
     );
     if (match) {
-      await updateAccessRequest(match.id, {
-        status: "rejected",
-        decided_at: new Date().toISOString(),
-      });
+      await deleteAccessRequest(match.id);
     }
   }
 }

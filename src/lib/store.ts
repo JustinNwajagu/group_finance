@@ -1,6 +1,7 @@
 import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { useFirestore } from "./config";
 import type { PaymentStatus } from "./types";
@@ -135,7 +136,14 @@ export async function createMember(input: {
   if (useFirestore()) {
     const id = await firestoreNextId("members");
     const row: MemberRow = { id, ...rowBase };
-    await adminDb()!.collection("members").doc(String(id)).set(row);
+    await adminDb()!
+      .collection("members")
+      .doc(String(id))
+      .set({
+        ...row,
+        // Native Firestore timestamp kept alongside ISO string for console/queries.
+        created_at_ts: FieldValue.serverTimestamp(),
+      });
     return row;
   }
   const db = await loadLocal();
@@ -185,6 +193,28 @@ export async function countLinkedLogins(): Promise<number> {
   return (await listAllMembers()).filter((m) => Boolean(m.auth_uid)).length;
 }
 
+function coerceCreatedAt(raw: Record<string, unknown>): string {
+  const value = raw.created_at;
+  if (typeof value === "string" && value) return value;
+  // Firestore Timestamp (admin SDK)
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as { toDate?: () => Date }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString();
+  }
+  const ts = raw.created_at_ts;
+  if (
+    ts &&
+    typeof ts === "object" &&
+    typeof (ts as { toDate?: () => Date }).toDate === "function"
+  ) {
+    return (ts as { toDate: () => Date }).toDate().toISOString();
+  }
+  return new Date().toISOString();
+}
+
 function normalizeMember(raw: Record<string, unknown>): MemberRow | null {
   if (!isAppRow(raw)) return null;
   return {
@@ -194,7 +224,7 @@ function normalizeMember(raw: Record<string, unknown>): MemberRow | null {
     phone: (raw.phone as string | null) ?? null,
     auth_uid: (raw.auth_uid as string | null) ?? null,
     login_email: (raw.login_email as string | null) ?? null,
-    created_at: String(raw.created_at ?? ""),
+    created_at: coerceCreatedAt(raw),
   };
 }
 

@@ -57,7 +57,12 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
     failPayments("Add a member first, then create a payment.");
   }
 
-  await createPaymentRequestRow({ title, amount, deadline });
+  await createPaymentRequestRow({
+    type: "contribution",
+    title,
+    amount,
+    deadline,
+  });
   revalidateDashboards();
   redirect("/payments?ok=1");
 }
@@ -115,6 +120,9 @@ export async function recordMemberContribution(
 
   const request = await getPaymentRequestById(requestId);
   if (!request) failReturn(returnTo, "Payment title not found.");
+  if (request.type !== "contribution") {
+    failReturn(returnTo, "Use the Dues page for monthly dues payments.");
+  }
 
   const member = await getMemberById(memberId);
   if (!member) failReturn(returnTo, "Member not found.");
@@ -144,6 +152,7 @@ export async function recordMemberContribution(
     });
   } else {
     await createPaymentRow({
+      type: "contribution",
       payment_request_id: requestId,
       member_id: memberId,
       amount,
@@ -181,6 +190,9 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
 
   const request = await getPaymentRequestById(requestId);
   if (!request) failReturn(returnTo, "Payment not found.");
+  if (request.type !== "contribution") {
+    failReturn(returnTo, "Use the Dues page for monthly dues payments.");
+  }
 
   if (amount + 1e-9 < Number(request.amount)) {
     failReturn(
@@ -219,6 +231,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
       });
     } else {
       await createPaymentRow({
+        type: "contribution",
         payment_request_id: requestId,
         member_id: memberId,
         amount,

@@ -2,6 +2,9 @@ export type AppRole = "admin" | "member" | "pending";
 
 export type PaymentStatus = "pledge" | "paid";
 
+/** Mutually exclusive payment categories stored on requests + payments. */
+export type PaymentType = "contribution" | "dues";
+
 export type AppUser = {
   id: number;
   cursor_sub: string | null;
@@ -23,21 +26,27 @@ export type Member = {
 
 export type PaymentRequest = {
   id: number;
+  type: PaymentType;
   title: string;
   amount: string;
   deadline: string;
+  /** Set for dues years (Jan–Dec schedule). */
+  year: number | null;
   concluded_at: string | null;
   created_at: string;
 };
 
 export type Payment = {
   id: number;
+  type: PaymentType;
   payment_request_id: number;
   title: string;
   member_id: number;
   amount: string;
   payment_date: string | null;
   status: PaymentStatus;
+  /** Dues only: calendar months (1–12) covered by this payment. */
+  covered_months: number[] | null;
   created_at: string;
 };
 

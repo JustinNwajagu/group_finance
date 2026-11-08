@@ -21,7 +21,9 @@ import {
 const byName = compareMembersByName;
 
 export async function requestedPaymentCount(): Promise<number> {
-  return (await listAllPaymentRequestRows()).length;
+  return (await listAllPaymentRequestRows()).filter(
+    (r) => r.type === "contribution",
+  ).length;
 }
 
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
@@ -32,7 +34,9 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
     listAllPaymentRows(),
     listAllDuesSchedules(),
   ]);
-  const paymentCount = requests.length;
+  const contributionRequests = requests.filter((r) => r.type === "contribution");
+  const contributionPayments = payments.filter((p) => p.type === "contribution");
+  const paymentCount = contributionRequests.length;
   const activeSchedule = schedules[0] ?? null;
   const duesYear = activeSchedule?.year ?? null;
   const duesPayments = activeSchedule
@@ -61,7 +65,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
       return {
         ...m,
         payment_count: paymentCount,
-        contribution_count: payments.filter(
+        contribution_count: contributionPayments.filter(
           (p) => p.member_id === m.id && p.status === "paid",
         ).length,
         dues_count: monthsPaid,
@@ -78,7 +82,10 @@ export async function getMember(id: number): Promise<Member | null> {
 export async function memberContribution(id: number): Promise<string> {
   const payments = await listAllPaymentRows();
   const total = payments
-    .filter((p) => p.member_id === id && p.status === "paid")
+    .filter(
+      (p) =>
+        p.member_id === id && p.status === "paid" && p.type === "contribution",
+    )
     .reduce((sum, p) => sum + Number(p.amount), 0);
   return total.toFixed(2);
 }
@@ -94,7 +101,8 @@ export async function memberPaymentStats(id: number): Promise<{
   return {
     payment_count,
     contribution_count: payments.filter(
-      (p) => p.member_id === id && p.status === "paid",
+      (p) =>
+        p.member_id === id && p.status === "paid" && p.type === "contribution",
     ).length,
   };
 }
@@ -105,25 +113,27 @@ export async function listMemberOptions(): Promise<Member[]> {
 
 export async function listOpenPaymentRequests(): Promise<PaymentRequest[]> {
   return (await listAllPaymentRequestRows())
-    .filter((r) => !r.concluded_at)
+    .filter((r) => r.type === "contribution" && !r.concluded_at)
     .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.id - b.id);
 }
 
 export async function listConcludedPaymentRequests(): Promise<PaymentRequest[]> {
   return (await listAllPaymentRequestRows())
-    .filter((r) => r.concluded_at)
+    .filter((r) => r.type === "contribution" && r.concluded_at)
     .sort((a, b) =>
       (b.concluded_at ?? "").localeCompare(a.concluded_at ?? ""),
     );
 }
 
 export async function listAllPaymentRequests(): Promise<PaymentRequest[]> {
-  return (await listAllPaymentRequestRows()).sort((a, b) => {
-    const ao = a.concluded_at ? 1 : 0;
-    const bo = b.concluded_at ? 1 : 0;
-    if (ao !== bo) return ao - bo;
-    return a.deadline.localeCompare(b.deadline) || b.id - a.id;
-  });
+  return (await listAllPaymentRequestRows())
+    .filter((r) => r.type === "contribution")
+    .sort((a, b) => {
+      const ao = a.concluded_at ? 1 : 0;
+      const bo = b.concluded_at ? 1 : 0;
+      if (ao !== bo) return ao - bo;
+      return a.deadline.localeCompare(b.deadline) || b.id - a.id;
+    });
 }
 
 export async function getPaymentRequest(
@@ -136,13 +146,15 @@ export async function contributionListsForRequest(
   requestId: number,
 ): Promise<ContributionLists | null> {
   const request = await getPaymentRequest(requestId);
-  if (!request) return null;
+  if (!request || request.type !== "contribution") return null;
 
   const [members, payments] = await Promise.all([
     listAllMembers(),
     listAllPaymentRows(),
   ]);
-  const forRequest = payments.filter((p) => p.payment_request_id === requestId);
+  const forRequest = payments.filter(
+    (p) => p.payment_request_id === requestId && p.type === "contribution",
+  );
   const byMember = new Map(forRequest.map((p) => [p.member_id, p]));
 
   const contributed: MemberPaymentRow[] = [];
@@ -213,7 +225,7 @@ export async function listPaymentsForMember(
   const reqById = new Map(requests.map((r) => [r.id, r]));
   const memById = new Map(members.map((m) => [m.id, m]));
   return payments
-    .filter((p) => p.member_id === id)
+    .filter((p) => p.member_id === id && p.type === "contribution")
     .map((p) => {
       const r = reqById.get(p.payment_request_id);
       const m = memById.get(p.member_id);
@@ -221,6 +233,8 @@ export async function listPaymentsForMember(
         ...p,
         title: r?.title ?? "Payment",
         member_name: m?.name ?? "Member",
+        type: p.type,
+        covered_months: p.covered_months,
       };
     })
     .sort((a, b) => {
@@ -242,6 +256,7 @@ export async function listPayments(
   const reqById = new Map(requests.map((r) => [r.id, r]));
   const memById = new Map(members.map((m) => [m.id, m]));
   return payments
+    .filter((p) => p.type === "contribution")
     .map((p) => {
       const r = reqById.get(p.payment_request_id);
       const m = memById.get(p.member_id);

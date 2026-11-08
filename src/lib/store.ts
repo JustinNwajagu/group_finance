@@ -5,7 +5,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { useFirestore } from "./config";
 import { compareMembersByName } from "./member-sort";
-import type { PaymentStatus } from "./types";
+import type { PaymentStatus, PaymentType } from "./types";
 
 export type MemberRow = {
   id: number;
@@ -21,23 +21,28 @@ export type MemberRow = {
 
 export type PaymentRequestRow = {
   id: number;
+  type: PaymentType;
   title: string;
   amount: string;
   deadline: string;
+  year: number | null;
   concluded_at: string | null;
   created_at: string;
 };
 
 export type PaymentRow = {
   id: number;
+  type: PaymentType;
   payment_request_id: number;
   member_id: number;
   amount: string;
   payment_date: string | null;
   status: PaymentStatus;
+  covered_months: number[] | null;
   created_at: string;
 };
 
+/** View of a dues-year payment_request (type=dues). */
 export type DuesScheduleRow = {
   id: number;
   year: number;
@@ -45,6 +50,7 @@ export type DuesScheduleRow = {
   created_at: string;
 };
 
+/** View of a dues payment row (type=dues). */
 export type DuesPaymentRow = {
   id: number;
   dues_schedule_id: number;
@@ -54,6 +60,10 @@ export type DuesPaymentRow = {
   payment_date: string;
   created_at: string;
 };
+
+function coercePaymentType(raw: unknown): PaymentType {
+  return raw === "dues" ? "dues" : "contribution";
+}
 
 type LocalDb = {
   counters: {
@@ -300,16 +310,64 @@ export async function getMemberById(id: number): Promise<MemberRow | null> {
     : null;
 }
 
+function normalizePaymentRequest(
+  raw: Record<string, unknown>,
+): PaymentRequestRow | null {
+  if (!isAppRow(raw)) return null;
+  const type = coercePaymentType(raw.type);
+  const yearRaw = raw.year != null ? Number(raw.year) : null;
+  return {
+    id: Number(raw.id),
+    type,
+    title: String(raw.title ?? ""),
+    amount: money(raw.amount as string | number),
+    deadline: String(raw.deadline ?? ""),
+    year:
+      type === "dues" && yearRaw != null && Number.isFinite(yearRaw)
+        ? yearRaw
+        : null,
+    concluded_at: (raw.concluded_at as string | null) ?? null,
+    created_at: String(raw.created_at ?? nowIso()),
+  };
+}
+
+function normalizePayment(raw: Record<string, unknown>): PaymentRow | null {
+  if (!isAppRow(raw)) return null;
+  const type = coercePaymentType(raw.type);
+  let covered_months: number[] | null = null;
+  if (Array.isArray(raw.covered_months)) {
+    covered_months = raw.covered_months
+      .map((m) => Number(m))
+      .filter((m) => Number.isFinite(m) && m >= 1 && m <= 12);
+  }
+  return {
+    id: Number(raw.id),
+    type,
+    payment_request_id: Number(raw.payment_request_id),
+    member_id: Number(raw.member_id),
+    amount: money(raw.amount as string | number),
+    payment_date: (raw.payment_date as string | null) ?? null,
+    status: raw.status === "paid" ? "paid" : "pledge",
+    covered_months: type === "dues" ? covered_months ?? [] : null,
+    created_at: String(raw.created_at ?? nowIso()),
+  };
+}
+
 export async function createPaymentRequestRow(input: {
   title: string;
   amount: number;
   deadline: string;
+  type?: PaymentType;
+  year?: number | null;
 }): Promise<PaymentRequestRow> {
   const created_at = nowIso();
+  const type = input.type ?? "contribution";
   const rowBase = {
+    type,
     title: input.title,
     amount: money(input.amount),
     deadline: input.deadline,
+    year: type === "dues" ? (input.year ?? null) : null,
     concluded_at: null as string | null,
     created_at,
   };
@@ -331,13 +389,19 @@ export async function listAllPaymentRequestRows(): Promise<PaymentRequestRow[]> 
   if (useFirestore()) {
     const snap = await adminDb()!.collection("payment_requests").get();
     return snap.docs
-      .map((d) => d.data())
-      .filter((d): d is PaymentRequestRow =>
-        isAppRow(d as Record<string, unknown>),
-      );
+      .map((d) => normalizePaymentRequest(d.data() as Record<string, unknown>))
+      .filter((d): d is PaymentRequestRow => d != null);
   }
   const db = await loadLocal();
-  return [...db.payment_requests];
+  return db.payment_requests
+    .map((r) => normalizePaymentRequest(r as unknown as Record<string, unknown>))
+    .filter((d): d is PaymentRequestRow => d != null);
+}
+
+export async function listPaymentRequestRowsByType(
+  type: PaymentType,
+): Promise<PaymentRequestRow[]> {
+  return (await listAllPaymentRequestRows()).filter((r) => r.type === type);
 }
 
 export async function getPaymentRequestById(
@@ -350,11 +414,13 @@ export async function getPaymentRequestById(
       .doc(String(id))
       .get();
     if (!snap.exists) return null;
-    const data = snap.data() as Record<string, unknown>;
-    return isAppRow(data) ? (data as unknown as PaymentRequestRow) : null;
+    return normalizePaymentRequest(snap.data() as Record<string, unknown>);
   }
   const db = await loadLocal();
-  return db.payment_requests.find((r) => r.id === id) ?? null;
+  const found = db.payment_requests.find((r) => r.id === id);
+  return found
+    ? normalizePaymentRequest(found as unknown as Record<string, unknown>)
+    : null;
 }
 
 export async function updatePaymentRequestRow(
@@ -379,11 +445,19 @@ export async function listAllPaymentRows(): Promise<PaymentRow[]> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("payments").get();
     return snap.docs
-      .map((d) => d.data())
-      .filter((d): d is PaymentRow => isAppRow(d as Record<string, unknown>));
+      .map((d) => normalizePayment(d.data() as Record<string, unknown>))
+      .filter((d): d is PaymentRow => d != null);
   }
   const db = await loadLocal();
-  return [...db.payments];
+  return db.payments
+    .map((p) => normalizePayment(p as unknown as Record<string, unknown>))
+    .filter((d): d is PaymentRow => d != null);
+}
+
+export async function listPaymentRowsByType(
+  type: PaymentType,
+): Promise<PaymentRow[]> {
+  return (await listAllPaymentRows()).filter((p) => p.type === type);
 }
 
 export async function getPaymentById(id: number): Promise<PaymentRow | null> {
@@ -391,11 +465,13 @@ export async function getPaymentById(id: number): Promise<PaymentRow | null> {
   if (useFirestore()) {
     const snap = await adminDb()!.collection("payments").doc(String(id)).get();
     if (!snap.exists) return null;
-    const data = snap.data() as Record<string, unknown>;
-    return isAppRow(data) ? (data as unknown as PaymentRow) : null;
+    return normalizePayment(snap.data() as Record<string, unknown>);
   }
   const db = await loadLocal();
-  return db.payments.find((p) => p.id === id) ?? null;
+  const found = db.payments.find((p) => p.id === id);
+  return found
+    ? normalizePayment(found as unknown as Record<string, unknown>)
+    : null;
 }
 
 export async function findPaymentForMemberRequest(
@@ -409,15 +485,17 @@ export async function findPaymentForMemberRequest(
       .where("member_id", "==", memberId)
       .limit(1)
       .get();
-    return snap.empty ? null : (snap.docs[0].data() as PaymentRow);
+    if (snap.empty) return null;
+    return normalizePayment(snap.docs[0].data() as Record<string, unknown>);
   }
   const db = await loadLocal();
-  return (
-    db.payments.find(
-      (p) =>
-        p.payment_request_id === paymentRequestId && p.member_id === memberId,
-    ) ?? null
+  const found = db.payments.find(
+    (p) =>
+      p.payment_request_id === paymentRequestId && p.member_id === memberId,
   );
+  return found
+    ? normalizePayment(found as unknown as Record<string, unknown>)
+    : null;
 }
 
 export async function createPaymentRow(input: {
@@ -426,14 +504,25 @@ export async function createPaymentRow(input: {
   amount: number | string;
   status: PaymentStatus;
   payment_date: string | null;
+  type?: PaymentType;
+  covered_months?: number[] | null;
 }): Promise<PaymentRow> {
   const created_at = nowIso();
+  const type = input.type ?? "contribution";
+  const covered =
+    type === "dues" && Array.isArray(input.covered_months)
+      ? [...input.covered_months]
+          .filter((m) => m >= 1 && m <= 12)
+          .sort((a, b) => a - b)
+      : null;
   const base = {
+    type,
     payment_request_id: input.payment_request_id,
     member_id: input.member_id,
     amount: money(input.amount),
     status: input.status,
     payment_date: input.payment_date,
+    covered_months: covered,
     created_at,
   };
   if (useFirestore()) {
@@ -482,102 +571,60 @@ export async function deletePaymentRow(id: number): Promise<void> {
   await saveLocal(db);
 }
 
-function normalizeDuesSchedule(
-  raw: Record<string, unknown>,
-): DuesScheduleRow | null {
-  if (!isAppRow(raw)) return null;
-  const year = Number(raw.year);
-  if (!Number.isFinite(year) || year < 2000) return null;
+function scheduleFromRequest(row: PaymentRequestRow): DuesScheduleRow | null {
+  if (row.type !== "dues" || row.year == null) return null;
   return {
-    id: Number(raw.id),
-    year,
-    monthly_amount: money(raw.monthly_amount as string | number),
-    created_at: String(raw.created_at ?? nowIso()),
+    id: row.id,
+    year: row.year,
+    monthly_amount: row.amount,
+    created_at: row.created_at,
   };
 }
 
-function normalizeDuesPayment(
-  raw: Record<string, unknown>,
-): DuesPaymentRow | null {
-  if (!isAppRow(raw)) return null;
-  let covered_months: number[] = [];
-  if (Array.isArray(raw.covered_months)) {
-    covered_months = raw.covered_months
-      .map((m) => Number(m))
-      .filter((m) => Number.isFinite(m) && m >= 1 && m <= 12);
-  } else {
-    // Legacy shape: start_month + months
-    const start = Number(raw.start_month);
-    const count = Number(raw.months);
-    if (Number.isFinite(start) && Number.isFinite(count) && count >= 1) {
-      for (let i = 0; i < count; i += 1) {
-        const m = start + i;
-        if (m >= 1 && m <= 12) covered_months.push(m);
-      }
-    }
-  }
-  if (covered_months.length === 0) return null;
+function duesPaymentFromRow(row: PaymentRow): DuesPaymentRow | null {
+  if (row.type !== "dues") return null;
+  const covered = row.covered_months ?? [];
+  if (covered.length === 0) return null;
   return {
-    id: Number(raw.id),
-    dues_schedule_id: Number(raw.dues_schedule_id),
-    member_id: Number(raw.member_id),
-    amount: money(raw.amount as string | number),
-    covered_months,
-    payment_date: String(raw.payment_date ?? ""),
-    created_at: String(raw.created_at ?? nowIso()),
+    id: row.id,
+    dues_schedule_id: row.payment_request_id,
+    member_id: row.member_id,
+    amount: row.amount,
+    covered_months: covered,
+    payment_date: row.payment_date ?? "",
+    created_at: row.created_at,
   };
 }
 
+/** Opens a dues year as a typed payment_request (type=dues). */
 export async function createDuesSchedule(input: {
   year: number;
   monthly_amount: number;
 }): Promise<DuesScheduleRow> {
-  const created_at = nowIso();
-  const rowBase = {
+  const row = await createPaymentRequestRow({
+    type: "dues",
+    title: `${input.year} Dues`,
+    amount: input.monthly_amount,
+    deadline: `${input.year}-12-31`,
     year: input.year,
-    monthly_amount: money(input.monthly_amount),
-    created_at,
-  };
-  if (useFirestore()) {
-    const id = await firestoreNextId("dues_schedules");
-    const row: DuesScheduleRow = { id, ...rowBase };
-    await adminDb()!.collection("dues_schedules").doc(String(id)).set(row);
-    return row;
-  }
-  const db = await loadLocal();
-  const id = await nextLocalId(db, "dues_schedules");
-  const row: DuesScheduleRow = { id, ...rowBase };
-  db.dues_schedules.push(row);
-  await saveLocal(db);
-  return row;
+  });
+  const schedule = scheduleFromRequest(row);
+  if (!schedule) throw new Error("Failed to create dues schedule.");
+  return schedule;
 }
 
 export async function listAllDuesSchedules(): Promise<DuesScheduleRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("dues_schedules").get();
-    return snap.docs
-      .map((d) => normalizeDuesSchedule(d.data() as Record<string, unknown>))
-      .filter((d): d is DuesScheduleRow => d != null)
-      .sort((a, b) => b.year - a.year || a.id - b.id);
-  }
-  const db = await loadLocal();
-  return [...db.dues_schedules].sort((a, b) => b.year - a.year || a.id - b.id);
+  return (await listPaymentRequestRowsByType("dues"))
+    .map(scheduleFromRequest)
+    .filter((d): d is DuesScheduleRow => d != null)
+    .sort((a, b) => b.year - a.year || a.id - b.id);
 }
 
 export async function getDuesScheduleById(
   id: number,
 ): Promise<DuesScheduleRow | null> {
-  if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
-    const snap = await adminDb()!
-      .collection("dues_schedules")
-      .doc(String(id))
-      .get();
-    if (!snap.exists) return null;
-    return normalizeDuesSchedule(snap.data() as Record<string, unknown>);
-  }
-  const db = await loadLocal();
-  return db.dues_schedules.find((r) => r.id === id) ?? null;
+  const row = await getPaymentRequestById(id);
+  return row ? scheduleFromRequest(row) : null;
 }
 
 export async function getDuesScheduleByYear(
@@ -588,62 +635,34 @@ export async function getDuesScheduleByYear(
 }
 
 export async function listAllDuesPayments(): Promise<DuesPaymentRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("dues_payments").get();
-    return snap.docs
-      .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
-      .filter((d): d is DuesPaymentRow => d != null);
-  }
-  const db = await loadLocal();
-  return [...db.dues_payments];
+  return (await listPaymentRowsByType("dues"))
+    .map(duesPaymentFromRow)
+    .filter((d): d is DuesPaymentRow => d != null);
 }
 
 export async function listDuesPaymentsForSchedule(
   scheduleId: number,
 ): Promise<DuesPaymentRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!
-      .collection("dues_payments")
-      .where("dues_schedule_id", "==", scheduleId)
-      .get();
-    return snap.docs
-      .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
-      .filter((d): d is DuesPaymentRow => d != null);
-  }
-  const db = await loadLocal();
-  return db.dues_payments.filter((p) => p.dues_schedule_id === scheduleId);
+  return (await listPaymentRowsByType("dues"))
+    .filter((p) => p.payment_request_id === scheduleId)
+    .map(duesPaymentFromRow)
+    .filter((d): d is DuesPaymentRow => d != null);
 }
 
 export async function listDuesPaymentsForMember(
   memberId: number,
 ): Promise<DuesPaymentRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!
-      .collection("dues_payments")
-      .where("member_id", "==", memberId)
-      .get();
-    return snap.docs
-      .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
-      .filter((d): d is DuesPaymentRow => d != null);
-  }
-  const db = await loadLocal();
-  return db.dues_payments.filter((p) => p.member_id === memberId);
+  return (await listPaymentRowsByType("dues"))
+    .filter((p) => p.member_id === memberId)
+    .map(duesPaymentFromRow)
+    .filter((d): d is DuesPaymentRow => d != null);
 }
 
 export async function getDuesPaymentById(
   id: number,
 ): Promise<DuesPaymentRow | null> {
-  if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
-    const snap = await adminDb()!
-      .collection("dues_payments")
-      .doc(String(id))
-      .get();
-    if (!snap.exists) return null;
-    return normalizeDuesPayment(snap.data() as Record<string, unknown>);
-  }
-  const db = await loadLocal();
-  return db.dues_payments.find((p) => p.id === id) ?? null;
+  const row = await getPaymentById(id);
+  return row ? duesPaymentFromRow(row) : null;
 }
 
 export async function createDuesPayment(input: {
@@ -653,38 +672,20 @@ export async function createDuesPayment(input: {
   covered_months: number[];
   payment_date: string;
 }): Promise<DuesPaymentRow> {
-  const created_at = nowIso();
-  const covered_months = [...input.covered_months]
-    .filter((m) => m >= 1 && m <= 12)
-    .sort((a, b) => a - b);
-  const base = {
-    dues_schedule_id: input.dues_schedule_id,
+  const row = await createPaymentRow({
+    type: "dues",
+    payment_request_id: input.dues_schedule_id,
     member_id: input.member_id,
-    amount: money(input.amount),
-    covered_months,
+    amount: input.amount,
+    status: "paid",
     payment_date: input.payment_date,
-    created_at,
-  };
-  if (useFirestore()) {
-    const id = await firestoreNextId("dues_payments");
-    const row: DuesPaymentRow = { id, ...base };
-    await adminDb()!.collection("dues_payments").doc(String(id)).set(row);
-    return row;
-  }
-  const db = await loadLocal();
-  const id = await nextLocalId(db, "dues_payments");
-  const row: DuesPaymentRow = { id, ...base };
-  db.dues_payments.push(row);
-  await saveLocal(db);
-  return row;
+    covered_months: input.covered_months,
+  });
+  const mapped = duesPaymentFromRow(row);
+  if (!mapped) throw new Error("Failed to create dues payment.");
+  return mapped;
 }
 
 export async function deleteDuesPayment(id: number): Promise<void> {
-  if (useFirestore()) {
-    await adminDb()!.collection("dues_payments").doc(String(id)).delete();
-    return;
-  }
-  const db = await loadLocal();
-  db.dues_payments = db.dues_payments.filter((p) => p.id !== id);
-  await saveLocal(db);
+  await deletePaymentRow(id);
 }

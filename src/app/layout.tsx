@@ -14,8 +14,8 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "KLEF Ledger",
-  description: "Group financial ledger",
+  title: "KLEF 13",
+  description: "Group financial records for KLEF 13",
   icons: {
     icon: "/logo.jpg",
     apple: "/logo.jpg",

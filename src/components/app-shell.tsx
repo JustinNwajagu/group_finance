@@ -21,8 +21,7 @@ export function AppShell({
       <header className="topbar">
         <Link href={homeHref} className="brand">
           <BrandLogo size={36} />
-          <span className="brand-mark">KLEF</span>
-          <span className="brand-sub">Ledger</span>
+          <span className="brand-mark">KLEF 13</span>
         </Link>
         <nav className="nav" aria-label="Primary">
           <Link

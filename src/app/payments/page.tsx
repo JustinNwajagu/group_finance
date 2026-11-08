@@ -36,10 +36,11 @@ export default async function PaymentsPage({
     <AppShell viewer={viewer} active="payments">
       <div className="page-head">
         <div>
-          <h1>Payments</h1>
+          <h1>Contributions</h1>
           <p>
-            Current open payment requests. Record pledges and paid amounts here.
-            Finished payments move to Archive. Amounts are in Nigerian Naira (₦).
+            One-off contribution requests (separate from monthly dues). Record
+            pledges and paid amounts here. Finished titles move to Archive.
+            Amounts are in Nigerian Naira (₦).
           </p>
         </div>
       </div>
@@ -63,9 +64,9 @@ export default async function PaymentsPage({
 
       <div className={admin ? "split split-2" : "stack"}>
         <section className="panel">
-          <h2>Current payments</h2>
+          <h2>Current contributions</h2>
           {boards.length === 0 ? (
-            <div className="hero-empty">No open payment requests.</div>
+            <div className="hero-empty">No open contribution requests.</div>
           ) : (
             <div className="contrib-boards">
               {boards.map((board) => (

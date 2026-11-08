@@ -33,10 +33,11 @@ export default async function HomePage({
         <div>
           <h1>Home</h1>
           <p>
-            Roster overview. Payments is the count of requested titles (same for
-            everyone). Contributions is how many titles each member has{" "}
-            <strong>paid</strong> (pledges do not count). Open payments live
-            under Payments; finished ones under Archive.
+            Roster overview. Payments is the count of contribution titles (same
+            for everyone). Contributions is how many of those titles each member
+            has <strong>paid</strong> (pledges do not count). Open contribution
+            requests live under Contributions; monthly dues under Dues; finished
+            contribution titles under Archive.
           </p>
         </div>
         <Suspense fallback={null}>

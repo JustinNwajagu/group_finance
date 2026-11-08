@@ -1,0 +1,138 @@
+import "server-only";
+import { compareMembersByName } from "./member-sort";
+import {
+  getDuesScheduleById,
+  getDuesScheduleByYear,
+  listAllDuesSchedules,
+  listAllMembers,
+  listDuesPaymentsForMember,
+  listDuesPaymentsForSchedule,
+  type DuesPaymentRow,
+  type DuesScheduleRow,
+  type MemberRow,
+} from "./store";
+import type {
+  DuesMemberYear,
+  DuesPaymentWithMember,
+  DuesYearBoard,
+} from "./types";
+
+function moneySum(values: Array<string | number>): string {
+  let total = 0;
+  for (const v of values) total += Number(v);
+  return total.toFixed(2);
+}
+
+export function monthsCoveredForMember(
+  payments: DuesPaymentRow[],
+): boolean[] {
+  const paid = Array.from({ length: 12 }, () => false);
+  for (const p of payments) {
+    for (const m of p.covered_months) {
+      if (m >= 1 && m <= 12) paid[m - 1] = true;
+    }
+  }
+  return paid;
+}
+
+export function remainingMonths(paid: boolean[]): number {
+  return paid.filter((v) => !v).length;
+}
+
+function toMemberYear(
+  member: MemberRow,
+  payments: DuesPaymentRow[],
+): DuesMemberYear {
+  const months_paid = monthsCoveredForMember(payments);
+  const months_count = months_paid.filter(Boolean).length;
+  return {
+    member,
+    months_paid,
+    months_count,
+    amount_paid: moneySum(payments.map((p) => p.amount)),
+    remaining_months: 12 - months_count,
+  };
+}
+
+export async function listDuesSchedules(): Promise<DuesScheduleRow[]> {
+  return listAllDuesSchedules();
+}
+
+export async function getDuesBoard(
+  scheduleIdOrYear: number,
+  byYear = false,
+): Promise<DuesYearBoard | null> {
+  const schedule = byYear
+    ? await getDuesScheduleByYear(scheduleIdOrYear)
+    : await getDuesScheduleById(scheduleIdOrYear);
+  if (!schedule) return null;
+
+  const [members, payments] = await Promise.all([
+    listAllMembers(),
+    listDuesPaymentsForSchedule(schedule.id),
+  ]);
+
+  const byMember = new Map<number, DuesPaymentRow[]>();
+  for (const p of payments) {
+    const list = byMember.get(p.member_id) ?? [];
+    list.push(p);
+    byMember.set(p.member_id, list);
+  }
+
+  const memById = new Map(members.map((m) => [m.id, m]));
+  const rows = [...members]
+    .sort(compareMembersByName)
+    .map((m) => toMemberYear(m, byMember.get(m.id) ?? []));
+
+  const paymentRows: DuesPaymentWithMember[] = [...payments]
+    .sort((a, b) => {
+      const byDate = b.payment_date.localeCompare(a.payment_date);
+      if (byDate !== 0) return byDate;
+      return b.id - a.id;
+    })
+    .map((p) => ({
+      ...p,
+      member_name: memById.get(p.member_id)?.name ?? `Member #${p.member_id}`,
+      year: schedule.year,
+    }));
+
+  return {
+    schedule,
+    rows,
+    payments: paymentRows,
+    total_collected: moneySum(payments.map((p) => p.amount)),
+  };
+}
+
+export async function getDuesBoardForYear(
+  year: number,
+): Promise<DuesYearBoard | null> {
+  return getDuesBoard(year, true);
+}
+
+export async function memberDuesSummary(memberId: number): Promise<
+  Array<{
+    schedule: DuesScheduleRow;
+    months_paid: boolean[];
+    months_count: number;
+    amount_paid: string;
+    remaining_months: number;
+  }>
+> {
+  const [schedules, payments] = await Promise.all([
+    listAllDuesSchedules(),
+    listDuesPaymentsForMember(memberId),
+  ]);
+  return schedules.map((schedule) => {
+    const forYear = payments.filter((p) => p.dues_schedule_id === schedule.id);
+    const months_paid = monthsCoveredForMember(forYear);
+    const months_count = months_paid.filter(Boolean).length;
+    return {
+      schedule,
+      months_paid,
+      months_count,
+      amount_paid: moneySum(forYear.map((p) => p.amount)),
+      remaining_months: 12 - months_count,
+    };
+  });
+}

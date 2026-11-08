@@ -290,6 +290,55 @@ table.data td.num {
   white-space: nowrap;
 }
 
+.dues-year-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.dues-year-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.dues-year-chip:hover {
+  border-color: var(--sea);
+  color: var(--sea-deep);
+}
+
+.dues-year-chip.active {
+  border-color: var(--sea);
+  background: rgba(31, 122, 108, 0.12);
+  color: var(--sea-deep);
+}
+
+.dues-table-wrap {
+  overflow-x: auto;
+}
+
+table.dues-grid th.dues-month,
+table.dues-grid td.dues-month {
+  text-align: center;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  width: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+table.dues-grid td.dues-paid {
+  color: var(--sea-deep);
+  font-weight: 700;
+}
+
 .money {
   font-variant-numeric: tabular-nums;
   font-weight: 600;

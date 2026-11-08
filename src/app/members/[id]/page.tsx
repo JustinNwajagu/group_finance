@@ -10,6 +10,8 @@ import {
   memberContribution,
   memberPaymentStats,
 } from "@/lib/data";
+import { memberDuesSummary } from "@/lib/dues-data";
+import { DUES_MONTH_LABELS } from "@/lib/dues-months";
 import { formatMoney } from "@/lib/format";
 import { groupPaymentsByTitle } from "@/lib/group";
 
@@ -28,10 +30,11 @@ export default async function MemberDetailPage({
   const member = await getMember(id);
   if (!member) notFound();
 
-  const [payments, paidTotal, stats] = await Promise.all([
+  const [payments, paidTotal, stats, duesYears] = await Promise.all([
     listPaymentsForMember(id),
     memberContribution(id),
     memberPaymentStats(id),
+    memberDuesSummary(id),
   ]);
   const groups = groupPaymentsByTitle(payments);
 
@@ -62,11 +65,61 @@ export default async function MemberDetailPage({
       </div>
 
       <section className="panel">
-        <h2>Payments by title</h2>
+        <h2>Contributions by title</h2>
         {payments.length === 0 ? (
-          <div className="hero-empty">No payments recorded for this member.</div>
+          <div className="hero-empty">
+            No contribution payments recorded for this member.
+          </div>
         ) : (
           <PaymentGroups groups={groups} showMember={false} isAdmin={admin} />
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>Dues</h2>
+        {duesYears.length === 0 ? (
+          <div className="hero-empty">No dues years opened yet.</div>
+        ) : (
+          <div className="table-wrap">
+            <table className="data dues-grid">
+              <thead>
+                <tr>
+                  <th>Year</th>
+                  {DUES_MONTH_LABELS.map((label) => (
+                    <th key={label} className="dues-month">
+                      {label}
+                    </th>
+                  ))}
+                  <th className="num">Paid</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {duesYears.map((year) => (
+                  <tr key={year.schedule.id}>
+                    <td>
+                      <Link
+                        className="row-link"
+                        href={`/dues?year=${year.schedule.year}`}
+                      >
+                        {year.schedule.year}
+                      </Link>
+                    </td>
+                    {year.months_paid.map((paid, i) => (
+                      <td
+                        key={DUES_MONTH_LABELS[i]}
+                        className={paid ? "dues-month dues-paid" : "dues-month"}
+                      >
+                        {paid ? "●" : "·"}
+                      </td>
+                    ))}
+                    <td className="num">{year.months_count}/12</td>
+                    <td>{formatMoney(year.amount_paid)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </AppShell>

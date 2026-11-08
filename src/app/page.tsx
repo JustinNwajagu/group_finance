@@ -33,11 +33,11 @@ export default async function HomePage({
         <div>
           <h1>Home</h1>
           <p>
-            Roster overview. Payments is the count of contribution titles (same
-            for everyone). Contributions is how many of those titles each member
-            has <strong>paid</strong> (pledges do not count). Open contribution
-            requests live under Contributions; monthly dues under Dues; finished
-            contribution titles under Archive.
+            Roster overview. <strong>Contributions</strong> is how many
+            contribution titles each member has paid (pledges do not count).{" "}
+            <strong>Dues</strong> is months paid in the active dues year
+            (Jan–Dec). The two counts are separate — dues never count as
+            contributions and vice versa.
           </p>
         </div>
         <Suspense fallback={null}>
@@ -59,7 +59,13 @@ export default async function HomePage({
           <div className="panel-heading-row">
             <h2>Roster</h2>
             <p className="panel-heading-meta">
-              Total payments <strong>{paymentTotal}</strong>
+              Contribution titles <strong>{paymentTotal}</strong>
+              {members[0]?.dues_year != null ? (
+                <>
+                  {" "}
+                  · Dues year <strong>{members[0].dues_year}</strong>
+                </>
+              ) : null}
             </p>
           </div>
           {members.length === 0 ? (
@@ -76,8 +82,8 @@ export default async function HomePage({
                     <th className="num">#</th>
                     <th>Member</th>
                     <th>Email</th>
-                    <th>Payments</th>
-                    <th>Contributions</th>
+                    <th className="num">Contributions</th>
+                    <th className="num">Dues</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -90,8 +96,20 @@ export default async function HomePage({
                         </Link>
                       </td>
                       <td className="muted">{m.email || "—"}</td>
-                      <td>{m.payment_count}</td>
-                      <td>{m.contribution_count}</td>
+                      <td className="num">
+                        {m.contribution_count}
+                        <span className="muted">/{m.payment_count}</span>
+                      </td>
+                      <td className="num">
+                        {m.dues_year != null ? (
+                          <>
+                            {m.dues_count}
+                            <span className="muted">/12</span>
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

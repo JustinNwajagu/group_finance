@@ -6,13 +6,16 @@ import type {
   PaymentRequest,
   PaymentWithMember,
 } from "./types";
+import { monthsCoveredForMember } from "./dues-data";
 import { compareMembersByName } from "./member-sort";
 import {
   getMemberById,
   getPaymentRequestById,
+  listAllDuesSchedules,
   listAllMembers,
   listAllPaymentRequestRows,
   listAllPaymentRows,
+  listDuesPaymentsForSchedule,
 } from "./store";
 
 const byName = compareMembersByName;
@@ -23,12 +26,25 @@ export async function requestedPaymentCount(): Promise<number> {
 
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
   const q = query?.trim().toLowerCase() ?? "";
-  const [members, requests, payments] = await Promise.all([
+  const [members, requests, payments, schedules] = await Promise.all([
     listAllMembers(),
     listAllPaymentRequestRows(),
     listAllPaymentRows(),
+    listAllDuesSchedules(),
   ]);
   const paymentCount = requests.length;
+  const activeSchedule = schedules[0] ?? null;
+  const duesYear = activeSchedule?.year ?? null;
+  const duesPayments = activeSchedule
+    ? await listDuesPaymentsForSchedule(activeSchedule.id)
+    : [];
+  const duesByMember = new Map<number, typeof duesPayments>();
+  for (const p of duesPayments) {
+    const list = duesByMember.get(p.member_id) ?? [];
+    list.push(p);
+    duesByMember.set(p.member_id, list);
+  }
+
   return members
     .filter((m) => {
       if (!q) return true;
@@ -37,13 +53,21 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
         (m.email ?? "").toLowerCase().includes(q)
       );
     })
-    .map((m) => ({
-      ...m,
-      payment_count: paymentCount,
-      contribution_count: payments.filter(
-        (p) => p.member_id === m.id && p.status === "paid",
-      ).length,
-    }))
+    .map((m) => {
+      const monthsPaid = activeSchedule
+        ? monthsCoveredForMember(duesByMember.get(m.id) ?? []).filter(Boolean)
+            .length
+        : 0;
+      return {
+        ...m,
+        payment_count: paymentCount,
+        contribution_count: payments.filter(
+          (p) => p.member_id === m.id && p.status === "paid",
+        ).length,
+        dues_count: monthsPaid,
+        dues_year: duesYear,
+      };
+    })
     .sort(byName);
 }
 

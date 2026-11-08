@@ -46,8 +46,14 @@ export type PaymentWithMember = Payment & {
 };
 
 export type MemberContribution = Member & {
+  /** Total contribution titles requested (same for every member). */
   payment_count: number;
+  /** Contribution titles this member has paid (excludes dues). */
   contribution_count: number;
+  /** Dues months paid in the active dues year (excludes contributions). */
+  dues_count: number;
+  /** Active dues year used for dues_count, if any. */
+  dues_year: number | null;
 };
 
 export type MemberPaymentRow = Member & {

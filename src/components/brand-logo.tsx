@@ -10,7 +10,7 @@ export function BrandLogo({
   return (
     <Image
       src="/logo.jpg"
-      alt="KLEF"
+      alt="KLEF 13"
       width={size}
       height={size}
       priority={priority}

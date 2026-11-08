@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { bulkImportDues } from "@/app/actions/bulk-import";
 import {
   createDuesYear,
   recordDuesPayment,
@@ -30,6 +31,12 @@ export default async function DuesPage({
   const params = await searchParams;
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
+  const bulkCount =
+    typeof params.count === "string" ? params.count : undefined;
+  const bulkTitle =
+    typeof params.title === "string" ? params.title : undefined;
+  const bulkYear =
+    typeof params.year === "string" ? params.year : undefined;
   const yearParam =
     typeof params.year === "string" ? Number(params.year) : NaN;
 
@@ -88,6 +95,11 @@ export default async function DuesPage({
           year: "Dues year opened.",
           recorded: "Dues payment recorded.",
           cleared: "Dues payment removed.",
+          bulk_dues: bulkTitle
+            ? `Imported ${bulkCount ?? ""} dues row(s) for “${bulkTitle}”${
+                bulkYear ? ` (${bulkYear})` : ""
+              }.`
+            : "Dues spreadsheet imported.",
         }}
       />
 
@@ -96,7 +108,7 @@ export default async function DuesPage({
           <div className="panel-heading-row">
             <h2>
               {board
-                ? `${board.schedule.year} dues`
+                ? board.schedule.title || `${board.schedule.year} dues`
                 : "Year tracker"}
             </h2>
             {board ? (
@@ -282,6 +294,63 @@ export default async function DuesPage({
                 </p>
                 <button type="submit" className="btn-primary">
                   Open year
+                </button>
+              </form>
+            </section>
+
+            <section className="panel">
+              <h2>Bulk upload dues</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Upload CSV or Excel. The <strong>file name</strong> becomes the
+                dues title (include the year, e.g.{" "}
+                <code>2026-Dues.xlsx</code>). Required columns:{" "}
+                <code>Member</code>, <code>Amount</code>. Optional:{" "}
+                <code>Payment date</code>, <code>Notes</code>. Amounts must be
+                whole multiples of the monthly due. Nothing is saved if any row
+                fails validation.
+              </p>
+              <form
+                action={bulkImportDues}
+                className="form-grid"
+                encType="multipart/form-data"
+              >
+                <label className="field">
+                  Spreadsheet
+                  <input
+                    name="file"
+                    type="file"
+                    accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    required
+                  />
+                </label>
+                <div className="form-grid two">
+                  <label className="field">
+                    Year (if not in file name)
+                    <input
+                      name="year"
+                      type="number"
+                      min={2000}
+                      max={2100}
+                      defaultValue={selectedYear}
+                    />
+                  </label>
+                  <label className="field">
+                    Monthly due (₦)
+                    <input
+                      name="monthly_amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                      defaultValue={
+                        board ? board.schedule.monthly_amount : undefined
+                      }
+                    />
+                  </label>
+                </div>
+                <button type="submit" className="btn-primary">
+                  Validate &amp; import
                 </button>
               </form>
             </section>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { createMember, importMembers } from "@/app/actions/members";
+import { createMember } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
 import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
@@ -52,7 +52,6 @@ export default async function HomePage({
         error={error}
         messages={{
           member: "Member added.",
-          import: "Import complete.",
         }}
       />
 
@@ -119,54 +118,30 @@ export default async function HomePage({
         </section>
 
         {admin ? (
-          <div className="split split-2">
-            <section className="panel">
-              <h2>Add member</h2>
-              <form action={createMember} className="form-grid">
-                <label className="field">
-                  Name
-                  <input name="name" required autoComplete="off" />
-                </label>
-                <label className="field">
-                  Email (optional)
-                  <input name="email" type="email" autoComplete="off" />
-                </label>
-                <label className="field">
-                  Phone (optional)
-                  <input name="phone" type="tel" autoComplete="off" />
-                </label>
-                <p className="muted" style={{ margin: 0 }}>
-                  Adding a member does not create a login. Logins are approved
-                  separately on Access.
-                </p>
-                <button type="submit" className="btn-primary">
-                  Add member
-                </button>
-              </form>
-            </section>
-            <section className="panel">
-              <h2>Import members</h2>
-              <p className="muted" style={{ marginTop: 0 }}>
-                One per line: <code>Name</code>, optional{" "}
-                <code>email</code>, optional <code>phone</code>. Import does not
-                grant login access.
+          <section className="panel">
+            <h2>Add member</h2>
+            <form action={createMember} className="form-grid">
+              <label className="field">
+                Name
+                <input name="name" required autoComplete="off" />
+              </label>
+              <label className="field">
+                Email (optional)
+                <input name="email" type="email" autoComplete="off" />
+              </label>
+              <label className="field">
+                Phone (optional)
+                <input name="phone" type="tel" autoComplete="off" />
+              </label>
+              <p className="muted" style={{ margin: 0 }}>
+                Roster is preloaded. Use this only for rare additions. Adding a
+                member does not create a login — approve logins on Access.
               </p>
-              <form action={importMembers} className="form-grid">
-                <label className="field">
-                  CSV / list
-                  <textarea
-                    name="csv"
-                    placeholder={
-                      "Ada Lovelace, ada@example.com, +2348000000000\nGrace Hopper"
-                    }
-                  />
-                </label>
-                <button type="submit" className="btn-primary">
-                  Import
-                </button>
-              </form>
-            </section>
-          </div>
+              <button type="submit" className="btn-primary">
+                Add member
+              </button>
+            </form>
+          </section>
         ) : null}
       </div>
     </AppShell>

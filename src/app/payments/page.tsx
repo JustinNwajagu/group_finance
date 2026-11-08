@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import { bulkImportContributions } from "@/app/actions/bulk-import";
 import {
   createPaymentRequest,
   recordMemberContribution,
@@ -24,6 +25,10 @@ export default async function PaymentsPage({
   const params = await searchParams;
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
+  const bulkCount =
+    typeof params.count === "string" ? params.count : undefined;
+  const bulkTitle =
+    typeof params.title === "string" ? params.title : undefined;
   const admin = isAdmin(viewer);
   const [boards, members, requests] = await Promise.all([
     listContributionBoards(true),
@@ -59,6 +64,9 @@ export default async function PaymentsPage({
           amended: "Contribution list updated.",
           concluded: "Payment moved to Archive.",
           reopened: "Payment reopened on Payments.",
+          bulk_contributions: bulkTitle
+            ? `Imported ${bulkCount ?? ""} contribution row(s) for “${bulkTitle}”.`
+            : "Contribution spreadsheet imported.",
         }}
       />
 
@@ -206,6 +214,63 @@ export default async function PaymentsPage({
                   </p>
                   <button type="submit" className="btn-primary">
                     Create payment
+                  </button>
+                </form>
+              )}
+            </section>
+
+            <section className="panel">
+              <h2>Bulk upload contributions</h2>
+              <p className="muted" style={{ marginTop: 0 }}>
+                Upload CSV or Excel. The <strong>file name</strong> becomes the
+                contribution title. Required columns:{" "}
+                <code>Member</code>, <code>Amount</code>. Optional:{" "}
+                <code>Status</code> (paid/pledge), <code>Payment date</code>,{" "}
+                <code>Notes</code>. Nothing is saved if any row fails validation.
+              </p>
+              {members.length === 0 ? (
+                <p className="muted" style={{ margin: 0 }}>
+                  Add members on Home first.
+                </p>
+              ) : (
+                <form
+                  action={bulkImportContributions}
+                  className="form-grid"
+                  encType="multipart/form-data"
+                >
+                  <label className="field">
+                    Spreadsheet
+                    <input
+                      name="file"
+                      type="file"
+                      accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      required
+                    />
+                  </label>
+                  <div className="form-grid two">
+                    <label className="field">
+                      Minimum amount per member (₦)
+                      <input
+                        name="amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        placeholder="0.00"
+                      />
+                    </label>
+                    <label className="field">
+                      Payment deadline
+                      <input
+                        name="deadline"
+                        type="date"
+                        required
+                        defaultValue={today}
+                      />
+                    </label>
+                  </div>
+                  <button type="submit" className="btn-primary">
+                    Validate &amp; import
                   </button>
                 </form>
               )}

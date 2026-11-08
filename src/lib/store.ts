@@ -44,6 +44,8 @@ export type PaymentRow = {
 export type DuesScheduleRow = {
   id: number;
   year: number;
+  /** Display title — often from an uploaded document name. */
+  title: string;
   monthly_amount: string;
   created_at: string;
 };
@@ -540,9 +542,11 @@ function normalizeDuesSchedule(
   if (!isAppRow(raw)) return null;
   const year = Number(raw.year);
   if (!Number.isFinite(year) || year < 2000) return null;
+  const titleRaw = String(raw.title ?? "").trim();
   return {
     id: Number(raw.id),
     year,
+    title: titleRaw || `${year} Dues`,
     monthly_amount: money(
       (raw.monthly_amount as string | number | undefined) ??
         (raw.amount as string | number | undefined) ??
@@ -656,11 +660,13 @@ function ensureLegacyDuesMigrated(): Promise<void> {
 export async function createDuesSchedule(input: {
   year: number;
   monthly_amount: number;
+  title?: string;
 }): Promise<DuesScheduleRow> {
   await ensureLegacyDuesMigrated();
   const created_at = nowIso();
   const rowBase = {
     year: input.year,
+    title: (input.title?.trim() || `${input.year} Dues`).trim(),
     monthly_amount: money(input.monthly_amount),
     created_at,
   };

@@ -87,6 +87,7 @@ export type ContributionLists = {
 export type DuesSchedule = {
   id: number;
   year: number;
+  title: string;
   monthly_amount: string;
   created_at: string;
 };

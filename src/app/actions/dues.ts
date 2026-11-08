@@ -55,7 +55,11 @@ export async function createDuesYear(formData: FormData): Promise<void> {
     failDues(`Dues for ${year} already exist.`, year);
   }
 
-  await createDuesSchedule({ year, monthly_amount: monthly });
+  await createDuesSchedule({
+    year,
+    monthly_amount: monthly,
+    title: `${year} Dues`,
+  });
   revalidateDues();
   okDues("year", year);
 }

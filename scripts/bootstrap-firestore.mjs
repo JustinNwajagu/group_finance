@@ -56,31 +56,42 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
-/** Data collections the app uses (contributions vs dues are split). */
+/**
+ * Data collections the app uses (contributions vs dues are split).
+ * `_init` stubs are only for collections that may otherwise be empty and
+ * invisible in the Firebase console. Never stub `members` — real roster
+ * rows already make that collection visible, and stubs inflate doc counts.
+ */
 const collections = [
   {
     name: "members",
     note: "Roster members (title + name; login linked later).",
+    stub: false,
   },
   {
     name: "payment_requests",
     note: "Contribution payment titles (not dues).",
+    stub: true,
   },
   {
     name: "payments",
     note: "Contribution payment rows (pledge/paid).",
+    stub: true,
   },
   {
     name: "dues_schedules",
     note: "Dues years (Jan–Dec) with fixed monthly amount.",
+    stub: true,
   },
   {
     name: "dues_payments",
     note: "Dues payments with covered_months.",
+    stub: true,
   },
   {
     name: "access_requests",
     note: "Pending / decided login access requests.",
+    stub: false,
   },
 ];
 
@@ -113,10 +124,21 @@ async function ensureCollectionStub(name, note) {
 }
 
 console.log(`Bootstrapping Firestore for project ${projectId}…`);
-for (const { name, note } of collections) {
+for (const { name, note, stub } of collections) {
   console.log(`\n${name}`);
   await ensureCounter(name);
-  await ensureCollectionStub(name, note);
+  if (stub) {
+    await ensureCollectionStub(name, note);
+  } else {
+    // Drop leftover visibility stubs that inflate document counts.
+    const initRef = db.collection(name).doc("_init");
+    if ((await initRef.get()).exists) {
+      await initRef.delete();
+      console.log(`  removed ${name}/_init`);
+    } else {
+      console.log(`  skip stub for ${name}`);
+    }
+  }
 }
 
 console.log("\nDone. Counters + dues/contribution collections are ready.");

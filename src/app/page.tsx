@@ -61,6 +61,8 @@ export default async function HomePage({
           <div className="panel-heading-row">
             <h2>Roster</h2>
             <p className="panel-heading-meta">
+              Members <strong>{members.length}</strong>
+              {" · "}
               Contributions count <strong>{contributionCount}</strong>
               {" · "}
               Dues count <strong>{duesYearCount}</strong>
@@ -79,7 +81,6 @@ export default async function HomePage({
                   <tr>
                     <th className="num">#</th>
                     <th>Member</th>
-                    <th>Email</th>
                     <th className="num">Contributions</th>
                     <th className="num">Dues</th>
                   </tr>
@@ -93,7 +94,6 @@ export default async function HomePage({
                           {m.name}
                         </Link>
                       </td>
-                      <td className="muted">{m.email || "—"}</td>
                       <td className="num">
                         {m.contribution_count}
                         <span className="muted">/{m.payment_count}</span>

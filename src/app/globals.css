@@ -793,6 +793,14 @@ textarea {
   color: var(--ink);
 }
 
+.stat-line .stat-denom {
+  font-size: 0.7em;
+  font-weight: 500;
+  color: var(--ink-soft);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .stat-line span {
   font-size: 0.8rem;
   letter-spacing: 0.06em;

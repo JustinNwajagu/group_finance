@@ -1,5 +1,6 @@
 import "server-only";
 import { compareMembersByName } from "./member-sort";
+import { duesYearFraction } from "./dues-months";
 import {
   getDuesScheduleById,
   getDuesScheduleByYear,
@@ -110,29 +111,48 @@ export async function getDuesBoardForYear(
   return getDuesBoard(year, true);
 }
 
-export async function memberDuesSummary(memberId: number): Promise<
-  Array<{
+export async function memberDuesSummary(memberId: number): Promise<{
+  years_count: number;
+  dues_count: number;
+  amount_paid: string;
+  years: Array<{
     schedule: DuesScheduleRow;
     months_paid: boolean[];
     months_count: number;
+    year_fraction: number;
     amount_paid: string;
     remaining_months: number;
-  }>
-> {
+    payments: DuesPaymentRow[];
+  }>;
+}> {
   const [schedules, payments] = await Promise.all([
     listAllDuesSchedules(),
     listDuesPaymentsForMember(memberId),
   ]);
-  return schedules.map((schedule) => {
-    const forYear = payments.filter((p) => p.dues_schedule_id === schedule.id);
+  const years = schedules.map((schedule) => {
+    const forYear = payments
+      .filter((p) => p.dues_schedule_id === schedule.id)
+      .sort((a, b) => {
+        const byDate = b.payment_date.localeCompare(a.payment_date);
+        if (byDate !== 0) return byDate;
+        return b.id - a.id;
+      });
     const months_paid = monthsCoveredForMember(forYear);
     const months_count = months_paid.filter(Boolean).length;
     return {
       schedule,
       months_paid,
       months_count,
+      year_fraction: duesYearFraction(months_count),
       amount_paid: moneySum(forYear.map((p) => p.amount)),
       remaining_months: 12 - months_count,
+      payments: forYear,
     };
   });
+  return {
+    years_count: years.length,
+    dues_count: years.reduce((sum, y) => sum + y.year_fraction, 0),
+    amount_paid: moneySum(years.map((y) => y.amount_paid)),
+    years,
+  };
 }

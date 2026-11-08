@@ -311,4 +311,58 @@ export async function provisionApprovedUser(
   return { passwordResetLink, member: linked };
 }
 
-export { listMembersWithoutLogin };
+/**
+ * Remove Firebase login for a member but keep the roster row.
+ * Clears auth_uid / login_email so a new login can be linked later.
+ */
+export async function deleteMemberLogin(memberId: number): Promise<void> {
+  const member = await getMemberById(memberId);
+  if (!member) {
+    throw new Error("Member not found.");
+  }
+  if (!member.auth_uid && !member.login_email) {
+    throw new Error("This member has no login to delete.");
+  }
+
+  const auth = adminAuth();
+  if (auth) {
+    try {
+      if (member.auth_uid) {
+        await auth.deleteUser(member.auth_uid);
+      } else if (member.login_email) {
+        const user = await auth.getUserByEmail(member.login_email);
+        await auth.deleteUser(user.uid);
+      }
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      // Already gone in Auth — still clear the roster link.
+      if (code !== "auth/user-not-found") {
+        throw err instanceof Error ? err : new Error("Could not delete login.");
+      }
+    }
+  }
+
+  await updateMemberRow(memberId, {
+    auth_uid: null,
+    login_email: null,
+  });
+
+  // Mark any approved access request for this login as rejected so they
+  // cannot sign in again until a new approval.
+  if (member.login_email) {
+    const rows = await listAccessRequests();
+    const match = rows.find(
+      (r) =>
+        r.email === member.login_email!.toLowerCase() &&
+        r.status === "approved",
+    );
+    if (match) {
+      await updateAccessRequest(match.id, {
+        status: "rejected",
+        decided_at: new Date().toISOString(),
+      });
+    }
+  }
+}
+
+export { listMembersWithoutLogin, listMembersWithLogin } from "./store";

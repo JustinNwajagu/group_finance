@@ -6,6 +6,7 @@ import { requireAdmin, isAdmin } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/config";
 import {
   createAccessRequest,
+  deleteMemberLogin,
   emailHasAuthAccount,
   findPendingOrApprovedByEmail,
   getAccessRequestById,
@@ -14,6 +15,7 @@ import {
   provisionApprovedUser,
   updateAccessRequest,
 } from "@/lib/access-requests";
+import { getMemberById } from "@/lib/store";
 
 export type LoginFailureKind =
   | "wrong_password"
@@ -194,4 +196,67 @@ export async function loadPendingAccessRequests() {
 export async function getLoginCapacityAction() {
   await requireAdmin();
   return loginCapacity();
+}
+
+export async function deleteLoginAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const memberId = Number(formData.get("member_id"));
+  if (!Number.isFinite(memberId) || memberId <= 0) {
+    redirect("/access?error=" + encodeURIComponent("Invalid member."));
+  }
+
+  const member = await getMemberById(memberId);
+  if (!member) {
+    redirect("/access?error=" + encodeURIComponent("Member not found."));
+  }
+  const loginEmail = (member.login_email || member.email || "").toLowerCase();
+  if (loginEmail && isAdminEmail(loginEmail)) {
+    redirect(
+      "/access?error=" +
+        encodeURIComponent("The admin login cannot be deleted here."),
+    );
+  }
+
+  try {
+    await deleteMemberLogin(memberId);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not delete login.";
+    redirect("/access?error=" + encodeURIComponent(message));
+  }
+
+  revalidatePath("/access");
+  revalidatePath("/");
+  redirect("/access?ok=login_deleted");
+}
+
+/** Admin-triggered password reset link for a member login. */
+export async function sendMemberPasswordReset(
+  formData: FormData,
+): Promise<void> {
+  await requireAdmin();
+  const memberId = Number(formData.get("member_id"));
+  const member = await getMemberById(memberId);
+  const email = (member?.login_email || member?.email || "").trim().toLowerCase();
+  if (!email) {
+    redirect(
+      "/access?error=" + encodeURIComponent("This member has no login email."),
+    );
+  }
+
+  const { adminAuth } = await import("@/lib/firebase-admin");
+  const auth = adminAuth();
+  if (!auth) {
+    redirect("/access?error=" + encodeURIComponent("Auth is unavailable."));
+  }
+  try {
+    const link = await auth.generatePasswordResetLink(email);
+    revalidatePath("/access");
+    redirect("/access?ok=reset_sent&link=" + encodeURIComponent(link));
+  } catch {
+    redirect(
+      "/access?error=" +
+        encodeURIComponent("Could not create a password reset link."),
+    );
+  }
 }

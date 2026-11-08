@@ -612,6 +612,23 @@ textarea {
   background: rgba(255, 255, 255, 0.55);
 }
 
+.password-field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.password-field input {
+  width: 100%;
+}
+
+.password-toggle {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .contrib-dialog-actions {
   display: flex;
   justify-content: flex-end;

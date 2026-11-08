@@ -172,6 +172,11 @@ export async function listMembersWithoutLogin(): Promise<MemberRow[]> {
   return (await listAllMembers()).filter((m) => !m.auth_uid);
 }
 
+/** Roster members that currently have a linked login. */
+export async function listMembersWithLogin(): Promise<MemberRow[]> {
+  return (await listAllMembers()).filter((m) => Boolean(m.auth_uid));
+}
+
 export async function countMembers(): Promise<number> {
   return (await listAllMembers()).length;
 }

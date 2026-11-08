@@ -2,7 +2,9 @@ import { connection } from "next/server";
 import { signOut } from "@/app/actions/auth";
 import {
   approveAccessRequest,
+  deleteLoginAction,
   rejectAccessRequest,
+  sendMemberPasswordReset,
 } from "@/app/actions/access-requests";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
@@ -12,6 +14,7 @@ import {
   listMembersWithoutLogin,
   loginCapacity,
 } from "@/lib/access-requests";
+import { listMembersWithLogin } from "@/lib/store";
 import { formatTimestamp } from "@/lib/format";
 
 export const instant = false;
@@ -27,10 +30,11 @@ export default async function AccessPage({
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const error = typeof params.error === "string" ? params.error : undefined;
   const link = typeof params.link === "string" ? params.link : undefined;
-  const [pending, recent, unlinkable, capacity] = await Promise.all([
+  const [pending, recent, unlinkable, withLogin, capacity] = await Promise.all([
     listAccessRequests("pending"),
     listAccessRequests(),
     listMembersWithoutLogin(),
+    listMembersWithLogin(),
     loginCapacity(),
   ]);
   const decided = recent.filter((r) => r.status !== "pending").slice(0, 20);
@@ -56,14 +60,16 @@ export default async function AccessPage({
           approved:
             "Request approved. Share the password link with the member.",
           rejected: "Request rejected.",
+          login_deleted: "Login removed. The member stays on the roster.",
+          reset_sent: "Password reset link ready to share.",
         }}
       />
 
       {link ? (
         <section className="panel">
-          <h2>Password setup link</h2>
+          <h2>Password setup / reset link</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Send this one-time link to the new user so they can set a password:
+            Send this one-time link so they can set a new password:
           </p>
           <p style={{ wordBreak: "break-all" }}>
             <a href={link}>{link}</a>
@@ -149,6 +155,61 @@ export default async function AccessPage({
                   </form>
                 </div>
               ))}
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <h2>Active logins</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Deleting a login removes sign-in access only. The member stays on
+            the roster.
+          </p>
+          {withLogin.length === 0 ? (
+            <div className="hero-empty">No member logins yet.</div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Member</th>
+                    <th>Login email</th>
+                    <th>Phone</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {withLogin.map((m) => (
+                    <tr key={m.id}>
+                      <td>{m.name}</td>
+                      <td>{m.login_email || m.email || "—"}</td>
+                      <td>{m.phone || "—"}</td>
+                      <td>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "0.35rem",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <form action={sendMemberPasswordReset}>
+                            <input type="hidden" name="member_id" value={m.id} />
+                            <button type="submit" className="btn-ghost">
+                              Reset password
+                            </button>
+                          </form>
+                          <form action={deleteLoginAction}>
+                            <input type="hidden" name="member_id" value={m.id} />
+                            <button type="submit" className="btn-ghost">
+                              Delete login
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

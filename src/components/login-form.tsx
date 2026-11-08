@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   GoogleAuthProvider,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
@@ -38,6 +39,7 @@ export function LoginForm({
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestEmail, setRequestEmail] = useState("");
   const [requestNotice, setRequestNotice] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,6 +132,37 @@ export function LoginForm({
     });
   }
 
+  function onForgotPassword() {
+    setError(null);
+    setRequestNotice(null);
+    const email = emailInputRef.current?.value.trim() ?? "";
+    if (!email || !email.includes("@")) {
+      setError("Enter your email address first, then choose Forgot password.");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const auth = getFirebaseAuth(firebaseConfig!);
+        await sendPasswordResetEmail(auth, email);
+        setRequestNotice(
+          "If an account exists for that email, a password reset link has been sent.",
+        );
+      } catch (err) {
+        const code = firebaseCode(err);
+        if (code === "auth/invalid-email") {
+          setError("Enter a valid email address.");
+          return;
+        }
+        if (code === "auth/user-not-found") {
+          setError("No account found for this email. You can request access.");
+          openRequestFor(email);
+          return;
+        }
+        setError("Could not send a reset email. Try again shortly.");
+      }
+    });
+  }
+
   function onGoogle() {
     setError(null);
     setRequestNotice(null);
@@ -176,19 +209,39 @@ export function LoginForm({
         </label>
         <label className="field">
           Password
-          <input
-            ref={passwordInputRef}
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            disabled={pending}
-          />
+          <div className="password-field">
+            <input
+              ref={passwordInputRef}
+              name="password"
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="current-password"
+              disabled={pending}
+            />
+            <button
+              type="button"
+              className="btn-ghost password-toggle"
+              onClick={() => setShowPassword((v) => !v)}
+              disabled={pending}
+              aria-pressed={showPassword}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
         </label>
         <button type="submit" className="btn-primary" disabled={pending}>
           {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
+      <button
+        type="button"
+        className="btn-ghost"
+        onClick={onForgotPassword}
+        disabled={pending}
+      >
+        Forgot password
+      </button>
       <button
         type="button"
         className="btn-ghost"

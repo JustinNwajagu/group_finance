@@ -181,7 +181,7 @@ export function parseMoneyCell(raw: string): number | null {
 
 export function parseStatusCell(raw: string): "paid" | "pledge" | null {
   const v = raw.trim().toLowerCase();
-  if (!v) return "paid";
+  if (!v) return null;
   if (v === "paid" || v === "pay" || v === "complete") return "paid";
   if (v === "pledge" || v === "pledged" || v === "promise") return "pledge";
   return null;

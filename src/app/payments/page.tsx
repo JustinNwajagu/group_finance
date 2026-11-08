@@ -224,9 +224,10 @@ export default async function PaymentsPage({
               <p className="muted" style={{ marginTop: 0 }}>
                 Upload CSV or Excel. The <strong>file name</strong> becomes the
                 contribution title. Required columns:{" "}
-                <code>Member</code>, <code>Amount</code>. Optional:{" "}
-                <code>Status</code> (paid/pledge), <code>Payment date</code>,{" "}
-                <code>Notes</code>. Nothing is saved if any row fails validation.
+                <code>Member</code>, <code>Amount</code>,{" "}
+                <code>Status</code> (paid or pledge). Optional:{" "}
+                <code>Payment date</code>, <code>Notes</code>. Nothing is saved
+                if any row fails validation.
               </p>
               {members.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>

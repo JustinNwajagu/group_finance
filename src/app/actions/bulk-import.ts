@@ -77,7 +77,7 @@ export async function bulkImportContributions(
   const parsed = await parseUploadedSheet(file);
   if ("error" in parsed) fail("/payments", parsed.error);
 
-  const headerIssues = requireColumns(parsed, ["member", "amount"]);
+  const headerIssues = requireColumns(parsed, ["member", "amount", "status"]);
   if (headerIssues.length) fail("/payments", formatIssues(headerIssues));
 
   const members = await listAllMembers();
@@ -94,7 +94,8 @@ export async function bulkImportContributions(
     const rowNum = idx + 2; // header is row 1
     const memberName = row.member ?? "";
     const amount = parseMoneyCell(row.amount ?? "");
-    const status = parseStatusCell(row.status ?? "");
+    const statusRaw = (row.status ?? "").trim();
+    const status = statusRaw ? parseStatusCell(statusRaw) : null;
     const paymentDate = parseDateCell(row.payment_date ?? "");
     const notes = (row.notes ?? "").trim() || null;
 
@@ -121,10 +122,10 @@ export async function bulkImportContributions(
       });
       return;
     }
-    if (status == null) {
+    if (!statusRaw || status == null) {
       issues.push({
         row: rowNum,
-        message: 'Status must be "paid" or "pledge".',
+        message: 'Status is required and must be "paid" or "pledge".',
       });
       return;
     }

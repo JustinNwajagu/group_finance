@@ -53,6 +53,9 @@ function MemberList({
               {m.amount ? (
                 <span className="muted"> · {formatMoney(m.amount)}</span>
               ) : null}
+              {m.notes ? (
+                <span className="muted"> · {m.notes}</span>
+              ) : null}
               {renderExtra?.(m)}
             </li>
           ))}
@@ -95,6 +98,7 @@ function RecordActions({
           defaultAmount={member.amount}
           defaultStatus="paid"
           defaultDate={today}
+          defaultNotes={member.notes}
           triggerLabel="Mark paid"
         />
       ) : (
@@ -108,6 +112,7 @@ function RecordActions({
           paymentId={member.payment_id}
           defaultAmount={member.amount}
           defaultStatus="pledge"
+          defaultNotes={member.notes}
           triggerLabel="Mark pledge"
         />
       )}

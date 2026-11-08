@@ -17,6 +17,7 @@ type ContributeDialogProps = {
   defaultAmount?: string | null;
   defaultStatus: PaymentStatus;
   defaultDate?: string | null;
+  defaultNotes?: string | null;
   triggerLabel: string;
 };
 
@@ -31,6 +32,7 @@ export function ContributeDialog({
   defaultAmount,
   defaultStatus,
   defaultDate,
+  defaultNotes,
   triggerLabel,
 }: ContributeDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -132,6 +134,16 @@ export function ContributeDialog({
               type="date"
               defaultValue={defaultDate || (defaultStatus === "paid" ? today : "")}
               required={defaultStatus === "paid"}
+            />
+          </label>
+
+          <label className="field">
+            Notes (optional)
+            <textarea
+              name="notes"
+              rows={2}
+              defaultValue={defaultNotes ?? ""}
+              placeholder="Bank transfer ref, cash collector, etc."
             />
           </label>
 

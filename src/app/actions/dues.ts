@@ -67,6 +67,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
   const memberId = Number(formData.get("member_id"));
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim() || null;
   const amount = Number(amountRaw);
 
   if (!Number.isFinite(scheduleId) || scheduleId <= 0) {
@@ -124,6 +125,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     amount,
     covered_months,
     payment_date,
+    notes,
   });
 
   revalidateDues(`/members/${memberId}`);

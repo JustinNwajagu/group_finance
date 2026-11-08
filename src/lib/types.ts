@@ -40,6 +40,7 @@ export type Payment = {
   amount: string;
   payment_date: string | null;
   status: PaymentStatus;
+  notes: string | null;
   created_at: string;
 };
 
@@ -65,6 +66,7 @@ export type MemberPaymentRow = Member & {
   payment_id: number | null;
   status: PaymentStatus | null;
   amount: string | null;
+  notes: string | null;
 };
 
 export type ContributionLists = {
@@ -98,6 +100,7 @@ export type DuesPayment = {
   /** Calendar months covered by this payment (1=Jan … 12=Dec). */
   covered_months: number[];
   payment_date: string;
+  notes: string | null;
   created_at: string;
 };
 

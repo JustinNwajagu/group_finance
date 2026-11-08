@@ -37,6 +37,7 @@ export type PaymentRow = {
   amount: string;
   payment_date: string | null;
   status: PaymentStatus;
+  notes: string | null;
   created_at: string;
 };
 
@@ -54,8 +55,15 @@ export type DuesPaymentRow = {
   amount: string;
   covered_months: number[];
   payment_date: string;
+  notes: string | null;
   created_at: string;
 };
+
+function normalizeNotes(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return trimmed ? trimmed : null;
+}
 
 type LocalDb = {
   counters: {
@@ -328,6 +336,7 @@ function normalizePayment(raw: Record<string, unknown>): PaymentRow | null {
     amount: money(raw.amount as string | number),
     payment_date: (raw.payment_date as string | null) ?? null,
     status: raw.status === "paid" ? "paid" : "pledge",
+    notes: normalizeNotes(raw.notes),
     created_at: String(raw.created_at ?? nowIso()),
   };
 }
@@ -466,6 +475,7 @@ export async function createPaymentRow(input: {
   amount: number | string;
   status: PaymentStatus;
   payment_date: string | null;
+  notes?: string | null;
 }): Promise<PaymentRow> {
   const created_at = nowIso();
   const base = {
@@ -474,6 +484,7 @@ export async function createPaymentRow(input: {
     amount: money(input.amount),
     status: input.status,
     payment_date: input.payment_date,
+    notes: normalizeNotes(input.notes ?? null),
     created_at,
   };
   if (useFirestore()) {
@@ -493,11 +504,12 @@ export async function createPaymentRow(input: {
 export async function updatePaymentRow(
   id: number,
   patch: Partial<
-    Pick<PaymentRow, "amount" | "status" | "payment_date">
+    Pick<PaymentRow, "amount" | "status" | "payment_date" | "notes">
   >,
 ): Promise<void> {
   const cleaned = { ...patch };
   if (cleaned.amount != null) cleaned.amount = money(cleaned.amount);
+  if ("notes" in cleaned) cleaned.notes = normalizeNotes(cleaned.notes ?? null);
   if (useFirestore()) {
     await adminDb()!
       .collection("payments")
@@ -562,6 +574,7 @@ function normalizeDuesPayment(
     amount: money(raw.amount as string | number),
     covered_months,
     payment_date: String(raw.payment_date ?? ""),
+    notes: normalizeNotes(raw.notes),
     created_at: String(raw.created_at ?? nowIso()),
   };
 }
@@ -751,6 +764,7 @@ export async function createDuesPayment(input: {
   amount: number;
   covered_months: number[];
   payment_date: string;
+  notes?: string | null;
 }): Promise<DuesPaymentRow> {
   await ensureLegacyDuesMigrated();
   const created_at = nowIso();
@@ -763,6 +777,7 @@ export async function createDuesPayment(input: {
     amount: money(input.amount),
     covered_months,
     payment_date: input.payment_date,
+    notes: normalizeNotes(input.notes ?? null),
     created_at,
   };
   if (useFirestore()) {

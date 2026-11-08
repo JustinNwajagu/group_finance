@@ -99,6 +99,7 @@ export async function recordMemberContribution(
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? "pledge").trim().toLowerCase();
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim() || null;
   const returnTo = String(formData.get("return_to") ?? "/payments");
   const amount = Number(amountRaw);
   const status = statusRaw === "paid" ? "paid" : "pledge";
@@ -141,6 +142,7 @@ export async function recordMemberContribution(
       amount: amount.toFixed(2),
       status,
       payment_date: paymentDate,
+      notes,
     });
   } else {
     await createPaymentRow({
@@ -149,6 +151,7 @@ export async function recordMemberContribution(
       amount,
       status,
       payment_date: paymentDate,
+      notes,
     });
   }
 
@@ -165,6 +168,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? "pledge").trim().toLowerCase();
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim() || null;
   const returnTo = String(formData.get("return_to") ?? "/payments");
   const status = statusRaw === "paid" ? "paid" : "pledge";
   const amount = Number(amountRaw);
@@ -208,6 +212,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
       amount: amount.toFixed(2),
       status,
       payment_date: paymentDate,
+      notes,
     });
   } else {
     const existing = await findPaymentForMemberRequest(requestId, memberId);
@@ -216,6 +221,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
         amount: amount.toFixed(2),
         status,
         payment_date: paymentDate,
+        notes,
       });
     } else {
       await createPaymentRow({
@@ -224,6 +230,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
         amount,
         status,
         payment_date: paymentDate,
+        notes,
       });
     }
   }

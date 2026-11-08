@@ -35,6 +35,7 @@ export function PaymentGroups({
                   <th>Amount</th>
                   <th>Status</th>
                   <th>Date</th>
+                  <th>Notes</th>
                   <th>Recorded</th>
                   {isAdmin ? <th>Action</th> : null}
                 </tr>
@@ -67,6 +68,7 @@ export function PaymentGroups({
                     <td>
                       {p.payment_date ? formatDate(p.payment_date) : "—"}
                     </td>
+                    <td className="muted">{p.notes || "—"}</td>
                     <td className="muted">{formatTimestamp(p.created_at)}</td>
                     {isAdmin ? (
                       <td>

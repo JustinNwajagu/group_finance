@@ -161,6 +161,7 @@ export async function contributionListsForRequest(
         payment_id: null,
         status: null,
         amount: null,
+        notes: null,
       });
       continue;
     }
@@ -169,6 +170,7 @@ export async function contributionListsForRequest(
       payment_id: p.id,
       status: p.status,
       amount: p.amount,
+      notes: p.notes,
     };
     if (p.status === "paid") contributed.push(row);
     else pledged.push(row);

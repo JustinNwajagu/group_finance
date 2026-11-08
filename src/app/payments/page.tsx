@@ -149,6 +149,14 @@ export default async function PaymentsPage({
                       defaultValue={today}
                     />
                   </label>
+                  <label className="field">
+                    Notes (optional)
+                    <textarea
+                      name="notes"
+                      rows={2}
+                      placeholder="Bank transfer ref, cash collector, etc."
+                    />
+                  </label>
                   <p className="muted" style={{ margin: 0 }}>
                     Both pledge and paid count as contributed. Use Archive to
                     amend concluded payments.

@@ -230,6 +230,14 @@ export default async function DuesPage({
                       defaultValue={today}
                     />
                   </label>
+                  <label className="field">
+                    Notes (optional)
+                    <textarea
+                      name="notes"
+                      rows={2}
+                      placeholder="Bank transfer ref, cash collector, etc."
+                    />
+                  </label>
                   <button type="submit" className="btn-primary">
                     Save dues payment
                   </button>
@@ -289,6 +297,7 @@ export default async function DuesPage({
                         <th>Member</th>
                         <th>Amount</th>
                         <th>Months</th>
+                        <th>Notes</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -303,6 +312,7 @@ export default async function DuesPage({
                             <td className="muted">
                               {monthCount} ({formatCoveredMonths(p.covered_months)})
                             </td>
+                            <td className="muted">{p.notes || "—"}</td>
                             <td>
                               <form action={removeDuesPayment}>
                                 <input type="hidden" name="id" value={p.id} />

@@ -139,6 +139,14 @@ export default async function ArchivePage({
                 Payment date (optional)
                 <input name="payment_date" type="date" defaultValue={today} />
               </label>
+              <label className="field">
+                Notes (optional)
+                <textarea
+                  name="notes"
+                  rows={2}
+                  placeholder="Bank transfer ref, cash collector, etc."
+                />
+              </label>
               <button type="submit" className="btn-primary">
                 Save contribution
               </button>

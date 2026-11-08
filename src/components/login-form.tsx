@@ -19,6 +19,7 @@ import {
   classifyLoginFailure,
   submitAccessRequest,
 } from "@/app/actions/access-requests";
+import { PasswordInput } from "@/components/password-input";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
 
 function firebaseCode(err: unknown): string | null {
@@ -39,7 +40,6 @@ export function LoginForm({
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestEmail, setRequestEmail] = useState("");
   const [requestNotice, setRequestNotice] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
 
@@ -209,26 +209,13 @@ export function LoginForm({
         </label>
         <label className="field">
           Password
-          <div className="password-field">
-            <input
-              ref={passwordInputRef}
-              name="password"
-              type={showPassword ? "text" : "password"}
-              required
-              autoComplete="current-password"
-              disabled={pending}
-            />
-            <button
-              type="button"
-              className="btn-ghost password-toggle"
-              onClick={() => setShowPassword((v) => !v)}
-              disabled={pending}
-              aria-pressed={showPassword}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
+          <PasswordInput
+            inputRef={passwordInputRef}
+            name="password"
+            required
+            autoComplete="current-password"
+            disabled={pending}
+          />
         </label>
         <button type="submit" className="btn-primary" disabled={pending}>
           {pending ? "Signing in…" : "Sign in"}
@@ -314,6 +301,7 @@ function AccessRequestDialog({
         email: String(data.get("email") ?? ""),
         name: String(data.get("name") ?? ""),
         phone: String(data.get("phone") ?? ""),
+        password: String(data.get("password") ?? ""),
       });
       if (!result.ok) {
         setError(result.error);
@@ -345,8 +333,8 @@ function AccessRequestDialog({
           </button>
         </div>
         <p className="muted" style={{ margin: 0 }}>
-          An admin must approve your request and link it to a member before you
-          can access KLEF 13.
+          Choose your password now. An admin must still approve and link you to
+          a member before you can sign in.
         </p>
         {error ? (
           <p className="form-error" role="alert">
@@ -381,6 +369,16 @@ function AccessRequestDialog({
             type="tel"
             required
             autoComplete="tel"
+            disabled={pending}
+          />
+        </label>
+        <label className="field">
+          Password
+          <PasswordInput
+            name="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
             disabled={pending}
           />
         </label>

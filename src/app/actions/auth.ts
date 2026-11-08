@@ -9,7 +9,10 @@ import {
   homePathForRole,
 } from "@/lib/auth";
 import { firebaseAdminConfigured, isAdminEmail } from "@/lib/config";
-import { emailIsApproved } from "@/lib/access-requests";
+import {
+  emailIsApproved,
+  findPendingOrApprovedByEmail,
+} from "@/lib/access-requests";
 import type { AppRole } from "@/lib/types";
 
 const SESSION_DAYS = 14;
@@ -42,11 +45,23 @@ export async function createFirebaseSession(
     if (!isAdminEmail(email)) {
       const approved = await emailIsApproved(email);
       if (!approved) {
+        const request = await findPendingOrApprovedByEmail(email);
+        if (request?.status === "pending") {
+          return {
+            ok: false,
+            error:
+              "Your access request is waiting for admin approval. You cannot sign in yet.",
+            kind: "pending",
+          };
+        }
         // Delete auto-created Google Auth users that were never approved.
-        try {
-          await auth.deleteUser(decoded.uid);
-        } catch {
-          /* ignore */
+        const provider = decoded.firebase?.sign_in_provider;
+        if (provider === "google.com") {
+          try {
+            await auth.deleteUser(decoded.uid);
+          } catch {
+            /* ignore */
+          }
         }
         return {
           ok: false,

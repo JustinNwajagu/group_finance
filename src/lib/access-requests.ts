@@ -274,10 +274,12 @@ export async function provisionApprovedUser(
   let authUid: string | null = null;
 
   if (auth) {
+    let createdFresh = false;
     try {
       const existing = await auth.getUserByEmail(request.email);
       authUid = existing.uid;
     } catch {
+      // Fallback if the requester somehow has no Auth user yet.
       const crypto = await import("node:crypto");
       const temp = crypto.randomBytes(18).toString("base64url") + "Aa1!";
       const created = await auth.createUser({
@@ -287,11 +289,15 @@ export async function provisionApprovedUser(
         emailVerified: false,
       });
       authUid = created.uid;
+      createdFresh = true;
     }
-    try {
-      passwordResetLink = await auth.generatePasswordResetLink(request.email);
-    } catch {
-      passwordResetLink = null;
+    // Only mint a reset link when we had to invent a temporary password.
+    if (createdFresh) {
+      try {
+        passwordResetLink = await auth.generatePasswordResetLink(request.email);
+      } catch {
+        passwordResetLink = null;
+      }
     }
   }
 

@@ -613,20 +613,40 @@ textarea {
 }
 
 .password-field {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.4rem;
-  align-items: center;
+  position: relative;
+  display: block;
 }
 
-.password-field input {
+.password-field-input {
   width: 100%;
+  padding-right: 2.6rem !important;
 }
 
-.password-toggle {
-  padding: 0.45rem 0.7rem;
-  font-size: 0.85rem;
-  white-space: nowrap;
+.password-eye {
+  position: absolute;
+  top: 50%;
+  right: 0.45rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.password-eye:hover {
+  color: var(--ink);
+  background: rgba(20, 32, 51, 0.06);
+}
+
+.password-eye:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .contrib-dialog-actions {

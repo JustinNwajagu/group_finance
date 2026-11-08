@@ -45,14 +45,6 @@ export async function classifyLoginFailure(
     };
   }
 
-  const exists = await emailHasAuthAccount(normalized);
-  if (exists) {
-    return {
-      kind: "wrong_password",
-      message: "Wrong password. Try again, or reset your password.",
-    };
-  }
-
   const existing = await findPendingOrApprovedByEmail(normalized);
   if (existing?.status === "pending") {
     return {
@@ -61,11 +53,20 @@ export async function classifyLoginFailure(
         "Your access request is waiting for admin approval. You cannot sign in yet.",
     };
   }
+
+  const exists = await emailHasAuthAccount(normalized);
+  if (exists) {
+    return {
+      kind: "wrong_password",
+      message: "Wrong password. Try again, or use Forgot password.",
+    };
+  }
+
   if (existing?.status === "approved") {
     return {
       kind: "wrong_password",
       message:
-        "Your account was approved. Use the password setup link from your admin, or reset your password.",
+        "Your account was approved. Sign in with your password, or use Forgot password.",
     };
   }
 
@@ -79,10 +80,12 @@ export async function submitAccessRequest(input: {
   email: string;
   name: string;
   phone: string;
+  password: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const email = input.email.trim().toLowerCase();
   const name = input.name.trim();
   const phone = input.phone.trim();
+  const password = input.password;
 
   if (!email.includes("@")) {
     return { ok: false, error: "Enter a valid email address." };
@@ -92,6 +95,12 @@ export async function submitAccessRequest(input: {
   }
   if (phone.length < 7) {
     return { ok: false, error: "Enter a valid phone number." };
+  }
+  if (password.length < 8) {
+    return {
+      ok: false,
+      error: "Choose a password with at least 8 characters.",
+    };
   }
 
   if (await emailHasAuthAccount(email)) {
@@ -112,11 +121,59 @@ export async function submitAccessRequest(input: {
     return {
       ok: false,
       error:
-        "This email was already approved. Check with your admin for the password link.",
+        "This email was already approved. Sign in with your password, or use Forgot password.",
     };
   }
 
-  await createAccessRequest({ email, name, phone });
+  // Create Auth credentials now (password is never stored in Firestore).
+  // App session still blocked until an admin approves + links a member.
+  const { adminAuth } = await import("@/lib/firebase-admin");
+  const auth = adminAuth();
+  if (!auth) {
+    return { ok: false, error: "Sign-up is unavailable right now." };
+  }
+  try {
+    await auth.createUser({
+      email,
+      password,
+      displayName: name,
+      emailVerified: false,
+    });
+  } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === "auth/email-already-exists") {
+      return {
+        ok: false,
+        error: "An account already exists for this email. Try signing in.",
+      };
+    }
+    if (code === "auth/invalid-password" || code === "auth/weak-password") {
+      return {
+        ok: false,
+        error: "Choose a stronger password (at least 8 characters).",
+      };
+    }
+    return { ok: false, error: "Could not create the account. Try again." };
+  }
+
+  try {
+    await createAccessRequest({ email, name, phone });
+  } catch (err) {
+    try {
+      const user = await auth.getUserByEmail(email);
+      await auth.deleteUser(user.uid);
+    } catch {
+      /* ignore cleanup failure */
+    }
+    return {
+      ok: false,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not save your access request.",
+    };
+  }
+
   revalidatePath("/access");
   return { ok: true };
 }
@@ -179,10 +236,26 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id)) return;
+  const request = await getAccessRequestById(id);
   await updateAccessRequest(id, {
     status: "rejected",
     decided_at: new Date().toISOString(),
   });
+
+  // Remove unused Auth credentials created at request time.
+  if (request?.email) {
+    const { adminAuth } = await import("@/lib/firebase-admin");
+    const auth = adminAuth();
+    if (auth) {
+      try {
+        const user = await auth.getUserByEmail(request.email);
+        await auth.deleteUser(user.uid);
+      } catch {
+        /* already removed */
+      }
+    }
+  }
+
   revalidatePath("/access");
   redirect("/access?ok=rejected");
 }

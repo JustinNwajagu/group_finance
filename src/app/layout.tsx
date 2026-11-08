@@ -17,8 +17,9 @@ export const metadata: Metadata = {
   title: "KLEF 13",
   description: "Group financial records for KLEF 13",
   icons: {
-    icon: [{ url: "/favicon.jpg", type: "image/jpeg" }],
-    apple: "/favicon.jpg",
+    icon: [{ url: "/tab-klef13.jpg", type: "image/jpeg" }],
+    apple: "/tab-klef13.jpg",
+    shortcut: "/tab-klef13.jpg",
   },
 };
 

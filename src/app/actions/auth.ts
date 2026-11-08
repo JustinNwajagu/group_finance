@@ -9,6 +9,7 @@ import {
   homePathForRole,
 } from "@/lib/auth";
 import { firebaseAdminConfigured, isAdminEmail } from "@/lib/config";
+import { emailIsApproved } from "@/lib/access-requests";
 import type { AppRole } from "@/lib/types";
 
 const SESSION_DAYS = 14;
@@ -17,18 +18,44 @@ export async function createFirebaseSession(
   idToken: string,
 ): Promise<
   | { ok: true; role: AppRole; redirectTo: string }
-  | { ok: false; error: string }
+  | { ok: false; error: string; kind?: "no_account" | "pending" | "other" }
 > {
   if (!firebaseAdminConfigured()) {
-    return { ok: false, error: "Firebase Admin is not configured." };
+    return { ok: false, error: "Sign-in is not configured.", kind: "other" };
   }
   const auth = adminAuth();
-  if (!auth) return { ok: false, error: "Firebase Auth unavailable." };
+  if (!auth) {
+    return { ok: false, error: "Sign-in is unavailable right now.", kind: "other" };
+  }
 
   try {
     const decoded = await auth.verifyIdToken(idToken);
     const email = (decoded.email ?? "").trim().toLowerCase();
-    if (!email) return { ok: false, error: "Signed-in account has no email." };
+    if (!email) {
+      return {
+        ok: false,
+        error: "That account has no email address.",
+        kind: "other",
+      };
+    }
+
+    if (!isAdminEmail(email)) {
+      const approved = await emailIsApproved(email);
+      if (!approved) {
+        // Delete auto-created Google Auth users that were never approved.
+        try {
+          await auth.deleteUser(decoded.uid);
+        } catch {
+          /* ignore */
+        }
+        return {
+          ok: false,
+          error:
+            "No approved account for this email. Request access so an admin can approve you.",
+          kind: "no_account",
+        };
+      }
+    }
 
     const role: AppRole = isAdminEmail(email) ? "admin" : "member";
     const expiresIn = SESSION_DAYS * 24 * 60 * 60 * 1000;
@@ -46,7 +73,11 @@ export async function createFirebaseSession(
     jar.delete(DEV_SESSION_COOKIE);
     return { ok: true, role, redirectTo: homePathForRole(role) };
   } catch {
-    return { ok: false, error: "Could not create a session. Try again." };
+    return {
+      ok: false,
+      error: "Could not start your session. Try again.",
+      kind: "other",
+    };
   }
 }
 

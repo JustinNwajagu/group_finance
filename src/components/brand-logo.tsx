@@ -1,4 +1,4 @@
-const BRAND_SRC = "/brand-klef13.jpg";
+const BRAND_SRC = "/tab-klef13.jpg";
 
 export function BrandLogo({
   size = 56,

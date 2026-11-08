@@ -91,14 +91,15 @@ a {
 
 .brand-logo {
   display: block;
-  border-radius: 50%;
+  border-radius: 12px;
   object-fit: cover;
   flex-shrink: 0;
-  background: #f4efe4;
+  background: #0f3d2e;
 }
 
 .gate-card .brand-logo {
   margin: 0 auto 0.35rem;
+  border-radius: 16px;
   box-shadow: 0 8px 24px rgba(15, 61, 46, 0.18);
 }
 

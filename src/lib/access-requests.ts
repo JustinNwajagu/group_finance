@@ -319,6 +319,16 @@ export async function provisionApprovedUser(
     phone: member.phone || request.phone || null,
   });
 
+  const { setUserRole } = await import("./user-roles");
+  const { isAdminEmail } = await import("./config");
+  if (!isAdminEmail(request.email)) {
+    await setUserRole({
+      email: request.email,
+      role: "member",
+      updatedBy: "approval",
+    });
+  }
+
   const linked = (await getMemberById(member.id)) ?? {
     ...member,
     auth_uid: authUid,
@@ -367,6 +377,8 @@ export async function deleteMemberLogin(memberId: number): Promise<void> {
   // Remove the approved access record so they cannot sign in again
   // until a new request is approved.
   if (member.login_email) {
+    const { deleteUserRole } = await import("./user-roles");
+    await deleteUserRole(member.login_email);
     const rows = await listAccessRequests();
     const match = rows.find(
       (r) =>

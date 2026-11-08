@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import { adminAuth } from "./firebase-admin";
-import { adminEmail, firebaseAdminConfigured, isAdminEmail } from "./config";
+import { adminEmail, firebaseAdminConfigured } from "./config";
+import { resolveAppRole } from "./user-roles";
 import type { AppRole, AppUser } from "./types";
 
 export const SESSION_COOKIE = "__session";
@@ -17,18 +18,14 @@ export type ViewerContext = {
   access: AppUser | null;
 };
 
-function roleForEmail(email: string): AppRole {
-  return isAdminEmail(email) ? "admin" : "member";
-}
-
-function viewerFromIdentity(input: {
+async function viewerFromIdentity(input: {
   sub: string;
   email: string;
   name: string;
   simulated: boolean;
-}): ViewerContext {
+}): Promise<ViewerContext> {
   const email = input.email.trim().toLowerCase();
-  const role = roleForEmail(email);
+  const role = await resolveAppRole(email);
   const access: AppUser = {
     id: 0,
     cursor_sub: input.sub,

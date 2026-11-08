@@ -17,6 +17,7 @@ import {
   updateAccessRequest,
 } from "@/lib/access-requests";
 import { getMemberById } from "@/lib/store";
+import { setUserRole } from "@/lib/user-roles";
 
 export type LoginFailureKind =
   | "wrong_password"
@@ -332,4 +333,33 @@ export async function sendMemberPasswordReset(
         encodeURIComponent("Could not create a password reset link."),
     );
   }
+}
+
+export async function setUserRoleAction(formData: FormData): Promise<void> {
+  const viewer = await requireAdmin();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const roleRaw = String(formData.get("role") ?? "")
+    .trim()
+    .toLowerCase();
+  const role = roleRaw === "admin" ? "admin" : "member";
+
+  if (!email || !email.includes("@")) {
+    redirect("/access?error=" + encodeURIComponent("Invalid email."));
+  }
+
+  try {
+    await setUserRole({
+      email,
+      role,
+      updatedBy: viewer.email,
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Could not update role.";
+    redirect("/access?error=" + encodeURIComponent(message));
+  }
+
+  revalidatePath("/access");
+  revalidatePath("/");
+  redirect("/access?ok=role_updated");
 }

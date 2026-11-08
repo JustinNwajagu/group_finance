@@ -13,6 +13,7 @@ import {
   emailIsApproved,
   findPendingOrApprovedByEmail,
 } from "@/lib/access-requests";
+import { resolveAppRole } from "@/lib/user-roles";
 import type { AppRole } from "@/lib/types";
 
 const SESSION_DAYS = 14;
@@ -72,7 +73,7 @@ export async function createFirebaseSession(
       }
     }
 
-    const role: AppRole = isAdminEmail(email) ? "admin" : "member";
+    const role: AppRole = await resolveAppRole(email);
     const expiresIn = SESSION_DAYS * 24 * 60 * 60 * 1000;
     const sessionCookie = await auth.createSessionCookie(idToken, {
       expiresIn,
@@ -107,7 +108,7 @@ export async function createDevSession(formData: FormData): Promise<void> {
     redirect("/login?error=" + encodeURIComponent("Enter a valid email."));
   }
   const jar = await cookies();
-  const role = isAdminEmail(email) ? "admin" : "member";
+  const role = await resolveAppRole(email);
   jar.set(
     DEV_SESSION_COOKIE,
     JSON.stringify({

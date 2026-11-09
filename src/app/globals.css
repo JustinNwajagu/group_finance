@@ -458,8 +458,87 @@ textarea {
 }
 
 .btn-primary:disabled {
-  opacity: 0.65;
+  opacity: 0.8;
   cursor: wait;
+}
+
+.btn-spinner {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: btn-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.form-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  color: var(--sea-deep);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 100;
+  pointer-events: none;
+  transform-origin: left center;
+  transform: scaleX(0);
+  opacity: 0;
+  background: linear-gradient(90deg, var(--sea), #3cb89f, var(--amber));
+  transition: opacity 120ms ease;
+}
+
+.nav-progress.is-active {
+  opacity: 1;
+  animation: nav-progress-run 1.1s ease-in-out infinite;
+}
+
+@keyframes nav-progress-run {
+  0% {
+    transform: scaleX(0.08);
+  }
+  50% {
+    transform: scaleX(0.72);
+  }
+  100% {
+    transform: scaleX(0.92);
+  }
+}
+
+.route-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: 40vh;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+form[aria-busy="true"] {
+  opacity: 0.92;
+}
+
+form[aria-busy="true"] input,
+form[aria-busy="true"] select,
+form[aria-busy="true"] textarea,
+form[aria-busy="true"] button:not([type="submit"]) {
+  pointer-events: none;
 }
 
 .btn-ghost {

@@ -4,9 +4,14 @@ import {
   createPaymentRequest,
   recordMemberContribution,
 } from "@/app/actions/payments";
+import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
 import { Flash } from "@/components/flash";
+import {
+  FormPendingStatus,
+  PendingSubmitButton,
+} from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
   listContributionBoards,
@@ -184,6 +189,7 @@ export default async function PaymentsPage({
                 </p>
               ) : (
                 <form action={createPaymentRequest} className="form-grid">
+                  <FormBusyMarker />
                   <label className="field">
                     Title
                     <input name="title" required autoComplete="off" />
@@ -212,9 +218,10 @@ export default async function PaymentsPage({
                     Creates the payment title. Members stay outstanding until
                     you record a pledge or paid contribution.
                   </p>
-                  <button type="submit" className="btn-primary">
-                    Create payment
-                  </button>
+                  <PendingSubmitButton
+                    idleLabel="Create payment"
+                    pendingLabel="Creating…"
+                  />
                 </form>
               )}
             </section>
@@ -241,6 +248,7 @@ export default async function PaymentsPage({
                   className="form-grid"
                   encType="multipart/form-data"
                 >
+                  <FormBusyMarker />
                   <label className="field">
                     Spreadsheet
                     <input
@@ -272,9 +280,11 @@ export default async function PaymentsPage({
                       />
                     </label>
                   </div>
-                  <button type="submit" className="btn-primary">
-                    Validate &amp; import
-                  </button>
+                  <FormPendingStatus message="Validating spreadsheet and uploading contributions…" />
+                  <PendingSubmitButton
+                    idleLabel="Validate & import"
+                    pendingLabel="Validating & uploading…"
+                  />
                 </form>
               )}
             </section>

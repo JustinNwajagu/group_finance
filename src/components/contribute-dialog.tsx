@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { saveBoardContribution } from "@/app/actions/payments";
+import { FormBusyMarker } from "@/components/action-form";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatMoney } from "@/lib/format";
 import type { PaymentStatus } from "@/lib/types";
 
@@ -78,6 +80,7 @@ export function ContributeDialog({
         }}
       >
         <form action={saveBoardContribution} className="contrib-dialog-panel">
+          <FormBusyMarker />
           <div className="contrib-dialog-head">
             <h3 id={titleId}>{triggerLabel}</h3>
             <button
@@ -155,9 +158,10 @@ export function ContributeDialog({
             >
               Cancel
             </button>
-            <button type="submit" className="btn-primary">
-              Save contribution
-            </button>
+            <PendingSubmitButton
+              idleLabel="Save contribution"
+              pendingLabel="Saving…"
+            />
           </div>
         </form>
       </dialog>

@@ -6,8 +6,13 @@ import {
   recordDuesPayment,
   removeDuesPayment,
 } from "@/app/actions/dues";
+import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
+import {
+  FormPendingStatus,
+  PendingSubmitButton,
+} from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { getDuesBoard, listDuesSchedules } from "@/lib/dues-data";
 import {
@@ -250,9 +255,10 @@ export default async function DuesPage({
                       placeholder="Bank transfer ref, cash collector, etc."
                     />
                   </label>
-                  <button type="submit" className="btn-primary">
-                    Save dues payment
-                  </button>
+                  <PendingSubmitButton
+                    idleLabel="Save dues payment"
+                    pendingLabel="Saving…"
+                  />
                 </form>
               )}
             </section>
@@ -260,6 +266,7 @@ export default async function DuesPage({
             <section className="panel">
               <h2>Open dues year</h2>
               <form action={createDuesYear} className="form-grid">
+                <FormBusyMarker />
                 <div className="form-grid two">
                   <label className="field">
                     Year
@@ -292,9 +299,10 @@ export default async function DuesPage({
                   Creates a Jan–Dec tracker for that year. One schedule per year;
                   monthly amount is fixed for everyone.
                 </p>
-                <button type="submit" className="btn-primary">
-                  Open year
-                </button>
+                <PendingSubmitButton
+                  idleLabel="Open year"
+                  pendingLabel="Opening…"
+                />
               </form>
             </section>
 
@@ -314,6 +322,7 @@ export default async function DuesPage({
                 className="form-grid"
                 encType="multipart/form-data"
               >
+                <FormBusyMarker />
                 <label className="field">
                   Spreadsheet
                   <input
@@ -349,9 +358,11 @@ export default async function DuesPage({
                     />
                   </label>
                 </div>
-                <button type="submit" className="btn-primary">
-                  Validate &amp; import
-                </button>
+                <FormPendingStatus message="Validating spreadsheet and uploading dues…" />
+                <PendingSubmitButton
+                  idleLabel="Validate & import"
+                  pendingLabel="Validating & uploading…"
+                />
               </form>
             </section>
 

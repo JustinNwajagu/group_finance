@@ -6,6 +6,7 @@ import {
   reopenPaymentRequest,
 } from "@/app/actions/payments";
 import { ContributeDialog } from "@/components/contribute-dialog";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { ContributionLists, MemberPaymentRow } from "@/lib/types";
 
@@ -119,13 +120,12 @@ function RecordActions({
       <form action={clearMemberContribution} className="inline-form">
         <input type="hidden" name="id" value={member.payment_id} />
         <input type="hidden" name="return_to" value={returnTo} />
-        <button
-          type="submit"
+        <PendingSubmitButton
           className="btn-ghost"
           style={{ padding: "0.15rem 0.45rem" }}
-        >
-          Clear
-        </button>
+          idleLabel="Clear"
+          pendingLabel="Clearing…"
+        />
       </form>
     </span>
   );
@@ -282,16 +282,19 @@ export function ContributionBoard({
                   required
                 />
               </label>
-              <button type="submit" className="btn-primary">
-                Conclude payment
-              </button>
+              <PendingSubmitButton
+                idleLabel="Conclude payment"
+                pendingLabel="Concluding…"
+              />
             </form>
           ) : (
             <form action={reopenPaymentRequest} className="inline-form">
               <input type="hidden" name="id" value={request.id} />
-              <button type="submit" className="btn-ghost">
-                Clear concluded date
-              </button>
+              <PendingSubmitButton
+                className="btn-ghost"
+                idleLabel="Clear concluded date"
+                pendingLabel="Reopening…"
+              />
             </form>
           )}
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/brand-logo";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type { ViewerContext } from "@/lib/auth";
 import { homePathForRole, isAdmin } from "@/lib/auth";
 
@@ -64,13 +65,12 @@ export function AppShell({
             {viewer.simulated ? " · local preview" : ""}
           </span>
           <form action={signOut} style={{ margin: 0 }}>
-            <button
-              type="submit"
+            <PendingSubmitButton
               className="btn-ghost"
               style={{ padding: "0.2rem 0.55rem", fontSize: "0.8rem" }}
-            >
-              Sign out
-            </button>
+              idleLabel="Sign out"
+              pendingLabel="Signing out…"
+            />
           </form>
         </div>
       </header>

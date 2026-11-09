@@ -2,9 +2,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { createMember } from "@/app/actions/members";
+import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers, requestedPaymentCount } from "@/lib/data";
 import { listDuesSchedules } from "@/lib/dues-data";
@@ -121,6 +123,7 @@ export default async function HomePage({
           <section className="panel">
             <h2>Add member</h2>
             <form action={createMember} className="form-grid">
+              <FormBusyMarker />
               <label className="field">
                 Name
                 <input name="name" required autoComplete="off" />
@@ -137,9 +140,10 @@ export default async function HomePage({
                 Roster is preloaded. Use this only for rare additions. Adding a
                 member does not create a login — approve logins on Access.
               </p>
-              <button type="submit" className="btn-primary">
-                Add member
-              </button>
+              <PendingSubmitButton
+                idleLabel="Add member"
+                pendingLabel="Adding…"
+              />
             </form>
           </section>
         ) : null}

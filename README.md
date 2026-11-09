@@ -1,35 +1,39 @@
-# KLEF Ledger
+# KLEF 13
 
 Group financial record-keeping for Project SHSN_KLEF_2013.
 
 ## Stack
 
 - Next.js App Router + TypeScript
-- **Snowflake** for shared durable data (when secrets are set)
-- Local **PGlite** sample store when Snowflake is unset
-- Cursor private/team identity (`cursor/identity.ts`)
+- **Firebase Authentication** + **Cloud Firestore**
+- Firebase App Hosting
 - Currency: **Nigerian Naira (₦)**
 
 ## Local run
 
 ```bash
-cd group-finance
+cp .env.example .env.local
+# fill Firebase web + Admin SDK values
 npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:3000. Locally you are a simulated viewer (`cursor/identity.dev.ts` / `.js`).
+Open http://127.0.0.1:3000.
 
-## Snowflake
+See `docs/firebase-setup.md` for Firebase project setup, and `docs/database-schema.md` for Firestore collections.
 
-Set `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USERNAME`, `SNOWFLAKE_PASSWORD`, `SNOWFLAKE_WAREHOUSE`, `SNOWFLAKE_DATABASE`, `SNOWFLAKE_SCHEMA` (optional `SNOWFLAKE_ROLE`). Then `npm run migrate` / publish build applies `migrations/snowflake/`.
+Optional one-time helpers:
+
+```bash
+npm run firestore:bootstrap
+```
 
 ## Roles
 
-- **Admin**: manage members, record payments, grant access / assign roles
-- **Member**: view and filter; see contribution totals
-- First signed-in person becomes admin when the access table is empty
+- **Admin**: manage members, contributions, dues, access, and user roles
+- **Member**: view roster, contributions, and dues
+- Primary admin mailbox: `klef2007.2013@gmail.com` (locked admin)
 
-## Publish
+## Deploy
 
-Publish as **private** (or team). Requires a GitHub/Origin-backed Cursor run. Prefer private in the publish dialog.
+Configure Firebase App Hosting / Hosting for this repo and set the same env vars in the hosting environment. Custom domain can be attached in the Firebase console.

@@ -4,13 +4,13 @@ The app uses **Firebase Authentication**, **Cloud Firestore**, and **Firebase Ho
 
 ## Admin rule
 
-Only one email is admin. Set:
+Primary admin mailbox (always admin):
 
 ```bash
 ADMIN_EMAIL=klef2007.2013@gmail.com
 ```
 
-Every other signed-in user is a **member**. There is no invite/role table.
+Other users default to **member**. Admins can assign `admin` / `member` roles on the Access page (`user_roles` collection).
 
 ## 1. Create a Firebase project
 

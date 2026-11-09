@@ -1,6 +1,6 @@
 # Database schema
 
-Firestore uses **Firestore collections** (same shape in the local file store). Think of each collection as a table.
+Data lives in **Cloud Firestore** collections. Think of each collection as a table.
 
 ## Required tables
 

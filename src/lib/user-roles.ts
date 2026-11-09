@@ -1,9 +1,11 @@
 import "server-only";
-import { adminDb } from "./firebase-admin";
-import { adminEmail, isAdminEmail, useFirestore } from "./config";
-import type { AppRole } from "./types";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { cache } from "react";
+import { adminDb } from "./firebase-admin";
+import { adminEmail, isAdminEmail, useFirestore } from "./config";
+import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
+import type { AppRole } from "./types";
 
 export type UserRoleRow = {
   email: string;
@@ -63,26 +65,30 @@ export async function resolveAppRole(email: string): Promise<AppRole> {
   return row?.role === "admin" ? "admin" : "member";
 }
 
-export async function getUserRole(email: string): Promise<UserRoleRow | null> {
+export const getUserRole = cache(async (
+  email: string,
+): Promise<UserRoleRow | null> => {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
-  if (useFirestore()) {
-    const snap = await adminDb()!
-      .collection("user_roles")
-      .doc(normalized)
-      .get();
-    if (!snap.exists) return null;
-    const data = snap.data() as Record<string, unknown>;
-    return {
-      email: normalized,
-      role: normalizeRole(data.role),
-      updated_at: String(data.updated_at ?? nowIso()),
-      updated_by: (data.updated_by as string | null) ?? null,
-    };
-  }
-  const db = await loadLocal();
-  return db.roles.find((r) => r.email === normalized) ?? null;
-}
+  return cachedLoad(`user_roles:${normalized}`, async () => {
+    if (useFirestore()) {
+      const snap = await adminDb()!
+        .collection("user_roles")
+        .doc(normalized)
+        .get();
+      if (!snap.exists) return null;
+      const data = snap.data() as Record<string, unknown>;
+      return {
+        email: normalized,
+        role: normalizeRole(data.role),
+        updated_at: String(data.updated_at ?? nowIso()),
+        updated_by: (data.updated_by as string | null) ?? null,
+      };
+    }
+    const db = await loadLocal();
+    return db.roles.find((r) => r.email === normalized) ?? null;
+  });
+});
 
 export async function listUserRoles(): Promise<UserRoleRow[]> {
   if (useFirestore()) {
@@ -129,6 +135,7 @@ export async function setUserRole(input: {
   };
   if (useFirestore()) {
     await adminDb()!.collection("user_roles").doc(email).set(row);
+    invalidateStoreCache();
     return row;
   }
   const db = await loadLocal();
@@ -136,6 +143,7 @@ export async function setUserRole(input: {
   if (idx >= 0) db.roles[idx] = row;
   else db.roles.push(row);
   await saveLocal(db);
+  invalidateStoreCache();
   return row;
 }
 
@@ -145,11 +153,13 @@ export async function deleteUserRole(email: string): Promise<void> {
   if (isAdminEmail(normalized)) return;
   if (useFirestore()) {
     await adminDb()!.collection("user_roles").doc(normalized).delete();
+    invalidateStoreCache();
     return;
   }
   const db = await loadLocal();
   db.roles = db.roles.filter((r) => r.email !== normalized);
   await saveLocal(db);
+  invalidateStoreCache();
 }
 
 /** Ensure primary admin has an explicit role document. */

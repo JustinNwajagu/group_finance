@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { connection } from "next/server";
 import { bulkImportDues } from "@/app/actions/bulk-import";
 import {
   createDuesYear,
@@ -30,10 +29,11 @@ export default async function DuesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await connection();
-  const viewer = await requireAccess();
-  const admin = isAdmin(viewer);
+  const viewerPromise = requireAccess();
+  const schedulesPromise = listDuesSchedules();
   const params = await searchParams;
+  const viewer = await viewerPromise;
+  const admin = isAdmin(viewer);
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const bulkCount =
@@ -45,7 +45,7 @@ export default async function DuesPage({
   const yearParam =
     typeof params.year === "string" ? Number(params.year) : NaN;
 
-  const schedules = await listDuesSchedules();
+  const schedules = await schedulesPromise;
   const currentYear = new Date().getFullYear();
   const selectedYear = Number.isFinite(yearParam)
     ? yearParam

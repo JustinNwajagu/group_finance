@@ -1,9 +1,11 @@
 import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { cache } from "react";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { useFirestore } from "./config";
+import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import { compareMembersByName } from "./member-sort";
 import type { PaymentStatus } from "./types";
 
@@ -199,6 +201,7 @@ export async function createMember(input: {
         // Native Firestore timestamp kept alongside ISO string for console/queries.
         created_at_ts: FieldValue.serverTimestamp(),
       });
+    invalidateStoreCache();
     return row;
   }
   const db = await loadLocal();
@@ -206,6 +209,7 @@ export async function createMember(input: {
   const row: MemberRow = { id, ...rowBase };
   db.members.push(row);
   await saveLocal(db);
+  invalidateStoreCache();
   return row;
 }
 
@@ -221,6 +225,7 @@ export async function updateMemberRow(
       .collection("members")
       .doc(String(id))
       .set(patch, { merge: true });
+    invalidateStoreCache();
     return;
   }
   const db = await loadLocal();
@@ -228,6 +233,7 @@ export async function updateMemberRow(
   if (!row) return;
   Object.assign(row, patch);
   await saveLocal(db);
+  invalidateStoreCache();
 }
 
 /** Roster members that do not yet have a linked login. */
@@ -283,20 +289,22 @@ function normalizeMember(raw: Record<string, unknown>): MemberRow | null {
   };
 }
 
-export async function listAllMembers(): Promise<MemberRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("members").get();
-    return snap.docs
-      .map((d) => normalizeMember(d.data() as Record<string, unknown>))
-      .filter((d): d is MemberRow => d != null)
+export const listAllMembers = cache(async (): Promise<MemberRow[]> => {
+  return cachedLoad("members", async () => {
+    if (useFirestore()) {
+      const snap = await adminDb()!.collection("members").get();
+      return snap.docs
+        .map((d) => normalizeMember(d.data() as Record<string, unknown>))
+        .filter((d): d is MemberRow => d != null)
+        .sort(compareMembersByName);
+    }
+    const db = await loadLocal();
+    return [...db.members]
+      .map((m) => normalizeMember(m as unknown as Record<string, unknown>)!)
+      .filter(Boolean)
       .sort(compareMembersByName);
-  }
-  const db = await loadLocal();
-  return [...db.members]
-    .map((m) => normalizeMember(m as unknown as Record<string, unknown>)!)
-    .filter(Boolean)
-    .sort(compareMembersByName);
-}
+  });
+});
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -362,6 +370,7 @@ export async function createPaymentRequestRow(input: {
     const id = await firestoreNextId("payment_requests");
     const row: PaymentRequestRow = { id, ...rowBase };
     await adminDb()!.collection("payment_requests").doc(String(id)).set(row);
+    invalidateStoreCache();
     return row;
   }
   const db = await loadLocal();
@@ -369,21 +378,30 @@ export async function createPaymentRequestRow(input: {
   const row: PaymentRequestRow = { id, ...rowBase };
   db.payment_requests.push(row);
   await saveLocal(db);
+  invalidateStoreCache();
   return row;
 }
 
-export async function listAllPaymentRequestRows(): Promise<PaymentRequestRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("payment_requests").get();
-    return snap.docs
-      .map((d) => normalizePaymentRequest(d.data() as Record<string, unknown>))
-      .filter((d): d is PaymentRequestRow => d != null);
-  }
-  const db = await loadLocal();
-  return db.payment_requests
-    .map((r) => normalizePaymentRequest(r as unknown as Record<string, unknown>))
-    .filter((d): d is PaymentRequestRow => d != null);
-}
+export const listAllPaymentRequestRows = cache(
+  async (): Promise<PaymentRequestRow[]> => {
+    return cachedLoad("payment_requests", async () => {
+      if (useFirestore()) {
+        const snap = await adminDb()!.collection("payment_requests").get();
+        return snap.docs
+          .map((d) =>
+            normalizePaymentRequest(d.data() as Record<string, unknown>),
+          )
+          .filter((d): d is PaymentRequestRow => d != null);
+      }
+      const db = await loadLocal();
+      return db.payment_requests
+        .map((r) =>
+          normalizePaymentRequest(r as unknown as Record<string, unknown>),
+        )
+        .filter((d): d is PaymentRequestRow => d != null);
+    });
+  },
+);
 
 export async function getPaymentRequestById(
   id: number,
@@ -413,6 +431,7 @@ export async function updatePaymentRequestRow(
       .collection("payment_requests")
       .doc(String(id))
       .set(patch, { merge: true });
+    invalidateStoreCache();
     return;
   }
   const db = await loadLocal();
@@ -420,20 +439,23 @@ export async function updatePaymentRequestRow(
   if (!row) return;
   Object.assign(row, patch);
   await saveLocal(db);
+  invalidateStoreCache();
 }
 
-export async function listAllPaymentRows(): Promise<PaymentRow[]> {
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("payments").get();
-    return snap.docs
-      .map((d) => normalizePayment(d.data() as Record<string, unknown>))
+export const listAllPaymentRows = cache(async (): Promise<PaymentRow[]> => {
+  return cachedLoad("payments", async () => {
+    if (useFirestore()) {
+      const snap = await adminDb()!.collection("payments").get();
+      return snap.docs
+        .map((d) => normalizePayment(d.data() as Record<string, unknown>))
+        .filter((d): d is PaymentRow => d != null);
+    }
+    const db = await loadLocal();
+    return db.payments
+      .map((r) => normalizePayment(r as unknown as Record<string, unknown>))
       .filter((d): d is PaymentRow => d != null);
-  }
-  const db = await loadLocal();
-  return db.payments
-    .map((p) => normalizePayment(p as unknown as Record<string, unknown>))
-    .filter((d): d is PaymentRow => d != null);
-}
+  });
+});
 
 export async function getPaymentById(id: number): Promise<PaymentRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -495,6 +517,7 @@ export async function createPaymentRow(input: {
     const id = await firestoreNextId("payments");
     const row: PaymentRow = { id, ...base };
     await adminDb()!.collection("payments").doc(String(id)).set(row);
+    invalidateStoreCache();
     return row;
   }
   const db = await loadLocal();
@@ -502,6 +525,7 @@ export async function createPaymentRow(input: {
   const row: PaymentRow = { id, ...base };
   db.payments.push(row);
   await saveLocal(db);
+  invalidateStoreCache();
   return row;
 }
 
@@ -526,16 +550,19 @@ export async function updatePaymentRow(
   if (!row) return;
   Object.assign(row, cleaned);
   await saveLocal(db);
+  invalidateStoreCache();
 }
 
 export async function deletePaymentRow(id: number): Promise<void> {
   if (useFirestore()) {
     await adminDb()!.collection("payments").doc(String(id)).delete();
+    invalidateStoreCache();
     return;
   }
   const db = await loadLocal();
   db.payments = db.payments.filter((p) => p.id !== id);
   await saveLocal(db);
+  invalidateStoreCache();
 }
 
 function normalizeDuesSchedule(
@@ -676,6 +703,7 @@ export async function createDuesSchedule(input: {
     const id = await firestoreNextId("dues_schedules");
     const row: DuesScheduleRow = { id, ...rowBase };
     await adminDb()!.collection("dues_schedules").doc(String(id)).set(row);
+    invalidateStoreCache();
     return row;
   }
   const db = await loadLocal();
@@ -683,26 +711,27 @@ export async function createDuesSchedule(input: {
   const row: DuesScheduleRow = { id, ...rowBase };
   db.dues_schedules.push(row);
   await saveLocal(db);
+  invalidateStoreCache();
   return row;
 }
 
-export async function listAllDuesSchedules(): Promise<DuesScheduleRow[]> {
-  await ensureLegacyDuesMigrated();
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("dues_schedules").get();
-    return snap.docs
-      .map((d) => normalizeDuesSchedule(d.data() as Record<string, unknown>))
-      .filter((d): d is DuesScheduleRow => d != null)
-      .sort((a, b) => b.year - a.year || a.id - b.id);
-  }
-  const db = await loadLocal();
-  return [...db.dues_schedules].sort((a, b) => b.year - a.year || a.id - b.id);
-}
+export const listAllDuesSchedules = cache(async (): Promise<DuesScheduleRow[]> => {
+  return cachedLoad("dues_schedules", async () => {
+    if (useFirestore()) {
+      const snap = await adminDb()!.collection("dues_schedules").get();
+      return snap.docs
+        .map((d) => normalizeDuesSchedule(d.data() as Record<string, unknown>))
+        .filter((d): d is DuesScheduleRow => d != null)
+        .sort((a, b) => b.year - a.year || a.id - b.id);
+    }
+    const db = await loadLocal();
+    return [...db.dues_schedules].sort((a, b) => b.year - a.year || a.id - b.id);
+  });
+});
 
 export async function getDuesScheduleById(
   id: number,
 ): Promise<DuesScheduleRow | null> {
-  await ensureLegacyDuesMigrated();
   if (!Number.isFinite(id) || id <= 0) return null;
   if (useFirestore()) {
     const snap = await adminDb()!
@@ -723,17 +752,18 @@ export async function getDuesScheduleByYear(
   return all.find((s) => s.year === year) ?? null;
 }
 
-export async function listAllDuesPayments(): Promise<DuesPaymentRow[]> {
-  await ensureLegacyDuesMigrated();
-  if (useFirestore()) {
-    const snap = await adminDb()!.collection("dues_payments").get();
-    return snap.docs
-      .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
-      .filter((d): d is DuesPaymentRow => d != null);
-  }
-  const db = await loadLocal();
-  return [...db.dues_payments];
-}
+export const listAllDuesPayments = cache(async (): Promise<DuesPaymentRow[]> => {
+  return cachedLoad("dues_payments", async () => {
+    if (useFirestore()) {
+      const snap = await adminDb()!.collection("dues_payments").get();
+      return snap.docs
+        .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
+        .filter((d): d is DuesPaymentRow => d != null);
+    }
+    const db = await loadLocal();
+    return [...db.dues_payments];
+  });
+});
 
 export async function listDuesPaymentsForSchedule(
   scheduleId: number,
@@ -753,7 +783,6 @@ export async function getDuesPaymentById(
   id: number,
 ): Promise<DuesPaymentRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  await ensureLegacyDuesMigrated();
   if (useFirestore()) {
     const snap = await adminDb()!
       .collection("dues_payments")
@@ -792,6 +821,7 @@ export async function createDuesPayment(input: {
     const id = await firestoreNextId("dues_payments");
     const row: DuesPaymentRow = { id, ...base };
     await adminDb()!.collection("dues_payments").doc(String(id)).set(row);
+    invalidateStoreCache();
     return row;
   }
   const db = await loadLocal();
@@ -799,15 +829,18 @@ export async function createDuesPayment(input: {
   const row: DuesPaymentRow = { id, ...base };
   db.dues_payments.push(row);
   await saveLocal(db);
+  invalidateStoreCache();
   return row;
 }
 
 export async function deleteDuesPayment(id: number): Promise<void> {
   if (useFirestore()) {
     await adminDb()!.collection("dues_payments").doc(String(id)).delete();
+    invalidateStoreCache();
     return;
   }
   const db = await loadLocal();
   db.dues_payments = db.dues_payments.filter((p) => p.id !== id);
   await saveLocal(db);
+  invalidateStoreCache();
 }

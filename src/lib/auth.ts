@@ -2,6 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { adminAuth } from "./firebase-admin";
 import { adminEmail, firebaseAdminConfigured } from "./config";
 import { resolveAppRole } from "./user-roles";
@@ -43,7 +44,7 @@ async function viewerFromIdentity(input: {
   };
 }
 
-export async function resolveViewer(): Promise<ViewerContext | null> {
+export const resolveViewer = cache(async (): Promise<ViewerContext | null> => {
   await connection();
   const jar = await cookies();
 
@@ -86,7 +87,7 @@ export async function resolveViewer(): Promise<ViewerContext | null> {
   } catch {
     return null;
   }
-}
+});
 
 export async function requireSignedIn(): Promise<ViewerContext> {
   const viewer = await resolveViewer();

@@ -27,24 +27,28 @@ export function AppShell({
         <nav className="nav" aria-label="Primary">
           <Link
             href="/"
+            prefetch
             className={active === "home" ? "nav-link active" : "nav-link"}
           >
             Home
           </Link>
           <Link
             href="/payments"
+            prefetch
             className={active === "payments" ? "nav-link active" : "nav-link"}
           >
             Contributions
           </Link>
           <Link
             href="/dues"
+            prefetch
             className={active === "dues" ? "nav-link active" : "nav-link"}
           >
             Dues
           </Link>
           <Link
             href="/archive"
+            prefetch
             className={active === "archive" ? "nav-link active" : "nav-link"}
           >
             Archive
@@ -52,6 +56,7 @@ export function AppShell({
           {admin ? (
             <Link
               href="/access"
+              prefetch
               className={active === "access" ? "nav-link active" : "nav-link"}
             >
               Access

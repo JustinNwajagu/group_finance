@@ -1,4 +1,4 @@
-import { connection } from "next/server";
+import { Suspense } from "react";
 import { bulkImportContributions } from "@/app/actions/bulk-import";
 import {
   createPaymentRequest,
@@ -8,6 +8,7 @@ import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
 import { Flash } from "@/components/flash";
+import { PageFallback } from "@/components/page-fallback";
 import {
   FormPendingStatus,
   PendingSubmitButton,
@@ -19,28 +20,249 @@ import {
   listOpenPaymentRequests,
 } from "@/lib/data";
 import { formatDate, formatMoney } from "@/lib/format";
+import type { ContributionLists, Member, PaymentRequest } from "@/lib/types";
 
 export const instant = false;
+
+async function PaymentsBody({
+  admin,
+  boardsPromise,
+  membersPromise,
+  requestsPromise,
+}: {
+  admin: boolean;
+  boardsPromise: Promise<ContributionLists[]>;
+  membersPromise: Promise<Member[]>;
+  requestsPromise: Promise<PaymentRequest[]>;
+}) {
+  const [boards, members, requests] = await Promise.all([
+    boardsPromise,
+    admin ? membersPromise : Promise.resolve([] as Member[]),
+    admin ? requestsPromise : Promise.resolve([] as PaymentRequest[]),
+  ]);
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <div className={admin ? "split split-2" : "stack"}>
+      <section className="panel">
+        <h2>Current contributions</h2>
+        {boards.length === 0 ? (
+          <div className="hero-empty">No open contribution requests.</div>
+        ) : (
+          <div className="contrib-boards">
+            {boards.map((board) => (
+              <ContributionBoard
+                key={board.request.id}
+                board={board}
+                isAdmin={admin}
+                returnTo="/payments"
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {admin ? (
+        <div className="stack">
+          <section className="panel">
+            <h2>Record member contribution</h2>
+            {members.length === 0 || requests.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {members.length === 0
+                  ? "Add a member on Home first."
+                  : "Create a payment request first, then record contributions."}
+              </p>
+            ) : (
+              <form action={recordMemberContribution} className="form-grid">
+                <FormBusyMarker />
+                <input type="hidden" name="return_to" value="/payments" />
+                <label className="field">
+                  Payment title
+                  <select name="payment_request_id" required defaultValue="">
+                    <option value="" disabled>
+                      Select payment
+                    </option>
+                    {requests.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.title} · min {formatMoney(r.amount)} · due{" "}
+                        {formatDate(r.deadline)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  Member
+                  <select name="member_id" required defaultValue="">
+                    <option value="" disabled>
+                      Select member
+                    </option>
+                    {members.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="form-grid two">
+                  <label className="field">
+                    Amount (₦)
+                    <input
+                      name="amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                    />
+                  </label>
+                  <label className="field">
+                    Status
+                    <select name="status" defaultValue="pledge">
+                      <option value="pledge">Pledge</option>
+                      <option value="paid">Paid</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="field">
+                  Payment date (optional)
+                  <input name="payment_date" type="date" defaultValue={today} />
+                </label>
+                <label className="field">
+                  Notes (optional)
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    placeholder="Bank transfer ref, cash collector, etc."
+                  />
+                </label>
+                <PendingSubmitButton
+                  idleLabel="Save contribution"
+                  pendingLabel="Saving…"
+                />
+              </form>
+            )}
+          </section>
+
+          <section className="panel">
+            <h2>New payment</h2>
+            {members.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                Add a member on Home first, then create a payment request.
+              </p>
+            ) : (
+              <form action={createPaymentRequest} className="form-grid">
+                <FormBusyMarker />
+                <label className="field">
+                  Title
+                  <input name="title" required autoComplete="off" />
+                </label>
+                <label className="field">
+                  Minimum amount per member (₦)
+                  <input
+                    name="amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    placeholder="0.00"
+                  />
+                </label>
+                <label className="field">
+                  Payment deadline
+                  <input
+                    name="deadline"
+                    type="date"
+                    required
+                    defaultValue={today}
+                  />
+                </label>
+                <PendingSubmitButton
+                  idleLabel="Create payment"
+                  pendingLabel="Creating…"
+                />
+              </form>
+            )}
+          </section>
+
+          <section className="panel">
+            <h2>Bulk upload contributions</h2>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Upload CSV or Excel. The <strong>file name</strong> becomes the
+              contribution title. Required columns: <code>Member</code>,{" "}
+              <code>Amount</code>, <code>Status</code> (paid or pledge).
+              Optional: <code>Payment date</code>, <code>Notes</code>. If the
+              deadline is already in the past, the contribution is closed and
+              goes to <strong>Archive</strong>.
+            </p>
+            {members.length === 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                Add members on Home first.
+              </p>
+            ) : (
+              <form action={bulkImportContributions} className="form-grid">
+                <FormBusyMarker />
+                <label className="field">
+                  Spreadsheet
+                  <input
+                    name="file"
+                    type="file"
+                    accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    required
+                  />
+                </label>
+                <div className="form-grid two">
+                  <label className="field">
+                    Minimum amount per member (₦)
+                    <input
+                      name="amount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                    />
+                  </label>
+                  <label className="field">
+                    Payment deadline
+                    <input
+                      name="deadline"
+                      type="date"
+                      required
+                      defaultValue={today}
+                    />
+                  </label>
+                </div>
+                <FormPendingStatus message="Validating spreadsheet and uploading contributions…" />
+                <PendingSubmitButton
+                  idleLabel="Validate & import"
+                  pendingLabel="Validating & uploading…"
+                />
+              </form>
+            )}
+          </section>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default async function PaymentsPage({
   searchParams,
 }: PageProps<"/payments">) {
-  await connection();
-  const viewer = await requireAccess();
+  // Kick off auth + data in parallel so Firestore isn't gated behind session verify.
+  const viewerPromise = requireAccess();
+  const boardsPromise = listContributionBoards(true);
+  const membersPromise = listMemberOptions();
+  const requestsPromise = listOpenPaymentRequests();
   const params = await searchParams;
+  const viewer = await viewerPromise;
+  const admin = isAdmin(viewer);
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const bulkCount =
     typeof params.count === "string" ? params.count : undefined;
   const bulkTitle =
     typeof params.title === "string" ? params.title : undefined;
-  const admin = isAdmin(viewer);
-  const [boards, members, requests] = await Promise.all([
-    listContributionBoards(true),
-    admin ? listMemberOptions() : Promise.resolve([]),
-    admin ? listOpenPaymentRequests() : Promise.resolve([]),
-  ]);
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <AppShell viewer={viewer} active="payments">
@@ -75,222 +297,14 @@ export default async function PaymentsPage({
         }}
       />
 
-      <div className={admin ? "split split-2" : "stack"}>
-        <section className="panel">
-          <h2>Current contributions</h2>
-          {boards.length === 0 ? (
-            <div className="hero-empty">No open contribution requests.</div>
-          ) : (
-            <div className="contrib-boards">
-              {boards.map((board) => (
-                <ContributionBoard
-                  key={board.request.id}
-                  board={board}
-                  isAdmin={admin}
-                  returnTo="/payments"
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {admin ? (
-          <div className="stack">
-            <section className="panel">
-              <h2>Record member contribution</h2>
-              {members.length === 0 || requests.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
-                  {members.length === 0
-                    ? "Add a member on Home first."
-                    : "Create a payment request first, then record contributions."}
-                </p>
-              ) : (
-                <form action={recordMemberContribution} className="form-grid">
-                  <input type="hidden" name="return_to" value="/payments" />
-                  <label className="field">
-                    Payment title
-                    <select name="payment_request_id" required defaultValue="">
-                      <option value="" disabled>
-                        Select payment
-                      </option>
-                      {requests.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.title} · min {formatMoney(r.amount)} · due{" "}
-                          {formatDate(r.deadline)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    Member
-                    <select name="member_id" required defaultValue="">
-                      <option value="" disabled>
-                        Select member
-                      </option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="form-grid two">
-                    <label className="field">
-                      Amount (₦)
-                      <input
-                        name="amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        placeholder="0.00"
-                      />
-                    </label>
-                    <label className="field">
-                      Status
-                      <select name="status" defaultValue="pledge">
-                        <option value="pledge">Pledge</option>
-                        <option value="paid">Paid</option>
-                      </select>
-                    </label>
-                  </div>
-                  <label className="field">
-                    Payment date (optional)
-                    <input
-                      name="payment_date"
-                      type="date"
-                      defaultValue={today}
-                    />
-                  </label>
-                  <label className="field">
-                    Notes (optional)
-                    <textarea
-                      name="notes"
-                      rows={2}
-                      placeholder="Bank transfer ref, cash collector, etc."
-                    />
-                  </label>
-                  <p className="muted" style={{ margin: 0 }}>
-                    Both pledge and paid count as contributed. Use Archive to
-                    amend concluded payments.
-                  </p>
-                  <button type="submit" className="btn-primary">
-                    Save contribution
-                  </button>
-                </form>
-              )}
-            </section>
-
-            <section className="panel">
-              <h2>New payment</h2>
-              {members.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
-                  Add a member on Home first, then create a payment request.
-                </p>
-              ) : (
-                <form action={createPaymentRequest} className="form-grid">
-                  <FormBusyMarker />
-                  <label className="field">
-                    Title
-                    <input name="title" required autoComplete="off" />
-                  </label>
-                  <label className="field">
-                    Minimum amount per member (₦)
-                    <input
-                      name="amount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      placeholder="0.00"
-                    />
-                  </label>
-                  <label className="field">
-                    Payment deadline
-                    <input
-                      name="deadline"
-                      type="date"
-                      required
-                      defaultValue={today}
-                    />
-                  </label>
-                  <p className="muted" style={{ margin: 0 }}>
-                    Creates the payment title. Members stay outstanding until
-                    you record a pledge or paid contribution.
-                  </p>
-                  <PendingSubmitButton
-                    idleLabel="Create payment"
-                    pendingLabel="Creating…"
-                  />
-                </form>
-              )}
-            </section>
-
-            <section className="panel">
-              <h2>Bulk upload contributions</h2>
-              <p className="muted" style={{ marginTop: 0 }}>
-                Upload CSV or Excel. The <strong>file name</strong> becomes the
-                contribution title. Required columns:{" "}
-                <code>Member</code>, <code>Amount</code>,{" "}
-                <code>Status</code> (paid or pledge). Optional:{" "}
-                <code>Payment date</code>, <code>Notes</code>. If the deadline
-                is already in the past, the contribution is closed and goes to{" "}
-                <strong>Archive</strong>. Nothing is saved if any row fails
-                validation.
-              </p>
-              {members.length === 0 ? (
-                <p className="muted" style={{ margin: 0 }}>
-                  Add members on Home first.
-                </p>
-              ) : (
-                <form
-                  action={bulkImportContributions}
-                  className="form-grid"
-                  encType="multipart/form-data"
-                >
-                  <FormBusyMarker />
-                  <label className="field">
-                    Spreadsheet
-                    <input
-                      name="file"
-                      type="file"
-                      accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      required
-                    />
-                  </label>
-                  <div className="form-grid two">
-                    <label className="field">
-                      Minimum amount per member (₦)
-                      <input
-                        name="amount"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        placeholder="0.00"
-                      />
-                    </label>
-                    <label className="field">
-                      Payment deadline
-                      <input
-                        name="deadline"
-                        type="date"
-                        required
-                        defaultValue={today}
-                      />
-                    </label>
-                  </div>
-                  <FormPendingStatus message="Validating spreadsheet and uploading contributions…" />
-                  <PendingSubmitButton
-                    idleLabel="Validate & import"
-                    pendingLabel="Validating & uploading…"
-                  />
-                </form>
-              )}
-            </section>
-          </div>
-        ) : null}
-      </div>
+      <Suspense fallback={<PageFallback label="Loading contributions…" />}>
+        <PaymentsBody
+          admin={admin}
+          boardsPromise={boardsPromise}
+          membersPromise={membersPromise}
+          requestsPromise={requestsPromise}
+        />
+      </Suspense>
     </AppShell>
   );
 }

@@ -1,4 +1,3 @@
-import { connection } from "next/server";
 import { recordMemberContribution } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
@@ -18,9 +17,12 @@ export default async function ArchivePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await connection();
-  const viewer = await requireAccess();
+  const viewerPromise = requireAccess();
+  const boardsPromise = listContributionBoards(false);
+  const membersPromise = listMemberOptions();
+  const requestsPromise = listAllPaymentRequests();
   const params = await searchParams;
+  const viewer = await viewerPromise;
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const bulkCount =
@@ -29,9 +31,9 @@ export default async function ArchivePage({
     typeof params.title === "string" ? params.title : undefined;
   const admin = isAdmin(viewer);
   const [allBoards, members, allRequests] = await Promise.all([
-    listContributionBoards(false),
-    admin ? listMemberOptions() : Promise.resolve([]),
-    admin ? listAllPaymentRequests() : Promise.resolve([]),
+    boardsPromise,
+    admin ? membersPromise : Promise.resolve([]),
+    admin ? requestsPromise : Promise.resolve([]),
   ]);
   const boards = allBoards.filter((b) => b.request.concluded_at);
   const requests = allRequests.filter((r) => r.concluded_at);

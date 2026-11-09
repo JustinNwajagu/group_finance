@@ -136,17 +136,12 @@ export async function getPaymentRequest(
   return getPaymentRequestById(id);
 }
 
-export async function contributionListsForRequest(
-  requestId: number,
-): Promise<ContributionLists | null> {
-  const request = await getPaymentRequest(requestId);
-  if (!request) return null;
-
-  const [members, payments] = await Promise.all([
-    listAllMembers(),
-    listAllPaymentRows(),
-  ]);
-  const forRequest = payments.filter((p) => p.payment_request_id === requestId);
+function buildContributionLists(
+  request: PaymentRequest,
+  members: Member[],
+  payments: Awaited<ReturnType<typeof listAllPaymentRows>>,
+): ContributionLists {
+  const forRequest = payments.filter((p) => p.payment_request_id === request.id);
   const byMember = new Map(forRequest.map((p) => [p.member_id, p]));
 
   const contributed: MemberPaymentRow[] = [];
@@ -194,18 +189,30 @@ export async function contributionListsForRequest(
   };
 }
 
+export async function contributionListsForRequest(
+  requestId: number,
+): Promise<ContributionLists | null> {
+  const request = await getPaymentRequest(requestId);
+  if (!request) return null;
+
+  const [members, payments] = await Promise.all([
+    listAllMembers(),
+    listAllPaymentRows(),
+  ]);
+  return buildContributionLists(request, members, payments);
+}
+
 export async function listContributionBoards(
   onlyOpen: boolean,
 ): Promise<ContributionLists[]> {
-  const requests = onlyOpen
-    ? await listOpenPaymentRequests()
-    : await listAllPaymentRequests();
-  const boards: ContributionLists[] = [];
-  for (const request of requests) {
-    const board = await contributionListsForRequest(request.id);
-    if (board) boards.push(board);
-  }
-  return boards;
+  const [requests, members, payments] = await Promise.all([
+    onlyOpen ? listOpenPaymentRequests() : listAllPaymentRequests(),
+    listAllMembers(),
+    listAllPaymentRows(),
+  ]);
+  return requests.map((request) =>
+    buildContributionLists(request, members, payments),
+  );
 }
 
 export async function listPaymentsForMember(

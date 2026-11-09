@@ -29,7 +29,6 @@ export default async function LoginPage({
         <BrandLogo size={80} priority />
         <p className="gate-brand">KLEF 13</p>
         <h1>Sign in</h1>
-        <p className="gate-lede">Group financial records for Project SHSN_KLEF_2013</p>
         <Flash ok={undefined} error={error} messages={{}} />
         <LoginForm firebaseConfig={config} adminEmail={adminEmail()} />
       </div>

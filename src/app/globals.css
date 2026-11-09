@@ -926,15 +926,8 @@ form[aria-busy="true"] button:not([type="submit"]) {
   color: var(--ink-soft);
 }
 
-.gate-lede {
-  margin: 0 0 1.35rem;
-  color: var(--ink-soft);
-  font-size: 0.92rem;
-  line-height: 1.45;
-}
-
 .gate-card .form-grid {
-  margin-top: 0.15rem;
+  margin-top: 0.85rem;
   text-align: left;
 }
 

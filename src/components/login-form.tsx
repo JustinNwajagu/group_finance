@@ -247,7 +247,7 @@ export function LoginForm({
           setResetOpen(false);
           setError(null);
           setRequestNotice(
-            `If an account exists for ${email}, a password reset link has been sent.`,
+            `Password reset link sent to ${email}. Check your inbox and spam/junk folder.`,
           );
         }}
         onNoAccount={(email) => {

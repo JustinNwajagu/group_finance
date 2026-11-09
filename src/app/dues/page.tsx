@@ -71,9 +71,9 @@ export default async function DuesPage({
         <div>
           <h1>Dues</h1>
           <p>
-            Monthly dues run January–December each year, tracked separately from
-            contribution payments. Amount paid ÷ monthly due = months covered;
-            members can clear the year in one payment or over time.
+            Monthly dues run January–December each year. Amount paid ÷ monthly
+            due = months covered; members can clear the year in one payment or
+            over time.
           </p>
         </div>
         {schedules.length > 0 ? (

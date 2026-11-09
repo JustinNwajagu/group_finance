@@ -273,9 +273,7 @@ export default async function PaymentsPage({
         <div>
           <h1>Contributions</h1>
           <p>
-            One-off contribution requests (separate from monthly dues). Record
-            pledges and paid amounts here. Finished titles move to Archive.
-            Amounts are in Nigerian Naira (₦).
+            One-off contribution requests (separate from monthly dues).
           </p>
         </div>
       </div>

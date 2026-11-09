@@ -154,8 +154,7 @@ export default async function HomePage({
           <p>
             Roster overview. <strong>Contributions</strong> is paid contribution
             titles (pledges do not count). <strong>Dues</strong> treats each
-            opened year as 1 — partial months count as a fraction (3 months =
-            0.25). The two counts are separate and stored in different tables.
+            opened year as 1.
           </p>
         </div>
         <Suspense fallback={null}>

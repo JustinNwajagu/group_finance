@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { bulkImportContributions } from "@/app/actions/bulk-import";
 import {
   createPaymentRequest,
@@ -35,6 +36,7 @@ async function PaymentsBody({
   membersPromise: Promise<Member[]>;
   requestsPromise: Promise<PaymentRequest[]>;
 }) {
+  await connection();
   const [boards, members, requests] = await Promise.all([
     boardsPromise,
     admin ? membersPromise : Promise.resolve([] as Member[]),
@@ -249,6 +251,7 @@ async function PaymentsBody({
 export default async function PaymentsPage({
   searchParams,
 }: PageProps<"/payments">) {
+  await connection();
   // Kick off auth + data in parallel so Firestore isn't gated behind session verify.
   const viewerPromise = requireAccess();
   const boardsPromise = listContributionBoards(true);

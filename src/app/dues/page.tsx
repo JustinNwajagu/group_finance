@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import { bulkImportDues } from "@/app/actions/bulk-import";
 import {
   createDuesYear,
@@ -29,6 +30,7 @@ export default async function DuesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await connection();
   const viewerPromise = requireAccess();
   const schedulesPromise = listDuesSchedules();
   const params = await searchParams;
@@ -317,11 +319,7 @@ export default async function DuesPage({
                 whole multiples of the monthly due. Nothing is saved if any row
                 fails validation.
               </p>
-              <form
-                action={bulkImportDues}
-                className="form-grid"
-                encType="multipart/form-data"
-              >
+              <form action={bulkImportDues} className="form-grid">
                 <FormBusyMarker />
                 <label className="field">
                   Spreadsheet

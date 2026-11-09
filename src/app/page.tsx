@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { connection } from "next/server";
 import { createMember } from "@/app/actions/members";
 import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
@@ -28,6 +29,7 @@ async function HomeRoster({
   q: string;
   admin: boolean;
 }) {
+  await connection();
   const [members, contributionCount, duesYearCount] = await Promise.all([
     membersPromise,
     contributionCountPromise,
@@ -132,6 +134,7 @@ export default async function HomePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await connection();
   const viewerPromise = requireAccess();
   const params = await searchParams;
   const q = typeof params.q === "string" ? params.q : "";

@@ -1,4 +1,5 @@
 import "server-only";
+import { connection } from "next/server";
 
 type CacheEntry = {
   at: number;
@@ -33,12 +34,15 @@ export async function cachedLoad<T>(
   loader: () => Promise<T>,
   ttlMs: number = DEFAULT_TTL_MS,
 ): Promise<T> {
+  // Mark this path as request-time before reading the clock (Cache Components).
+  await connection();
   const map = bucket();
   const hit = map.get(key);
-  if (hit && Date.now() - hit.at < ttlMs) {
+  const now = Date.now();
+  if (hit && now - hit.at < ttlMs) {
     return hit.value as T;
   }
   const value = await loader();
-  map.set(key, { at: Date.now(), value });
+  map.set(key, { at: now, value });
   return value;
 }

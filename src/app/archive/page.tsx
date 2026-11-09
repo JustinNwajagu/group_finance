@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { recordMemberContribution } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
@@ -17,6 +18,7 @@ export default async function ArchivePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await connection();
   const viewerPromise = requireAccess();
   const boardsPromise = listContributionBoards(false);
   const membersPromise = listMemberOptions();

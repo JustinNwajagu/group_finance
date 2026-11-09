@@ -278,13 +278,18 @@ function AccessRequestDialog({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [error, setError] = useState<string | null>(null);
+  const [errorForOpen, setErrorForOpen] = useState(open);
   const [pending, startTransition] = useTransition();
+
+  if (open !== errorForOpen) {
+    setErrorForOpen(open);
+    if (open) setError(null);
+  }
 
   useEffect(() => {
     const el = dialogRef.current;
     if (!el) return;
     if (open) {
-      setError(null);
       if (!el.open) el.showModal();
     } else if (el.open) {
       el.close();

@@ -1,5 +1,6 @@
 import "server-only";
 import * as XLSX from "xlsx";
+import { normalizePaymentTitle } from "./format";
 import { memberSortKey } from "./member-sort";
 import type { MemberRow } from "./store";
 
@@ -37,7 +38,9 @@ function mapHeader(raw: string): string | null {
 
 export function documentTitleFromFilename(filename: string): string {
   const base = filename.split(/[/\\]/).pop() ?? filename;
-  return base.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim();
+  return normalizePaymentTitle(
+    base.replace(/\.[^.]+$/, "").replace(/[_]+/g, " ").trim(),
+  );
 }
 
 export function yearFromTitle(title: string): number | null {

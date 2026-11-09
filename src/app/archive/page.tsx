@@ -4,8 +4,8 @@ import {
   AmendArchivedForm,
   type ExistingContribution,
 } from "@/components/amend-archived-form";
+import { ArchiveBoards } from "@/components/archive-boards";
 import { AppShell } from "@/components/app-shell";
-import { ContributionBoard } from "@/components/contribution-board";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
@@ -93,20 +93,7 @@ export default async function ArchivePage({
       <div className={admin && requests.length > 0 ? "split split-2" : "stack"}>
         <section className="panel">
           <h2>Concluded payments</h2>
-          {boards.length === 0 ? (
-            <div className="hero-empty">No archived payments yet.</div>
-          ) : (
-            <div className="contrib-boards">
-              {boards.map((board) => (
-                <ContributionBoard
-                  key={board.request.id}
-                  board={board}
-                  isAdmin={admin}
-                  returnTo="/archive"
-                />
-              ))}
-            </div>
-          )}
+          <ArchiveBoards boards={boards} isAdmin={admin} />
         </section>
 
         {admin && requests.length > 0 ? (

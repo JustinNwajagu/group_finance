@@ -1,3 +1,17 @@
+/** Collapse accidental repeats like "Levy - Levy" from filename stems. */
+export function normalizePaymentTitle(title: string): string {
+  const cleaned = title.trim().replace(/\s+/g, " ");
+  if (!cleaned) return cleaned;
+  const parts = cleaned.split(/\s[-–—]\s/).map((p) => p.trim()).filter(Boolean);
+  if (
+    parts.length === 2 &&
+    parts[0].toLowerCase() === parts[1].toLowerCase()
+  ) {
+    return parts[0];
+  }
+  return cleaned;
+}
+
 export function formatMoney(value: string | number): string {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return "₦0.00";

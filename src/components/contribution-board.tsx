@@ -135,10 +135,13 @@ export function ContributionBoard({
   board,
   isAdmin,
   returnTo = "/payments",
+  hideHeader = false,
 }: {
   board: ContributionLists;
   isAdmin: boolean;
   returnTo?: string;
+  /** When true, skip the title header (used inside archive accordion). */
+  hideHeader?: boolean;
 }) {
   const {
     request,
@@ -156,34 +159,38 @@ export function ContributionBoard({
     : "Everyone has a pledge or payment.";
 
   return (
-    <article className="contrib-board">
-      <header className="contrib-board-head">
-        <div>
-          <h3>{request.title}</h3>
-          <p className="muted" style={{ margin: "0.25rem 0 0" }}>
-            Expected {formatMoney(request.amount)} · Deadline{" "}
-            {formatDate(request.deadline)}
-            {concluded && request.concluded_at
-              ? ` · Concluded ${formatDate(request.concluded_at.slice(0, 10))}`
-              : " · Open"}
-          </p>
-          <div className="totals-line">
-            <span>
-              Pledges <strong>{formatMoney(pledge_total)}</strong>
-            </span>
-            <span className="totals-sep" aria-hidden="true">
-              ·
-            </span>
-            <span>
-              Realised <strong>{formatMoney(realised_total)}</strong>
-              <span className="muted"> · paid only</span>
-            </span>
+    <article className={`contrib-board${hideHeader ? " contrib-board-embedded" : ""}`}>
+      {hideHeader ? null : (
+        <header className="contrib-board-head">
+          <div>
+            <h3>{request.title}</h3>
+            <p className="muted" style={{ margin: "0.25rem 0 0" }}>
+              Expected {formatMoney(request.amount)} · Deadline{" "}
+              {formatDate(request.deadline)}
+              {concluded && request.concluded_at
+                ? ` · Concluded ${formatDate(request.concluded_at.slice(0, 10))}`
+                : " · Open"}
+            </p>
+            <div className="totals-line">
+              <span>
+                Pledges <strong>{formatMoney(pledge_total)}</strong>
+              </span>
+              <span className="totals-sep" aria-hidden="true">
+                ·
+              </span>
+              <span>
+                Realised <strong>{formatMoney(realised_total)}</strong>
+                <span className="muted"> · paid only</span>
+              </span>
+            </div>
           </div>
-        </div>
-        <span className={concluded ? "badge badge-paid" : "badge badge-pledge"}>
-          {concluded ? "Concluded" : "Current"}
-        </span>
-      </header>
+          <span
+            className={concluded ? "badge badge-paid" : "badge badge-pledge"}
+          >
+            {concluded ? "Concluded" : "Current"}
+          </span>
+        </header>
+      )}
 
       <div className="contrib-split contrib-split-3">
         <MemberList

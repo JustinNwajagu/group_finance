@@ -5,6 +5,7 @@ import { cache } from "react";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
 import { isFirestore } from "./config";
+import { normalizePaymentTitle } from "./format";
 import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import { compareMembersByName } from "./member-sort";
 import type { PaymentStatus } from "./types";
@@ -328,7 +329,7 @@ function normalizePaymentRequest(
   if (raw.type === "dues") return null;
   return {
     id: Number(raw.id),
-    title: String(raw.title ?? ""),
+    title: normalizePaymentTitle(String(raw.title ?? "")),
     amount: money(raw.amount as string | number),
     deadline: String(raw.deadline ?? ""),
     concluded_at: (raw.concluded_at as string | null) ?? null,
@@ -360,7 +361,7 @@ export async function createPaymentRequestRow(input: {
 }): Promise<PaymentRequestRow> {
   const created_at = nowIso();
   const rowBase = {
-    title: input.title,
+    title: normalizePaymentTitle(input.title),
     amount: money(input.amount),
     deadline: input.deadline,
     concluded_at: input.concluded_at ?? null,
@@ -424,7 +425,7 @@ export async function getPaymentRequestById(
 
 export async function updatePaymentRequestRow(
   id: number,
-  patch: Partial<Pick<PaymentRequestRow, "concluded_at">>,
+  patch: Partial<Pick<PaymentRequestRow, "concluded_at" | "title">>,
 ): Promise<void> {
   if (isFirestore()) {
     await adminDb()!
@@ -571,7 +572,7 @@ function normalizeDuesSchedule(
   if (!isAppRow(raw)) return null;
   const year = Number(raw.year);
   if (!Number.isFinite(year) || year < 2000) return null;
-  const titleRaw = String(raw.title ?? "").trim();
+  const titleRaw = normalizePaymentTitle(String(raw.title ?? ""));
   return {
     id: Number(raw.id),
     year,
@@ -695,7 +696,9 @@ export async function createDuesSchedule(input: {
   const created_at = nowIso();
   const rowBase = {
     year: input.year,
-    title: (input.title?.trim() || `${input.year} Dues`).trim(),
+    title:
+      normalizePaymentTitle(input.title?.trim() || `${input.year} Dues`) ||
+      `${input.year} Dues`,
     monthly_amount: money(input.monthly_amount),
     created_at,
   };

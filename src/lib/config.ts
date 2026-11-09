@@ -39,6 +39,6 @@ export function firebaseAdminConfigured(): boolean {
   );
 }
 
-export function useFirestore(): boolean {
+export function isFirestore(): boolean {
   return firebaseAdminConfigured();
 }

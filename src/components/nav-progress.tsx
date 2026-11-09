@@ -10,13 +10,16 @@ import { usePathname, useSearchParams } from "next/navigation";
 export function NavProgress() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const routeKey = `${pathname}?${searchParams.toString()}`;
   const [active, setActive] = useState(false);
+  const [activeForRoute, setActiveForRoute] = useState(routeKey);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  // Clear the bar once navigation lands on a new route (adjust state while rendering).
+  if (active && activeForRoute !== routeKey) {
     setActive(false);
-    if (timer.current) clearTimeout(timer.current);
-  }, [pathname, searchParams]);
+    setActiveForRoute(routeKey);
+  }
 
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -41,6 +44,7 @@ export function NavProgress() {
       } catch {
         return;
       }
+      setActiveForRoute(routeKey);
       setActive(true);
       if (timer.current) clearTimeout(timer.current);
       // Safety clear if navigation is cancelled / soft-blocked.
@@ -52,7 +56,7 @@ export function NavProgress() {
       document.removeEventListener("click", onClick, true);
       if (timer.current) clearTimeout(timer.current);
     };
-  }, []);
+  }, [routeKey]);
 
   return (
     <div

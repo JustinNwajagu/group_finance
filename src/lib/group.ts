@@ -1,5 +1,3 @@
-import type { PaymentWithMember } from "./types";
-
 export type PaymentTitleGroup<T extends { title: string; amount: string }> = {
   title: string;
   payments: T[];

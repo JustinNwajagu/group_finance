@@ -4,7 +4,7 @@ import path from "node:path";
 import { cache } from "react";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "./firebase-admin";
-import { useFirestore } from "./config";
+import { isFirestore } from "./config";
 import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import { compareMembersByName } from "./member-sort";
 import type { PaymentStatus } from "./types";
@@ -173,7 +173,7 @@ function isAppRow(data: Record<string, unknown> | undefined): boolean {
 }
 
 export async function storeBackend(): Promise<"firestore" | "local"> {
-  return useFirestore() ? "firestore" : "local";
+  return isFirestore() ? "firestore" : "local";
 }
 
 export async function createMember(input: {
@@ -190,7 +190,7 @@ export async function createMember(input: {
     login_email: null as string | null,
     created_at,
   };
-  if (useFirestore()) {
+  if (isFirestore()) {
     const id = await firestoreNextId("members");
     const row: MemberRow = { id, ...rowBase };
     await adminDb()!
@@ -220,7 +220,7 @@ export async function updateMemberRow(
   >,
 ): Promise<void> {
   if (!Number.isFinite(id) || id <= 0) return;
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!
       .collection("members")
       .doc(String(id))
@@ -291,7 +291,7 @@ function normalizeMember(raw: Record<string, unknown>): MemberRow | null {
 
 export const listAllMembers = cache(async (): Promise<MemberRow[]> => {
   return cachedLoad("members", async () => {
-    if (useFirestore()) {
+    if (isFirestore()) {
       const snap = await adminDb()!.collection("members").get();
       return snap.docs
         .map((d) => normalizeMember(d.data() as Record<string, unknown>))
@@ -308,7 +308,7 @@ export const listAllMembers = cache(async (): Promise<MemberRow[]> => {
 
 export async function getMemberById(id: number): Promise<MemberRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!.collection("members").doc(String(id)).get();
     if (!snap.exists) return null;
     return normalizeMember(snap.data() as Record<string, unknown>);
@@ -366,7 +366,7 @@ export async function createPaymentRequestRow(input: {
     concluded_at: input.concluded_at ?? null,
     created_at,
   };
-  if (useFirestore()) {
+  if (isFirestore()) {
     const id = await firestoreNextId("payment_requests");
     const row: PaymentRequestRow = { id, ...rowBase };
     await adminDb()!.collection("payment_requests").doc(String(id)).set(row);
@@ -385,7 +385,7 @@ export async function createPaymentRequestRow(input: {
 export const listAllPaymentRequestRows = cache(
   async (): Promise<PaymentRequestRow[]> => {
     return cachedLoad("payment_requests", async () => {
-      if (useFirestore()) {
+      if (isFirestore()) {
         const snap = await adminDb()!.collection("payment_requests").get();
         return snap.docs
           .map((d) =>
@@ -407,7 +407,7 @@ export async function getPaymentRequestById(
   id: number,
 ): Promise<PaymentRequestRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!
       .collection("payment_requests")
       .doc(String(id))
@@ -426,7 +426,7 @@ export async function updatePaymentRequestRow(
   id: number,
   patch: Partial<Pick<PaymentRequestRow, "concluded_at">>,
 ): Promise<void> {
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!
       .collection("payment_requests")
       .doc(String(id))
@@ -444,7 +444,7 @@ export async function updatePaymentRequestRow(
 
 export const listAllPaymentRows = cache(async (): Promise<PaymentRow[]> => {
   return cachedLoad("payments", async () => {
-    if (useFirestore()) {
+    if (isFirestore()) {
       const snap = await adminDb()!.collection("payments").get();
       return snap.docs
         .map((d) => normalizePayment(d.data() as Record<string, unknown>))
@@ -459,7 +459,7 @@ export const listAllPaymentRows = cache(async (): Promise<PaymentRow[]> => {
 
 export async function getPaymentById(id: number): Promise<PaymentRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!.collection("payments").doc(String(id)).get();
     if (!snap.exists) return null;
     return normalizePayment(snap.data() as Record<string, unknown>);
@@ -475,7 +475,7 @@ export async function findPaymentForMemberRequest(
   paymentRequestId: number,
   memberId: number,
 ): Promise<PaymentRow | null> {
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!
       .collection("payments")
       .where("payment_request_id", "==", paymentRequestId)
@@ -513,7 +513,7 @@ export async function createPaymentRow(input: {
     notes: normalizeNotes(input.notes ?? null),
     created_at,
   };
-  if (useFirestore()) {
+  if (isFirestore()) {
     const id = await firestoreNextId("payments");
     const row: PaymentRow = { id, ...base };
     await adminDb()!.collection("payments").doc(String(id)).set(row);
@@ -538,7 +538,7 @@ export async function updatePaymentRow(
   const cleaned = { ...patch };
   if (cleaned.amount != null) cleaned.amount = money(cleaned.amount);
   if ("notes" in cleaned) cleaned.notes = normalizeNotes(cleaned.notes ?? null);
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!
       .collection("payments")
       .doc(String(id))
@@ -554,7 +554,7 @@ export async function updatePaymentRow(
 }
 
 export async function deletePaymentRow(id: number): Promise<void> {
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!.collection("payments").doc(String(id)).delete();
     invalidateStoreCache();
     return;
@@ -614,7 +614,7 @@ function normalizeDuesPayment(
 
 /** Migrate any legacy type=dues rows out of contribution tables once. */
 async function migrateLegacyDuesFromPaymentTables(): Promise<void> {
-  if (!useFirestore()) return;
+  if (!isFirestore()) return;
   const db = adminDb()!;
   const [reqSnap, paySnap] = await Promise.all([
     db.collection("payment_requests").get(),
@@ -699,7 +699,7 @@ export async function createDuesSchedule(input: {
     monthly_amount: money(input.monthly_amount),
     created_at,
   };
-  if (useFirestore()) {
+  if (isFirestore()) {
     const id = await firestoreNextId("dues_schedules");
     const row: DuesScheduleRow = { id, ...rowBase };
     await adminDb()!.collection("dues_schedules").doc(String(id)).set(row);
@@ -717,7 +717,7 @@ export async function createDuesSchedule(input: {
 
 export const listAllDuesSchedules = cache(async (): Promise<DuesScheduleRow[]> => {
   return cachedLoad("dues_schedules", async () => {
-    if (useFirestore()) {
+    if (isFirestore()) {
       const snap = await adminDb()!.collection("dues_schedules").get();
       return snap.docs
         .map((d) => normalizeDuesSchedule(d.data() as Record<string, unknown>))
@@ -733,7 +733,7 @@ export async function getDuesScheduleById(
   id: number,
 ): Promise<DuesScheduleRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!
       .collection("dues_schedules")
       .doc(String(id))
@@ -754,7 +754,7 @@ export async function getDuesScheduleByYear(
 
 export const listAllDuesPayments = cache(async (): Promise<DuesPaymentRow[]> => {
   return cachedLoad("dues_payments", async () => {
-    if (useFirestore()) {
+    if (isFirestore()) {
       const snap = await adminDb()!.collection("dues_payments").get();
       return snap.docs
         .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
@@ -783,7 +783,7 @@ export async function getDuesPaymentById(
   id: number,
 ): Promise<DuesPaymentRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!
       .collection("dues_payments")
       .doc(String(id))
@@ -817,7 +817,7 @@ export async function createDuesPayment(input: {
     notes: normalizeNotes(input.notes ?? null),
     created_at,
   };
-  if (useFirestore()) {
+  if (isFirestore()) {
     const id = await firestoreNextId("dues_payments");
     const row: DuesPaymentRow = { id, ...base };
     await adminDb()!.collection("dues_payments").doc(String(id)).set(row);
@@ -834,7 +834,7 @@ export async function createDuesPayment(input: {
 }
 
 export async function deleteDuesPayment(id: number): Promise<void> {
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!.collection("dues_payments").doc(String(id)).delete();
     invalidateStoreCache();
     return;

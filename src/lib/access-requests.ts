@@ -2,13 +2,12 @@ import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { adminAuth, adminDb } from "./firebase-admin";
-import { useFirestore } from "./config";
+import { isFirestore } from "./config";
 import {
   countLinkedLogins,
   countMembers,
   createMember,
   getMemberById,
-  listMembersWithoutLogin,
   updateMemberRow,
   type MemberRow,
 } from "./store";
@@ -82,7 +81,7 @@ function normalizeRequest(raw: Record<string, unknown>): AccessRequestRow | null
 }
 
 async function nextId(): Promise<number> {
-  if (useFirestore()) {
+  if (isFirestore()) {
     const db = adminDb()!;
     const ref = db.collection("_counters").doc("access_requests");
     return db.runTransaction(async (tx) => {
@@ -119,7 +118,7 @@ export async function createAccessRequest(input: {
     decided_at: null,
   };
 
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!.collection("access_requests").doc(String(id)).set(row);
     return row;
   }
@@ -133,7 +132,7 @@ export async function listAccessRequests(
   status?: AccessRequestStatus,
 ): Promise<AccessRequestRow[]> {
   let rows: AccessRequestRow[];
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!.collection("access_requests").get();
     rows = snap.docs
       .map((d) => normalizeRequest(d.data() as Record<string, unknown>))
@@ -151,7 +150,7 @@ export async function getAccessRequestById(
   id: number,
 ): Promise<AccessRequestRow | null> {
   if (!Number.isFinite(id) || id <= 0) return null;
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!
       .collection("access_requests")
       .doc(String(id))
@@ -206,7 +205,7 @@ export async function updateAccessRequest(
   if (!existing) return null;
   const next = { ...existing, ...patch };
 
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!
       .collection("access_requests")
       .doc(String(id))
@@ -223,7 +222,7 @@ export async function updateAccessRequest(
 
 export async function deleteAccessRequest(id: number): Promise<void> {
   if (!Number.isFinite(id) || id <= 0) return;
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!.collection("access_requests").doc(String(id)).delete();
     return;
   }

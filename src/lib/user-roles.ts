@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
 import { adminDb } from "./firebase-admin";
-import { adminEmail, isAdminEmail, useFirestore } from "./config";
+import { adminEmail, isAdminEmail, isFirestore } from "./config";
 import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import type { AppRole } from "./types";
 
@@ -71,7 +71,7 @@ export const getUserRole = cache(async (
   const normalized = email.trim().toLowerCase();
   if (!normalized) return null;
   return cachedLoad(`user_roles:${normalized}`, async () => {
-    if (useFirestore()) {
+    if (isFirestore()) {
       const snap = await adminDb()!
         .collection("user_roles")
         .doc(normalized)
@@ -91,7 +91,7 @@ export const getUserRole = cache(async (
 });
 
 export async function listUserRoles(): Promise<UserRoleRow[]> {
-  if (useFirestore()) {
+  if (isFirestore()) {
     const snap = await adminDb()!.collection("user_roles").get();
     return snap.docs
       .map((d) => {
@@ -133,7 +133,7 @@ export async function setUserRole(input: {
     updated_at: nowIso(),
     updated_by: input.updatedBy,
   };
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!.collection("user_roles").doc(email).set(row);
     invalidateStoreCache();
     return row;
@@ -151,7 +151,7 @@ export async function deleteUserRole(email: string): Promise<void> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return;
   if (isAdminEmail(normalized)) return;
-  if (useFirestore()) {
+  if (isFirestore()) {
     await adminDb()!.collection("user_roles").doc(normalized).delete();
     invalidateStoreCache();
     return;

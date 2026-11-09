@@ -98,9 +98,9 @@ a {
 }
 
 .gate-card .brand-logo {
-  margin: 0 auto 0.35rem;
+  margin: 0 auto;
   border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(15, 61, 46, 0.18);
+  box-shadow: 0 10px 24px rgba(20, 32, 51, 0.12);
 }
 
 .brand-mark {
@@ -892,38 +892,103 @@ form[aria-busy="true"] button:not([type="submit"]) {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 2rem;
+  padding: 2rem 1.25rem;
   position: relative;
   z-index: 1;
 }
 
 .gate-card {
-  width: min(420px, 100%);
+  width: min(400px, 100%);
   text-align: center;
-  padding: 2.25rem 1.75rem;
+  padding: 2.5rem 1.85rem 2rem;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.8);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
-.gate-card .brand-mark {
-  font-size: 2.2rem;
+.gate-brand {
+  margin: 1rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  line-height: 1.15;
 }
 
 .gate-card h1 {
-  margin: 0.85rem 0 1.15rem;
+  margin: 0.35rem 0 0.45rem;
   font-family: var(--font-display);
-  font-size: 1.7rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.gate-lede {
+  margin: 0 0 1.35rem;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .gate-card .form-grid {
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
+  text-align: left;
+}
+
+.gate-card .form-error,
+.gate-card .form-ok {
+  text-align: left;
+}
+
+.login-stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.field-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.text-link {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--sea-deep);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+.text-link:hover {
+  color: var(--sea);
+}
+
+.text-link:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.login-foot {
+  margin: 0;
+  text-align: center;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
 }
 
 .gate-card p {
-  margin: 0;
   color: var(--ink-soft);
   line-height: 1.5;
 }

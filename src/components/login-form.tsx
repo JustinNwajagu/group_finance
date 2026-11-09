@@ -9,10 +9,8 @@ import {
   useTransition,
 } from "react";
 import {
-  GoogleAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
 } from "firebase/auth";
 import { createDevSession, createFirebaseSession } from "@/app/actions/auth";
 import {
@@ -38,7 +36,9 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [requestOpen, setRequestOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
   const [requestEmail, setRequestEmail] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [requestNotice, setRequestNotice] = useState<string | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
@@ -118,7 +118,7 @@ export function LoginForm({
               openRequestFor(email);
             }
           } catch {
-            setError("No account found for this email. You can request access.");
+            setError("No account found for this email. You can create an account.");
             openRequestFor(email);
           }
           return;
@@ -132,59 +132,8 @@ export function LoginForm({
     });
   }
 
-  function onForgotPassword() {
-    setError(null);
-    setRequestNotice(null);
-    const email = emailInputRef.current?.value.trim() ?? "";
-    if (!email || !email.includes("@")) {
-      setError("Enter your email address first, then choose Forgot password.");
-      return;
-    }
-    startTransition(async () => {
-      try {
-        const auth = getFirebaseAuth(firebaseConfig!);
-        await sendPasswordResetEmail(auth, email);
-        setRequestNotice(
-          "If an account exists for that email, a password reset link has been sent.",
-        );
-      } catch (err) {
-        const code = firebaseCode(err);
-        if (code === "auth/invalid-email") {
-          setError("Enter a valid email address.");
-          return;
-        }
-        if (code === "auth/user-not-found") {
-          setError("No account found for this email. You can request access.");
-          openRequestFor(email);
-          return;
-        }
-        setError("Could not send a reset email. Try again shortly.");
-      }
-    });
-  }
-
-  function onGoogle() {
-    setError(null);
-    setRequestNotice(null);
-    startTransition(async () => {
-      try {
-        const auth = getFirebaseAuth(firebaseConfig!);
-        const cred = await signInWithPopup(auth, new GoogleAuthProvider());
-        const email = cred.user.email ?? "";
-        await finish(await cred.user.getIdToken(), email);
-      } catch (err) {
-        const code = firebaseCode(err);
-        if (code === "auth/popup-closed-by-user") {
-          setError("Google sign-in was cancelled.");
-          return;
-        }
-        setError("Google sign-in failed. Try again.");
-      }
-    });
-  }
-
   return (
-    <div className="form-grid">
+    <div className="login-stack">
       {error ? (
         <p className="form-error" role="alert">
           {error}
@@ -195,6 +144,7 @@ export function LoginForm({
           {requestNotice}
         </p>
       ) : null}
+
       <form onSubmit={handleEmailSubmit} className="form-grid">
         <label className="field">
           Email
@@ -208,7 +158,22 @@ export function LoginForm({
           />
         </label>
         <label className="field">
-          Password
+          <span className="field-label-row">
+            <span>Password</span>
+            <button
+              type="button"
+              className="text-link"
+              disabled={pending}
+              onClick={() => {
+                setError(null);
+                setRequestNotice(null);
+                setResetEmail(emailInputRef.current?.value?.trim() ?? "");
+                setResetOpen(true);
+              }}
+            >
+              Forgot password?
+            </button>
+          </span>
           <PasswordInput
             inputRef={passwordInputRef}
             name="password"
@@ -221,32 +186,39 @@ export function LoginForm({
           {pending ? "Signing in…" : "Sign in"}
         </button>
       </form>
-      <button
-        type="button"
-        className="btn-ghost"
-        onClick={onForgotPassword}
-        disabled={pending}
-      >
-        Forgot password
-      </button>
-      <button
-        type="button"
-        className="btn-ghost"
-        onClick={onGoogle}
-        disabled={pending}
-      >
-        Continue with Google
-      </button>
-      <button
-        type="button"
-        className="btn-ghost"
-        disabled={pending}
-        onClick={() =>
-          openRequestFor(emailInputRef.current?.value?.trim() ?? "")
-        }
-      >
-        Request an account
-      </button>
+
+      <p className="login-foot">
+        Don&apos;t have an account?{" "}
+        <button
+          type="button"
+          className="text-link"
+          disabled={pending}
+          onClick={() =>
+            openRequestFor(emailInputRef.current?.value?.trim() ?? "")
+          }
+        >
+          Create an account
+        </button>
+      </p>
+
+      <ForgotPasswordDialog
+        open={resetOpen}
+        defaultEmail={resetEmail}
+        firebaseConfig={firebaseConfig}
+        onClose={() => setResetOpen(false)}
+        onSent={(email) => {
+          setResetOpen(false);
+          setError(null);
+          setRequestNotice(
+            `If an account exists for ${email}, a password reset link has been sent.`,
+          );
+        }}
+        onNoAccount={(email) => {
+          setResetOpen(false);
+          setError("No account found for this email. You can create an account.");
+          openRequestFor(email);
+        }}
+      />
 
       <AccessRequestDialog
         open={requestOpen}
@@ -261,6 +233,145 @@ export function LoginForm({
         }}
       />
     </div>
+  );
+}
+
+function ForgotPasswordDialog({
+  open,
+  defaultEmail,
+  firebaseConfig,
+  onClose,
+  onSent,
+  onNoAccount,
+}: {
+  open: boolean;
+  defaultEmail: string;
+  firebaseConfig: PublicFirebaseConfig;
+  onClose: () => void;
+  onSent: (email: string) => void;
+  onNoAccount: (email: string) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const [email, setEmail] = useState(defaultEmail);
+  const [error, setError] = useState<string | null>(null);
+  const [openSynced, setOpenSynced] = useState(open);
+  const [pending, startTransition] = useTransition();
+
+  if (open !== openSynced) {
+    setOpenSynced(open);
+    if (open) {
+      setError(null);
+      setEmail(defaultEmail);
+    }
+  }
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    if (open) {
+      if (!el.open) el.showModal();
+    } else if (el.open) {
+      el.close();
+    }
+  }, [open]);
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const auth = getFirebaseAuth(firebaseConfig);
+        const continueUrl = `${window.location.origin}/login`;
+        await sendPasswordResetEmail(auth, trimmed, {
+          url: continueUrl,
+          handleCodeInApp: false,
+        });
+        onSent(trimmed);
+      } catch (err) {
+        const code = firebaseCode(err);
+        if (code === "auth/invalid-email") {
+          setError("Enter a valid email address.");
+          return;
+        }
+        if (code === "auth/user-not-found") {
+          onNoAccount(trimmed);
+          return;
+        }
+        if (code === "auth/unauthorized-continue-uri") {
+          setError(
+            "Reset email could not be sent (domain not authorized). Ask an admin to add this site in Firebase Authentication → Authorized domains.",
+          );
+          return;
+        }
+        if (code === "auth/too-many-requests") {
+          setError("Too many attempts. Wait a moment and try again.");
+          return;
+        }
+        setError("Could not send a reset email. Try again shortly.");
+      }
+    });
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="contrib-dialog"
+      aria-labelledby={titleId}
+      onClose={onClose}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === dialogRef.current) onClose();
+      }}
+    >
+      <form onSubmit={onSubmit} className="contrib-dialog-panel">
+        <div className="contrib-dialog-head">
+          <h3 id={titleId}>Reset password</h3>
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        <p className="muted" style={{ margin: 0 }}>
+          Enter the email for your account. We&apos;ll send a link to choose a
+          new password.
+        </p>
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <label className="field">
+          Email
+          <input
+            name="email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={pending}
+            autoFocus
+          />
+        </label>
+        <div className="contrib-dialog-actions">
+          <button type="button" className="btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary" disabled={pending}>
+            {pending ? "Sending…" : "Send reset link"}
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 
@@ -332,7 +443,7 @@ function AccessRequestDialog({
     >
       <form onSubmit={onSubmit} className="contrib-dialog-panel">
         <div className="contrib-dialog-head">
-          <h3 id={titleId}>Request an account</h3>
+          <h3 id={titleId}>Create an account</h3>
           <button type="button" className="btn-ghost" onClick={onClose}>
             Close
           </button>

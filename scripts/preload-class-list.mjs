@@ -35,6 +35,7 @@ const MEMBERS = [
   ["Mr.", "Ikejide Tochukwu"],
   ["Mr.", "Ilonze Chibundo"],
   ["Dr.", "Iyi Clinton"],
+  ["Mr.", "Madukwe Anthony"],
   ["Mr.", "Mazi Victor"],
   ["Mr.", "Mbaneme Lotachukwu"],
   ["Fr.", "Mbiaku ChukwuEbuka"],

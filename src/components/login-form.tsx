@@ -26,6 +26,43 @@ function firebaseCode(err: unknown): string | null {
   return typeof code === "string" ? code : null;
 }
 
+function isLocalDevOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prefer a continue URL back to /login when the current origin is allowed in
+ * Firebase Auth → Authorized domains. Local preview (127.0.0.1) and other
+ * unauthorized hosts fall back to a plain reset email so the flow still works.
+ */
+async function sendPasswordResetWithFallback(
+  auth: ReturnType<typeof getFirebaseAuth>,
+  email: string,
+): Promise<void> {
+  const origin = window.location.origin;
+  const continueUrl = `${origin}/login`;
+
+  if (!isLocalDevOrigin(origin)) {
+    try {
+      await sendPasswordResetEmail(auth, email, {
+        url: continueUrl,
+        handleCodeInApp: false,
+      });
+      return;
+    } catch (err) {
+      if (firebaseCode(err) !== "auth/unauthorized-continue-uri") throw err;
+      // Domain not on the Auth allow-list yet — still send the reset mail.
+    }
+  }
+
+  await sendPasswordResetEmail(auth, email);
+}
+
 export function LoginForm({
   firebaseConfig,
   adminEmail,
@@ -288,11 +325,7 @@ function ForgotPasswordDialog({
     startTransition(async () => {
       try {
         const auth = getFirebaseAuth(firebaseConfig);
-        const continueUrl = `${window.location.origin}/login`;
-        await sendPasswordResetEmail(auth, trimmed, {
-          url: continueUrl,
-          handleCodeInApp: false,
-        });
+        await sendPasswordResetWithFallback(auth, trimmed);
         onSent(trimmed);
       } catch (err) {
         const code = firebaseCode(err);
@@ -302,12 +335,6 @@ function ForgotPasswordDialog({
         }
         if (code === "auth/user-not-found") {
           onNoAccount(trimmed);
-          return;
-        }
-        if (code === "auth/unauthorized-continue-uri") {
-          setError(
-            "Reset email could not be sent (domain not authorized). Ask an admin to add this site in Firebase Authentication → Authorized domains.",
-          );
           return;
         }
         if (code === "auth/too-many-requests") {

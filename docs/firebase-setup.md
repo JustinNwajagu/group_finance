@@ -54,7 +54,7 @@ firebase apphosting:secrets:set FIREBASE_PRIVATE_KEY
 `apphosting.yaml` already references those secret names. Console env values override the YAML if both are set.
 
 5. Attach a custom domain in the App Hosting backend settings when ready.
-6. Authorized domains: Authentication → Settings → add your App Hosting URL / custom domain (required for password-reset continue URLs back to `/login`).
+6. Authorized domains: Authentication → Settings → Authorized domains. Add your App Hosting / custom domain. `localhost` is included by default; add `127.0.0.1` if you preview on that host. Unauthorized continue URLs used to block reset emails — the app now falls back to a plain reset email when the domain is missing.
 7. Authentication → Sign-in method → enable **Email/Password**. Password reset emails use Firebase’s built-in mailer (Templates tab to customize).
 
 ### Continuous delivery

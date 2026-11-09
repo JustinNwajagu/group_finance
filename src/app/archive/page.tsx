@@ -1,5 +1,9 @@
 import { connection } from "next/server";
 import { recordMemberContribution } from "@/app/actions/payments";
+import {
+  AmendArchivedForm,
+  type ExistingContribution,
+} from "@/components/amend-archived-form";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
 import { Flash } from "@/components/flash";
@@ -9,7 +13,7 @@ import {
   listContributionBoards,
   listMemberOptions,
 } from "@/lib/data";
-import { formatDate, formatMoney } from "@/lib/format";
+import { listAllPaymentRows } from "@/lib/store";
 
 export const instant = false;
 
@@ -23,6 +27,7 @@ export default async function ArchivePage({
   const boardsPromise = listContributionBoards(false);
   const membersPromise = listMemberOptions();
   const requestsPromise = listAllPaymentRequests();
+  const paymentsPromise = listAllPaymentRows();
   const params = await searchParams;
   const viewer = await viewerPromise;
   const error = typeof params.error === "string" ? params.error : undefined;
@@ -32,13 +37,25 @@ export default async function ArchivePage({
   const bulkTitle =
     typeof params.title === "string" ? params.title : undefined;
   const admin = isAdmin(viewer);
-  const [allBoards, members, allRequests] = await Promise.all([
+  const [allBoards, members, allRequests, allPayments] = await Promise.all([
     boardsPromise,
     admin ? membersPromise : Promise.resolve([]),
     admin ? requestsPromise : Promise.resolve([]),
+    admin ? paymentsPromise : Promise.resolve([]),
   ]);
   const boards = allBoards.filter((b) => b.request.concluded_at);
   const requests = allRequests.filter((r) => r.concluded_at);
+  const archivedRequestIds = new Set(requests.map((r) => r.id));
+  const existing: Record<string, ExistingContribution> = {};
+  for (const p of allPayments) {
+    if (!archivedRequestIds.has(p.payment_request_id)) continue;
+    existing[`${p.payment_request_id}:${p.member_id}`] = {
+      amount: p.amount,
+      status: p.status,
+      payment_date: p.payment_date,
+      notes: p.notes,
+    };
+  }
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -95,73 +112,13 @@ export default async function ArchivePage({
         {admin && requests.length > 0 ? (
           <section className="panel">
             <h2>Amend archived contribution</h2>
-            <form action={recordMemberContribution} className="form-grid">
-              <input type="hidden" name="return_to" value="/archive" />
-              <label className="field">
-                Payment title
-                <select name="payment_request_id" required defaultValue="">
-                  <option value="" disabled>
-                    Select archived payment
-                  </option>
-                  {requests.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.title} · min {formatMoney(r.amount)} · concluded{" "}
-                      {r.concluded_at
-                        ? formatDate(r.concluded_at.slice(0, 10))
-                        : "—"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                Member
-                <select name="member_id" required defaultValue="">
-                  <option value="" disabled>
-                    Select member
-                  </option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="form-grid two">
-                <label className="field">
-                  Amount (₦)
-                  <input
-                    name="amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    placeholder="0.00"
-                  />
-                </label>
-                <label className="field">
-                  Status
-                  <select name="status" defaultValue="pledge">
-                    <option value="pledge">Pledge</option>
-                    <option value="paid">Paid</option>
-                  </select>
-                </label>
-              </div>
-              <label className="field">
-                Payment date (optional)
-                <input name="payment_date" type="date" defaultValue={today} />
-              </label>
-              <label className="field">
-                Notes (optional)
-                <textarea
-                  name="notes"
-                  rows={2}
-                  placeholder="Bank transfer ref, cash collector, etc."
-                />
-              </label>
-              <button type="submit" className="btn-primary">
-                Save contribution
-              </button>
-            </form>
+            <AmendArchivedForm
+              action={recordMemberContribution}
+              requests={requests}
+              members={members}
+              existing={existing}
+              today={today}
+            />
           </section>
         ) : null}
       </div>

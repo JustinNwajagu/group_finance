@@ -71,7 +71,7 @@ firebase apphosting:rollouts:create <BACKEND_ID>
 # or deploy local source without GitHub — see Firebase “alternative ways to deploy”
 ```
 
-The older `firebase.json` → `hosting.frameworksBackend` path is legacy for this app; App Hosting is the path of record.
+`firebase.json` only configures Firestore rules. App Hosting (via `apphosting.yaml` + the GitHub connection) is the deploy path.
 
 ## 3. Local without Firebase credentials
 

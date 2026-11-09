@@ -36,4 +36,6 @@ npm run firestore:bootstrap
 
 ## Deploy
 
-Configure Firebase App Hosting / Hosting for this repo and set the same env vars in the hosting environment. Custom domain can be attached in the Firebase console.
+**Firebase App Hosting** from GitHub (`main` → automatic rollout). Secrets go in Cloud Secret Manager via `firebase apphosting:secrets:set` (see `apphosting.yaml` and `docs/firebase-setup.md`).
+
+**CI:** GitHub Actions (`.github/workflows/ci.yml`) runs lint, typecheck, and production build on PRs and `main`.

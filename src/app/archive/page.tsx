@@ -23,6 +23,10 @@ export default async function ArchivePage({
   const params = await searchParams;
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
+  const bulkCount =
+    typeof params.count === "string" ? params.count : undefined;
+  const bulkTitle =
+    typeof params.title === "string" ? params.title : undefined;
   const admin = isAdmin(viewer);
   const [allBoards, members, allRequests] = await Promise.all([
     listContributionBoards(false),
@@ -59,6 +63,9 @@ export default async function ArchivePage({
           amended: "Contribution list updated.",
           concluded: "Payment archived.",
           reopened: "Payment reopened — see Payments.",
+          bulk_contributions: bulkTitle
+            ? `Imported ${bulkCount ?? ""} contribution row(s) for “${bulkTitle}” into Archive (deadline already passed).`
+            : "Contribution spreadsheet imported into Archive.",
         }}
       />
 

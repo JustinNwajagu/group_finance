@@ -347,13 +347,15 @@ export async function createPaymentRequestRow(input: {
   title: string;
   amount: number;
   deadline: string;
+  /** When set, the contribution is closed and appears in Archive. */
+  concluded_at?: string | null;
 }): Promise<PaymentRequestRow> {
   const created_at = nowIso();
   const rowBase = {
     title: input.title,
     amount: money(input.amount),
     deadline: input.deadline,
-    concluded_at: null as string | null,
+    concluded_at: input.concluded_at ?? null,
     created_at,
   };
   if (useFirestore()) {

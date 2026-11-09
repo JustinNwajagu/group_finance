@@ -226,8 +226,10 @@ export default async function PaymentsPage({
                 contribution title. Required columns:{" "}
                 <code>Member</code>, <code>Amount</code>,{" "}
                 <code>Status</code> (paid or pledge). Optional:{" "}
-                <code>Payment date</code>, <code>Notes</code>. Nothing is saved
-                if any row fails validation.
+                <code>Payment date</code>, <code>Notes</code>. If the deadline
+                is already in the past, the contribution is closed and goes to{" "}
+                <strong>Archive</strong>. Nothing is saved if any row fails
+                validation.
               </p>
               {members.length === 0 ? (
                 <p className="muted" style={{ margin: 0 }}>

@@ -154,10 +154,16 @@ export async function bulkImportContributions(
   }
   if (issues.length) fail("/payments", formatIssues(issues));
 
+  // Past deadline → contribution is closed and lands in Archive.
+  const today = new Date().toISOString().slice(0, 10);
+  const archived = deadline < today;
+  const concluded_at = archived ? `${deadline}T12:00:00.000Z` : null;
+
   const request = await createPaymentRequestRow({
     title: parsed.title,
     amount: minAmount,
     deadline,
+    concluded_at,
   });
 
   for (const row of prepared) {
@@ -188,7 +194,8 @@ export async function bulkImportContributions(
   revalidatePath("/payments");
   revalidatePath("/archive");
   revalidatePath("/members");
-  ok("/payments", "bulk_contributions", {
+  const dest = archived ? "/archive" : "/payments";
+  ok(dest, "bulk_contributions", {
     count: String(prepared.length),
     title: parsed.title,
   });

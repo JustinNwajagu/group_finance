@@ -436,7 +436,8 @@ table.dues-grid td.dues-paid {
   }
 }
 
-label.field {
+label.field,
+.field {
   display: grid;
   gap: 0.35rem;
   font-size: 0.85rem;

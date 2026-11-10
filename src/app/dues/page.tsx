@@ -13,12 +13,12 @@ import {
   FormPendingStatus,
   PendingSubmitButton,
 } from "@/components/pending-submit-button";
+import { RecordDuesForm } from "@/components/record-dues-form";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { getDuesBoard, listDuesSchedules } from "@/lib/dues-data";
 import {
   DUES_MONTH_LABELS,
   formatCoveredMonths,
-  monthsFromAmount,
 } from "@/lib/dues-months";
 import { formatDate, formatMoney } from "@/lib/format";
 import { listMemberOptions } from "@/lib/data";
@@ -72,8 +72,8 @@ export default async function DuesPage({
           <h1>Dues</h1>
           <p>
             Monthly dues run January–December each year. Amount paid ÷ monthly
-            due = months covered; members can clear the year in one payment or
-            over time.
+            due = months covered. Payments that cover more than one year are
+            split across a year range you choose.
           </p>
         </div>
         {schedules.length > 0 ? (
@@ -196,72 +196,22 @@ export default async function DuesPage({
                     : "Open a dues year first."}
                 </p>
               ) : (
-                <form action={recordDuesPayment} className="form-grid">
-                  <input
-                    type="hidden"
-                    name="dues_schedule_id"
-                    value={board.schedule.id}
-                  />
-                  <label className="field">
-                    Member
-                    <select name="member_id" required defaultValue="">
-                      <option value="" disabled>
-                        Select member
-                      </option>
-                      {board.rows
-                        .filter((r) => r.remaining_months > 0)
-                        .map((r) => (
-                          <option key={r.member.id} value={r.member.id}>
-                            {r.member.name} · {r.months_count}/12 · up to{" "}
-                            {formatMoney(
-                              r.remaining_months *
-                                Number(board.schedule.monthly_amount),
-                            )}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    Amount paid (₦)
-                    <input
-                      name="amount"
-                      type="number"
-                      min={monthly}
-                      step={monthly || 0.01}
-                      required
-                      placeholder={board.schedule.monthly_amount}
-                    />
-                  </label>
-                  <p className="muted" style={{ margin: 0 }}>
-                    Must be a multiple of {formatMoney(board.schedule.monthly_amount)}.
-                    Example: {formatMoney(monthly * 3)} covers 3 months from the
-                    next unpaid month.
-                    {monthsFromAmount(monthly * 12, monthly) === 12
-                      ? ` Full year = ${formatMoney(monthly * 12)}.`
-                      : null}
-                  </p>
-                  <label className="field">
-                    Payment date
-                    <input
-                      name="payment_date"
-                      type="date"
-                      required
-                      defaultValue={today}
-                    />
-                  </label>
-                  <label className="field">
-                    Notes (optional)
-                    <textarea
-                      name="notes"
-                      rows={2}
-                      placeholder="Bank transfer ref, cash collector, etc."
-                    />
-                  </label>
-                  <PendingSubmitButton
-                    idleLabel="Save dues payment"
-                    pendingLabel="Saving…"
-                  />
-                </form>
+                <RecordDuesForm
+                  action={recordDuesPayment}
+                  scheduleId={board.schedule.id}
+                  currentYear={board.schedule.year}
+                  monthly={monthly}
+                  today={today}
+                  yearOptions={schedules.map((s) => s.year)}
+                  members={members.map((m) => {
+                    const row = board.rows.find((r) => r.member.id === m.id);
+                    return {
+                      id: m.id,
+                      name: m.name,
+                      remainingInCurrentYear: row?.remaining_months ?? 12,
+                    };
+                  })}
+                />
               )}
             </section>
 

@@ -44,6 +44,50 @@ export function takeNextUnpaidMonths(
   return out;
 }
 
+export type YearMonthAllocation = {
+  year: number;
+  covered_months: number[];
+};
+
+/**
+ * Split `months` across years in [yearFrom, yearTo], filling unpaid months
+ * chronologically (earlier years first, Jan→Dec within each year).
+ */
+export function allocateMonthsAcrossYearRange(
+  paidByYear: Map<number, boolean[]>,
+  yearFrom: number,
+  yearTo: number,
+  months: number,
+): YearMonthAllocation[] | null {
+  if (
+    !Number.isFinite(yearFrom) ||
+    !Number.isFinite(yearTo) ||
+    !Number.isFinite(months) ||
+    months < 1
+  ) {
+    return null;
+  }
+  const start = Math.min(yearFrom, yearTo);
+  const end = Math.max(yearFrom, yearTo);
+  const empty = () => Array.from({ length: 12 }, () => false);
+  const allocations: YearMonthAllocation[] = [];
+  let remaining = months;
+
+  for (let year = start; year <= end && remaining > 0; year += 1) {
+    const paid = paidByYear.get(year) ?? empty();
+    const covered = takeNextUnpaidMonths(paid, remaining);
+    if (covered.length === 0) continue;
+    allocations.push({ year, covered_months: covered });
+    // Mark taken months so later logic could reuse the map if needed.
+    for (const m of covered) paid[m - 1] = true;
+    paidByYear.set(year, paid);
+    remaining -= covered.length;
+  }
+
+  if (remaining > 0) return null;
+  return allocations;
+}
+
 /**
  * Fractional dues credit for one year: monthsPaid/12.
  * A fully paid year counts as 1.

@@ -4,13 +4,23 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAdmin, requireAccess, requireAdmin } from "@/lib/auth";
 import {
+  disbursedFromContribution,
+  listContributionFundingOptions,
+} from "@/lib/expenses-data";
+import {
   certifyExpense,
   createExpense,
   deleteExpense,
   getExpenseById,
+  getPaymentRequestById,
+  listAllExpenses,
   updateBankAccountDetails,
 } from "@/lib/store";
-import type { ExpenseAllocation, ExpenseKind } from "@/lib/types";
+import type {
+  ExpenseAllocation,
+  ExpenseFundingSource,
+  ExpenseKind,
+} from "@/lib/types";
 
 function fail(message: string): never {
   redirect(`/expenses?error=${encodeURIComponent(message)}`);
@@ -18,6 +28,8 @@ function fail(message: string): never {
 
 function revalidateExpensePaths(memberIds: number[] = []) {
   revalidatePath("/expenses");
+  revalidatePath("/payments");
+  revalidatePath("/archive");
   revalidatePath("/");
   for (const id of memberIds) {
     revalidatePath(`/members/${id}`);
@@ -74,6 +86,14 @@ export async function recordExpense(formData: FormData): Promise<void> {
   const kind: ExpenseKind =
     kindRaw === "member" ? "member" : "miscellaneous";
   const notes = String(formData.get("notes") ?? "").trim();
+  const fundingRaw = String(formData.get("funding_source") ?? "").trim();
+  const funding_source: ExpenseFundingSource | null =
+    kind === "member"
+      ? fundingRaw === "contribution"
+        ? "contribution"
+        : "bank"
+      : null;
+  const paymentRequestId = Number(formData.get("payment_request_id") ?? "");
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date)) {
     fail("Choose a valid expense date.");
@@ -81,12 +101,15 @@ export async function recordExpense(formData: FormData): Promise<void> {
   if (!Number.isFinite(amount) || amount <= 0) {
     fail("Enter an expense amount greater than zero.");
   }
-  if (notes.length < 3) {
-    fail("Add compulsory notes with the expense breakdown.");
-  }
 
   let allocations: ExpenseAllocation[] = [];
+  let payment_request_id: number | null = null;
+  let fullContributionPayout = false;
+
   if (kind === "member") {
+    if (fundingRaw !== "contribution" && fundingRaw !== "bank") {
+      fail("Choose whether this payout comes from a contribution or the bank.");
+    }
     allocations = parseAllocations(formData);
     if (allocations.length === 0) {
       fail("Add at least one member recipient and amount.");
@@ -100,14 +123,69 @@ export async function recordExpense(formData: FormData): Promise<void> {
         `Recipient amounts (${allocTotal.toFixed(2)}) must equal the expense total (${amount.toFixed(2)}).`,
       );
     }
+
+    if (funding_source === "contribution") {
+      if (!Number.isFinite(paymentRequestId) || paymentRequestId <= 0) {
+        fail("Select which contribution this payout comes from.");
+      }
+      const request = await getPaymentRequestById(paymentRequestId);
+      if (!request) fail("That contribution was not found.");
+
+      const options = await listContributionFundingOptions();
+      const option = options.find((o) => o.id === paymentRequestId);
+      const remaining = Number(option?.remaining ?? 0);
+      if (!option || remaining <= 0) {
+        fail("That contribution has no realised amount left to pay out.");
+      }
+      if (amount - remaining > 0.009) {
+        fail(
+          `Payout cannot exceed the remaining realised amount (${remaining.toFixed(2)}).`,
+        );
+      }
+
+      payment_request_id = paymentRequestId;
+      fullContributionPayout = Math.abs(amount - remaining) <= 0.009;
+
+      // Race-safe double-check against live expense rows.
+      const expenses = await listAllExpenses();
+      const liveRemaining =
+        Number(option.realised_total) -
+        disbursedFromContribution(expenses, paymentRequestId);
+      if (amount - liveRemaining > 0.009) {
+        fail(
+          `Payout cannot exceed the remaining realised amount (${Math.max(0, liveRemaining).toFixed(2)}).`,
+        );
+      }
+    }
   }
+
+  const notesRequired =
+    kind === "miscellaneous" ||
+    funding_source === "bank" ||
+    (funding_source === "contribution" && !fullContributionPayout);
+
+  if (notesRequired && notes.length < 3) {
+    fail(
+      funding_source === "contribution"
+        ? "Partial contribution payouts need notes explaining the breakdown."
+        : "Add compulsory notes with the expense breakdown.",
+    );
+  }
+
+  const storedNotes =
+    notes ||
+    (fullContributionPayout && payment_request_id
+      ? `Full payout of remaining realised amount for contribution #${payment_request_id}.`
+      : "");
 
   await createExpense({
     expense_date,
     amount,
     kind,
-    notes,
+    notes: storedNotes,
     allocations,
+    funding_source,
+    payment_request_id,
     created_by_email: viewer.email,
     created_by_name: viewer.name,
   });

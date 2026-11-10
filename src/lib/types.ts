@@ -130,6 +130,9 @@ export type DuesYearBoard = {
 
 export type ExpenseKind = "member" | "miscellaneous";
 
+/** Where a member payout is drawn from. */
+export type ExpenseFundingSource = "contribution" | "bank";
+
 export type ExpenseAllocation = {
   member_id: number;
   amount: string;
@@ -147,10 +150,17 @@ export type Expense = {
   expense_date: string;
   amount: string;
   kind: ExpenseKind;
-  /** Required breakdown of what the money was spent on. */
+  /**
+   * Breakdown notes. Optional only when a contribution is paid out in full;
+   * required for bank-funded or partial contribution payouts / miscellaneous.
+   */
   notes: string;
   /** Member recipients; empty when kind is miscellaneous. */
   allocations: ExpenseAllocation[];
+  /** Member expenses: contribution pot or general bank balance. */
+  funding_source: ExpenseFundingSource | null;
+  /** When funding_source is contribution, the payment request pot used. */
+  payment_request_id: number | null;
   certifications: ExpenseCertification[];
   created_by_email: string;
   created_by_name: string;
@@ -166,6 +176,17 @@ export type ExpenseAllocationView = ExpenseAllocation & {
 export type ExpenseView = Omit<Expense, "allocations"> & {
   allocations: ExpenseAllocationView[];
   certified: boolean;
+  contribution_title: string | null;
+};
+
+/** Contribution pots available to fund member expense payouts. */
+export type ContributionFundingOption = {
+  id: number;
+  title: string;
+  concluded: boolean;
+  realised_total: string;
+  /** Realised total minus prior expenses drawn from this contribution. */
+  remaining: string;
 };
 
 export type BankAccountDetails = {

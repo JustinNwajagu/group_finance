@@ -250,6 +250,7 @@ export default async function MemberDetailPage({
                   <tr>
                     <th>Date</th>
                     <th>Amount received</th>
+                    <th>Funded from</th>
                     <th>Status</th>
                     <th>Notes</th>
                   </tr>
@@ -263,6 +264,11 @@ export default async function MemberDetailPage({
                         </Link>
                       </td>
                       <td>{formatMoney(amount)}</td>
+                      <td className="muted">
+                        {expense.funding_source === "contribution"
+                          ? (expense.contribution_title ?? "Contribution")
+                          : "Bank balance"}
+                      </td>
                       <td>
                         {expense.certified ? (
                           <span className="badge-paid">Certified</span>
@@ -272,7 +278,7 @@ export default async function MemberDetailPage({
                           </span>
                         )}
                       </td>
-                      <td className="muted">{expense.notes}</td>
+                      <td className="muted">{expense.notes || "—"}</td>
                     </tr>
                   ))}
                 </tbody>

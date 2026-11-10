@@ -12,6 +12,7 @@ import type {
   BankAccountDetails,
   ExpenseAllocation,
   ExpenseCertification,
+  ExpenseFundingSource,
   ExpenseKind,
   PaymentStatus,
 } from "./types";
@@ -77,6 +78,8 @@ export type ExpenseRow = {
   kind: ExpenseKind;
   notes: string;
   allocations: ExpenseAllocation[];
+  funding_source: ExpenseFundingSource | null;
+  payment_request_id: number | null;
   certifications: ExpenseCertification[];
   created_by_email: string;
   created_by_name: string;
@@ -964,23 +967,43 @@ export function expenseIsCertified(
   return Boolean(certifiedAt) || certifications.length >= 2;
 }
 
+function normalizeFundingSource(
+  raw: unknown,
+  kind: ExpenseKind,
+  paymentRequestId: number | null,
+): ExpenseFundingSource | null {
+  if (raw === "contribution" || raw === "bank") return raw;
+  if (kind === "member" && paymentRequestId != null) return "contribution";
+  if (kind === "member") return "bank";
+  return null;
+}
+
 function normalizeExpense(raw: Record<string, unknown>): ExpenseRow | null {
   if (!isAppRow(raw)) return null;
   const notes = String(raw.notes ?? "").trim();
-  if (!notes) return null;
   const certifications = normalizeExpenseCertifications(raw.certifications);
   const certified_at =
     (raw.certified_at as string | null) ??
     (certifications.length >= 2
       ? certifications[1]?.at ?? nowIso()
       : null);
+  const paymentRaw = Number(raw.payment_request_id);
+  const payment_request_id =
+    Number.isFinite(paymentRaw) && paymentRaw > 0 ? paymentRaw : null;
+  const kind = normalizeExpenseKind(raw.kind);
   return {
     id: Number(raw.id),
     expense_date: String(raw.expense_date ?? "").slice(0, 10),
     amount: money(raw.amount as string | number),
-    kind: normalizeExpenseKind(raw.kind),
+    kind,
     notes,
     allocations: normalizeExpenseAllocations(raw.allocations),
+    funding_source: normalizeFundingSource(
+      raw.funding_source,
+      kind,
+      payment_request_id,
+    ),
+    payment_request_id,
     certifications,
     created_by_email: String(raw.created_by_email ?? "")
       .trim()
@@ -1111,12 +1134,26 @@ export async function createExpense(input: {
   kind: ExpenseKind;
   notes: string;
   allocations: ExpenseAllocation[];
+  funding_source?: ExpenseFundingSource | null;
+  payment_request_id?: number | null;
   created_by_email: string;
   created_by_name: string;
 }): Promise<ExpenseRow> {
   const notes = input.notes.trim();
-  if (!notes) throw new Error("Expense notes are required.");
   const created_at = nowIso();
+  const payment_request_id =
+    input.kind === "member" &&
+    input.funding_source === "contribution" &&
+    input.payment_request_id &&
+    input.payment_request_id > 0
+      ? input.payment_request_id
+      : null;
+  const funding_source: ExpenseFundingSource | null =
+    input.kind === "member"
+      ? input.funding_source === "contribution"
+        ? "contribution"
+        : "bank"
+      : null;
   const base = {
     expense_date: input.expense_date,
     amount: money(input.amount),
@@ -1129,6 +1166,8 @@ export async function createExpense(input: {
             amount: money(a.amount),
           }))
         : [],
+    funding_source,
+    payment_request_id,
     certifications: [] as ExpenseCertification[],
     created_by_email: input.created_by_email.trim().toLowerCase(),
     created_by_name: input.created_by_name.trim(),

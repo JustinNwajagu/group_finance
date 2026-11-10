@@ -16,6 +16,7 @@ import { RecordExpenseForm } from "@/components/record-expense-form";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
   getBankLedgerSummary,
+  listContributionFundingOptions,
   listExpenseViews,
 } from "@/lib/expenses-data";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -36,11 +37,12 @@ export default async function ExpensesPage({
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
 
-  const [ledger, bank, expenses, members] = await Promise.all([
+  const [ledger, bank, expenses, members, contributions] = await Promise.all([
     getBankLedgerSummary(),
     getBankAccountDetails(),
     listExpenseViews(),
     admin ? listMemberOptions() : Promise.resolve([]),
+    admin ? listContributionFundingOptions() : Promise.resolve([]),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -55,8 +57,8 @@ export default async function ExpensesPage({
           <h1>Expenses</h1>
           <p>
             Bank balance rises with paid contributions and dues, and falls when
-            expenses are certified by two admins. Notes are required on every
-            payout.
+            expenses are certified by two admins. Member payouts can draw from a
+            contribution pot or the bank balance.
           </p>
         </div>
         <aside className="bank-corner" aria-label="Bank account details">
@@ -138,6 +140,11 @@ export default async function ExpensesPage({
                             {expense.kind === "member"
                               ? "Member payout"
                               : "Miscellaneous"}
+                            {expense.kind === "member"
+                              ? expense.funding_source === "contribution"
+                                ? ` · from ${expense.contribution_title ?? "contribution"}`
+                                : " · from bank"
+                              : ""}
                           </p>
                         </div>
                         <span className="badge-pledge">
@@ -230,6 +237,7 @@ export default async function ExpensesPage({
                       <th>Date</th>
                       <th>Amount</th>
                       <th>Type</th>
+                      <th>Funded from</th>
                       <th>Paid to</th>
                       <th>Notes</th>
                       <th>Certified by</th>
@@ -244,6 +252,13 @@ export default async function ExpensesPage({
                           {expense.kind === "member"
                             ? "Member"
                             : "Miscellaneous"}
+                        </td>
+                        <td className="muted">
+                          {expense.kind !== "member"
+                            ? "—"
+                            : expense.funding_source === "contribution"
+                              ? (expense.contribution_title ?? "Contribution")
+                              : "Bank balance"}
                         </td>
                         <td>
                           {expense.allocations.length > 0 ? (
@@ -283,7 +298,12 @@ export default async function ExpensesPage({
           <div className="stack">
             <section className="panel">
               <h2>Record expense</h2>
-              <RecordExpenseForm members={members} today={today} />
+              <RecordExpenseForm
+                members={members}
+                contributions={contributions}
+                today={today}
+                bankBalance={ledger.balance}
+              />
             </section>
 
             <section className="panel">

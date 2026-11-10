@@ -8,13 +8,15 @@ import {
   PendingSubmitButton,
 } from "@/components/pending-submit-button";
 import { formatMoney } from "@/lib/format";
-import type { Member } from "@/lib/types";
+import type { ContributionFundingOption, Member } from "@/lib/types";
 
 type AllocLine = {
   key: string;
   member_id: string;
   amount: string;
 };
+
+type FundingSource = "contribution" | "bank";
 
 let allocKey = 0;
 function nextKey() {
@@ -24,16 +26,33 @@ function nextKey() {
 
 export function RecordExpenseForm({
   members,
+  contributions,
   today,
+  bankBalance,
 }: {
   members: Member[];
+  contributions: ContributionFundingOption[];
   today: string;
+  bankBalance: string;
 }) {
   const [kind, setKind] = useState<"miscellaneous" | "member">("miscellaneous");
+  const [funding, setFunding] = useState<FundingSource>("contribution");
+  const [contributionId, setContributionId] = useState("");
   const [amount, setAmount] = useState("");
+  const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<AllocLine[]>([
     { key: nextKey(), member_id: "", amount: "" },
   ]);
+
+  const selectedContribution = useMemo(
+    () =>
+      contributions.find((c) => String(c.id) === contributionId) ?? null,
+    [contributions, contributionId],
+  );
+
+  const remaining = selectedContribution
+    ? Number(selectedContribution.remaining)
+    : 0;
 
   const allocTotal = useMemo(
     () =>
@@ -50,6 +69,59 @@ export function RecordExpenseForm({
     expenseAmount > 0 &&
     Math.abs(allocTotal - expenseAmount) > 0.009;
 
+  const fullContributionPayout =
+    kind === "member" &&
+    funding === "contribution" &&
+    selectedContribution != null &&
+    Number.isFinite(expenseAmount) &&
+    expenseAmount > 0 &&
+    Math.abs(expenseAmount - remaining) <= 0.009;
+
+  const notesRequired =
+    kind === "miscellaneous" ||
+    (kind === "member" && funding === "bank") ||
+    (kind === "member" &&
+      funding === "contribution" &&
+      !fullContributionPayout);
+
+  const contributionLeftAfterPayout =
+    selectedContribution && Number.isFinite(expenseAmount)
+      ? Math.max(0, remaining - (expenseAmount > 0 ? expenseAmount : 0))
+      : null;
+
+  function applyContribution(id: string) {
+    setContributionId(id);
+    const option = contributions.find((c) => String(c.id) === id);
+    if (!option) return;
+    const nextAmount = option.remaining;
+    setAmount(nextAmount);
+    setLines((prev) => {
+      if (prev.length === 1) {
+        return [{ ...prev[0]!, amount: nextAmount }];
+      }
+      return prev;
+    });
+  }
+
+  function switchKind(next: "miscellaneous" | "member") {
+    setKind(next);
+    if (next === "miscellaneous") {
+      setFunding("bank");
+      setContributionId("");
+    } else if (!funding) {
+      setFunding("contribution");
+    }
+  }
+
+  function switchFunding(next: FundingSource) {
+    setFunding(next);
+    if (next === "bank") {
+      setContributionId("");
+    } else if (contributionId) {
+      applyContribution(contributionId);
+    }
+  }
+
   return (
     <form action={recordExpense} className="form-grid">
       <FormBusyMarker />
@@ -62,18 +134,7 @@ export function RecordExpenseForm({
           defaultValue={today}
         />
       </label>
-      <label className="field">
-        Amount (₦)
-        <input
-          name="amount"
-          type="number"
-          min="0.01"
-          step="0.01"
-          required
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-      </label>
+
       <fieldset className="field expense-kind-fieldset">
         <legend>Paid to</legend>
         <div className="expense-kind-row">
@@ -83,7 +144,7 @@ export function RecordExpenseForm({
               name="kind"
               value="miscellaneous"
               checked={kind === "miscellaneous"}
-              onChange={() => setKind("miscellaneous")}
+              onChange={() => switchKind("miscellaneous")}
             />
             Miscellaneous
           </label>
@@ -93,7 +154,7 @@ export function RecordExpenseForm({
               name="kind"
               value="member"
               checked={kind === "member"}
-              onChange={() => setKind("member")}
+              onChange={() => switchKind("member")}
             />
             Member(s)
           </label>
@@ -101,10 +162,121 @@ export function RecordExpenseForm({
       </fieldset>
 
       {kind === "member" ? (
+        <>
+          <fieldset className="field expense-kind-fieldset">
+            <legend>Funded from</legend>
+            <div className="expense-kind-row">
+              <label className="expense-kind-option">
+                <input
+                  type="radio"
+                  name="funding_source"
+                  value="contribution"
+                  checked={funding === "contribution"}
+                  onChange={() => switchFunding("contribution")}
+                />
+                A contribution
+              </label>
+              <label className="expense-kind-option">
+                <input
+                  type="radio"
+                  name="funding_source"
+                  value="bank"
+                  checked={funding === "bank"}
+                  onChange={() => switchFunding("bank")}
+                />
+                Bank balance
+              </label>
+            </div>
+          </fieldset>
+
+          {funding === "contribution" ? (
+            <label className="field">
+              Contribution
+              <select
+                name="payment_request_id"
+                required
+                value={contributionId}
+                onChange={(e) => applyContribution(e.target.value)}
+              >
+                <option value="">Select contribution</option>
+                {contributions.map((c) => (
+                  <option
+                    key={c.id}
+                    value={c.id}
+                    disabled={Number(c.remaining) <= 0}
+                  >
+                    {c.title}
+                    {c.concluded ? " (concluded)" : " (open)"} · realised{" "}
+                    {formatMoney(c.realised_total)} · left{" "}
+                    {formatMoney(c.remaining)}
+                  </option>
+                ))}
+              </select>
+              {selectedContribution ? (
+                <span className="field-hint">
+                  Realised {formatMoney(selectedContribution.realised_total)}.
+                  Paying out fills the amount with the remaining{" "}
+                  {formatMoney(selectedContribution.remaining)} and subtracts
+                  member payouts from that pot
+                  {contributionLeftAfterPayout != null
+                    ? ` (left after this: ${formatMoney(contributionLeftAfterPayout)})`
+                    : ""}
+                  .
+                </span>
+              ) : (
+                <span className="field-hint">
+                  Prefer a concluded contribution. Selecting one fills the
+                  amount with its remaining realised total.
+                </span>
+              )}
+            </label>
+          ) : (
+            <p className="field-hint" style={{ margin: 0 }}>
+              Drawn from the group bank balance ({formatMoney(bankBalance)}).
+              Notes are required.
+            </p>
+          )}
+        </>
+      ) : null}
+
+      <label className="field">
+        Amount (₦)
+        <input
+          name="amount"
+          type="number"
+          min="0.01"
+          step="0.01"
+          required
+          value={amount}
+          onChange={(e) => {
+            const value = e.target.value;
+            setAmount(value);
+            setLines((prev) => {
+              if (prev.length === 1) {
+                return [{ ...prev[0]!, amount: value }];
+              }
+              return prev;
+            });
+          }}
+          max={
+            kind === "member" &&
+            funding === "contribution" &&
+            selectedContribution
+              ? selectedContribution.remaining
+              : undefined
+          }
+        />
+      </label>
+
+      {kind === "member" ? (
         <div className="expense-alloc-block">
           <p className="field-hint" style={{ marginTop: 0 }}>
-            Split the payout across one or more members. Totals must match the
-            expense amount.
+            Document each member and the amount they receive. Totals must match
+            the expense amount
+            {selectedContribution
+              ? "; that amount is subtracted from the contribution pot"
+              : ""}
+            .
           </p>
           {lines.map((line, index) => (
             <div className="expense-alloc-row" key={line.key}>
@@ -186,13 +358,28 @@ export function RecordExpenseForm({
 
       <label className="field">
         Notes / breakdown
+        {!notesRequired ? " (optional for full contribution payout)" : ""}
         <textarea
           name="notes"
-          required
-          minLength={3}
+          required={notesRequired}
+          minLength={notesRequired ? 3 : undefined}
           rows={4}
-          placeholder="What was paid for, invoice refs, cash collector, etc."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder={
+            notesRequired
+              ? funding === "bank" && kind === "member"
+                ? "Why this payout comes from the bank balance, refs, etc."
+                : "What was paid for, why only part of the contribution, refs, etc."
+              : "Optional — full remaining realised amount is being paid out."
+          }
         />
+        {!notesRequired ? (
+          <span className="field-hint">
+            Notes are optional because this pays out the contribution’s remaining
+            realised total in full.
+          </span>
+        ) : null}
       </label>
 
       <div className="form-actions">

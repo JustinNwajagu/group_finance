@@ -20,6 +20,9 @@ import {
 import { PasswordInput } from "@/components/password-input";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
 
+const WRONG_CREDENTIALS_MESSAGE =
+  "Incorrect email or password. Check your details and try again.";
+
 function firebaseCode(err: unknown): string | null {
   if (!err || typeof err !== "object") return null;
   const code = (err as { code?: string }).code;
@@ -71,7 +74,7 @@ export function LoginForm({
   adminEmail: string;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [signingIn, setSigningIn] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [requestEmail, setRequestEmail] = useState("");
@@ -79,6 +82,7 @@ export function LoginForm({
   const [requestNotice, setRequestNotice] = useState<string | null>(null);
   const emailInputRef = useRef<HTMLInputElement>(null);
   const passwordInputRef = useRef<HTMLInputElement>(null);
+  const pending = signingIn;
 
   if (!firebaseConfig) {
     return (
@@ -122,8 +126,9 @@ export function LoginForm({
     setRequestOpen(true);
   }
 
-  function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (signingIn) return;
     setError(null);
     setRequestNotice(null);
     const email = emailInputRef.current?.value.trim() ?? "";
@@ -133,40 +138,44 @@ export function LoginForm({
       return;
     }
 
-    startTransition(async () => {
-      try {
-        const auth = getFirebaseAuth(firebaseConfig!);
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        await finish(await cred.user.getIdToken(), email);
-      } catch (err) {
-        const code = firebaseCode(err);
-        if (
-          code === "auth/invalid-credential" ||
-          code === "auth/user-not-found" ||
-          code === "auth/wrong-password" ||
-          code === "auth/invalid-email" ||
-          code === "auth/invalid-login-credentials" ||
-          !code
-        ) {
-          try {
-            const classified = await classifyLoginFailure(email);
+    setSigningIn(true);
+    try {
+      const auth = getFirebaseAuth(firebaseConfig!);
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await finish(await cred.user.getIdToken(), email);
+    } catch (err) {
+      const code = firebaseCode(err);
+      if (
+        code === "auth/invalid-credential" ||
+        code === "auth/user-not-found" ||
+        code === "auth/wrong-password" ||
+        code === "auth/invalid-email" ||
+        code === "auth/invalid-login-credentials" ||
+        !code
+      ) {
+        try {
+          const classified = await classifyLoginFailure(email);
+          if (classified.kind === "wrong_password") {
+            setError(WRONG_CREDENTIALS_MESSAGE);
+          } else {
             setError(classified.message);
-            if (classified.kind === "no_account") {
-              openRequestFor(email);
-            }
-          } catch {
-            setError("No account found for this email. You can create an account.");
+          }
+          if (classified.kind === "no_account") {
             openRequestFor(email);
           }
-          return;
+        } catch {
+          setError(WRONG_CREDENTIALS_MESSAGE);
         }
-        if (code === "auth/too-many-requests") {
-          setError("Too many attempts. Wait a moment and try again.");
-          return;
-        }
-        setError("Sign-in failed. Check your details and try again.");
+        return;
       }
-    });
+      if (code === "auth/too-many-requests") {
+        setError("Too many attempts. Wait a moment and try again.");
+        return;
+      }
+      setError("Sign-in failed. Check your details and try again.");
+    } finally {
+      setSigningIn(false);
+    }
   }
 
   return (

@@ -11,6 +11,7 @@ import {
   memberPaymentStats,
 } from "@/lib/data";
 import { memberDuesSummary } from "@/lib/dues-data";
+import { listMemberExpenseReceipts } from "@/lib/expenses-data";
 import {
   DUES_MONTH_LABELS,
   formatCoveredMonths,
@@ -34,12 +35,17 @@ export default async function MemberDetailPage({
   const member = await getMember(id);
   if (!member) notFound();
 
-  const [payments, paidTotal, stats, dues] = await Promise.all([
+  const [payments, paidTotal, stats, dues, expenseReceipts] = await Promise.all([
     listPaymentsForMember(id),
     memberContribution(id),
     memberPaymentStats(id),
     memberDuesSummary(id),
+    listMemberExpenseReceipts(id),
   ]);
+  const expensesReceived = expenseReceipts
+    .filter((row) => row.expense.certified)
+    .reduce((sum, row) => sum + Number(row.amount), 0)
+    .toFixed(2);
   const groups = groupPaymentsByTitle(payments);
   const viewerEmail = viewer.email.trim().toLowerCase();
   const isSelf =
@@ -103,6 +109,14 @@ export default async function MemberDetailPage({
                 {dues.years_count > 0 ? formatMoney(dues.amount_paid) : "—"}
               </strong>
               <span>Dues paid (₦)</span>
+            </div>
+            <div>
+              <strong>
+                {expenseReceipts.length > 0
+                  ? formatMoney(expensesReceived)
+                  : "—"}
+              </strong>
+              <span>Expenses received (₦)</span>
             </div>
           </div>
         </div>
@@ -212,6 +226,57 @@ export default async function MemberDetailPage({
                   </table>
                 </div>
               ) : null}
+            </div>
+          )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-heading-row">
+            <h2>Expenses received</h2>
+            {expenseReceipts.length > 0 ? (
+              <p className="panel-heading-meta">
+                Certified {formatMoney(expensesReceived)}
+              </p>
+            ) : null}
+          </div>
+          {expenseReceipts.length === 0 ? (
+            <div className="hero-empty">
+              No expense payouts recorded for this member.
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Amount received</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {expenseReceipts.map(({ expense, amount }) => (
+                    <tr key={`${expense.id}-${amount}`}>
+                      <td>
+                        <Link className="row-link" href="/expenses">
+                          {formatDate(expense.expense_date)}
+                        </Link>
+                      </td>
+                      <td>{formatMoney(amount)}</td>
+                      <td>
+                        {expense.certified ? (
+                          <span className="badge-paid">Certified</span>
+                        ) : (
+                          <span className="badge-pledge">
+                            {expense.certifications.length}/2
+                          </span>
+                        )}
+                      </td>
+                      <td className="muted">{expense.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

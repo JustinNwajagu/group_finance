@@ -1126,6 +1126,167 @@ form[aria-busy="true"] button:not([type="submit"]) {
   }
 }
 
+.expenses-head {
+  align-items: start;
+}
+
+.bank-corner {
+  min-width: min(16rem, 100%);
+  max-width: 18rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.78),
+    rgba(236, 244, 239, 0.72)
+  );
+  box-shadow: var(--shadow);
+  text-align: right;
+}
+
+.bank-corner-label {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.bank-corner-name {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.bank-corner-meta {
+  margin: 0.15rem 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.expenses-balance-panel {
+  margin-bottom: 1.25rem;
+}
+
+.expenses-balance-line {
+  margin: 0;
+}
+
+.expense-list {
+  gap: 0.9rem;
+}
+
+.expense-card {
+  padding: 0.95rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.expense-card:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.expense-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.expense-card-amount {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.expense-notes {
+  margin: 0.55rem 0 0;
+  white-space: pre-wrap;
+}
+
+.expense-alloc-list,
+.expense-inline-list {
+  margin: 0.45rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.expense-certs {
+  margin: 0.45rem 0 0;
+}
+
+.expense-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.expense-kind-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.expense-kind-fieldset legend {
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.expense-kind-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+
+.expense-kind-option {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.expense-alloc-block {
+  display: grid;
+  gap: 0.75rem;
+  grid-column: 1 / -1;
+}
+
+.expense-alloc-row {
+  display: grid;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+@media (min-width: 720px) {
+  .expense-alloc-row {
+    grid-template-columns: 1.4fr 1fr auto;
+  }
+}
+
+.expense-alloc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: center;
+}
+
+.field-hint {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
 @media (max-width: 720px) {
   .topbar {
     grid-template-columns: 1fr;
@@ -1139,5 +1300,10 @@ form[aria-busy="true"] button:not([type="submit"]) {
 
   .viewer {
     text-align: left;
+  }
+
+  .bank-corner {
+    text-align: left;
+    max-width: none;
   }
 }

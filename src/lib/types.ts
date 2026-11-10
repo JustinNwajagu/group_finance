@@ -127,3 +127,61 @@ export type DuesYearBoard = {
   /** Sum of all dues amounts paid this year. */
   total_collected: string;
 };
+
+export type ExpenseKind = "member" | "miscellaneous";
+
+export type ExpenseAllocation = {
+  member_id: number;
+  amount: string;
+};
+
+export type ExpenseCertification = {
+  email: string;
+  name: string;
+  at: string;
+};
+
+/** Outflow from the group bank account. Certified when ≥2 admins sign. */
+export type Expense = {
+  id: number;
+  expense_date: string;
+  amount: string;
+  kind: ExpenseKind;
+  /** Required breakdown of what the money was spent on. */
+  notes: string;
+  /** Member recipients; empty when kind is miscellaneous. */
+  allocations: ExpenseAllocation[];
+  certifications: ExpenseCertification[];
+  created_by_email: string;
+  created_by_name: string;
+  created_at: string;
+  /** Set once two distinct admin certifications exist. */
+  certified_at: string | null;
+};
+
+export type ExpenseAllocationView = ExpenseAllocation & {
+  member_name: string;
+};
+
+export type ExpenseView = Omit<Expense, "allocations"> & {
+  allocations: ExpenseAllocationView[];
+  certified: boolean;
+};
+
+export type BankAccountDetails = {
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  /** Optional bank code / sort code / routing. */
+  bank_code: string;
+  updated_at: string | null;
+  updated_by: string | null;
+};
+
+export type BankLedgerSummary = {
+  contributions_in: string;
+  dues_in: string;
+  expenses_out: string;
+  pending_expenses: string;
+  balance: string;
+};

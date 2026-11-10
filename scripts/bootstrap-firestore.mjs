@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Ensures Firestore counters + visible collection stubs for KLEF 13:
- *   members, payment_requests, payments, dues_schedules, dues_payments
+ *   members, payment_requests, payments, dues_schedules, dues_payments, expenses
  *
  * Stub docs use `_meta: true` so the app never treats them as data rows.
  *
@@ -93,7 +93,21 @@ const collections = [
     note: "Pending / decided login access requests.",
     stub: false,
   },
+  {
+    name: "expenses",
+    note: "Group bank outflows (member or miscellaneous) with dual-admin cert.",
+    stub: true,
+  },
 ];
+
+const DEFAULT_BANK = {
+  bank_name: "UBA",
+  account_name: "Klef 2013",
+  account_number: "2280781660",
+  bank_code: "",
+  updated_at: null,
+  updated_by: null,
+};
 
 async function ensureCounter(name) {
   const ref = db.collection("_counters").doc(name);
@@ -141,5 +155,27 @@ for (const { name, note, stub } of collections) {
   }
 }
 
-console.log("\nDone. Counters + dues/contribution collections are ready.");
+console.log("\nsettings/bank_account");
+{
+  const ref = db.collection("settings").doc("bank_account");
+  const snap = await ref.get();
+  if (!snap.exists) {
+    await ref.set(DEFAULT_BANK);
+    console.log("  created settings/bank_account (UBA · Klef 2013)");
+  } else {
+    const data = snap.data() ?? {};
+    const empty =
+      !String(data.bank_name ?? "").trim() &&
+      !String(data.account_name ?? "").trim() &&
+      !String(data.account_number ?? "").trim();
+    if (empty) {
+      await ref.set(DEFAULT_BANK, { merge: true });
+      console.log("  filled empty settings/bank_account with defaults");
+    } else {
+      console.log("  exists  settings/bank_account");
+    }
+  }
+}
+
+console.log("\nDone. Counters + dues/contribution/expense collections are ready.");
 process.exit(0);

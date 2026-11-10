@@ -84,6 +84,10 @@ firebase apphosting:rollouts:create <BACKEND_ID>
 | `members` | Roster |
 | `payment_requests` | Shared payment titles (min ₦, deadline, conclude) |
 | `payments` | Per-member pledge/paid rows |
+| `dues_schedules` / `dues_payments` | Annual dues + month coverage |
+| `expenses` | Bank outflows (member/misc) needing 2 admin certifications |
+| `settings/bank_account` | UBA account shown on Expenses (default Klef 2013 / 2280781660) |
+| `access_requests` / `user_roles` | Login approval + roles |
 | `_counters` | Numeric id sequences |
 
 Full field list and why `payment_requests` is needed: [database-schema.md](./database-schema.md).

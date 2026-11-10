@@ -8,7 +8,13 @@ import { isFirestore } from "./config";
 import { normalizePaymentTitle } from "./format";
 import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import { compareMembersByName } from "./member-sort";
-import type { PaymentStatus } from "./types";
+import type {
+  BankAccountDetails,
+  ExpenseAllocation,
+  ExpenseCertification,
+  ExpenseKind,
+  PaymentStatus,
+} from "./types";
 
 export type MemberRow = {
   id: number;
@@ -64,11 +70,35 @@ export type DuesPaymentRow = {
   created_at: string;
 };
 
+export type ExpenseRow = {
+  id: number;
+  expense_date: string;
+  amount: string;
+  kind: ExpenseKind;
+  notes: string;
+  allocations: ExpenseAllocation[];
+  certifications: ExpenseCertification[];
+  created_by_email: string;
+  created_by_name: string;
+  created_at: string;
+  certified_at: string | null;
+};
+
 function normalizeNotes(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const trimmed = raw.trim();
   return trimmed ? trimmed : null;
 }
+
+/** Default group bank details (editable by admins on Expenses). */
+const DEFAULT_BANK: BankAccountDetails = {
+  bank_name: "UBA",
+  account_name: "Klef 2013",
+  account_number: "2280781660",
+  bank_code: "",
+  updated_at: null,
+  updated_by: null,
+};
 
 type LocalDb = {
   counters: {
@@ -77,12 +107,15 @@ type LocalDb = {
     payments: number;
     dues_schedules: number;
     dues_payments: number;
+    expenses: number;
   };
   members: MemberRow[];
   payment_requests: PaymentRequestRow[];
   payments: PaymentRow[];
   dues_schedules: DuesScheduleRow[];
   dues_payments: DuesPaymentRow[];
+  expenses: ExpenseRow[];
+  bank_account: BankAccountDetails;
 };
 
 type GlobalStore = typeof globalThis & {
@@ -98,21 +131,36 @@ function emptyLocal(): LocalDb {
       payments: 0,
       dues_schedules: 0,
       dues_payments: 0,
+      expenses: 0,
     },
     members: [],
     payment_requests: [],
     payments: [],
     dues_schedules: [],
     dues_payments: [],
+    expenses: [],
+    bank_account: { ...DEFAULT_BANK },
   };
 }
 
-/** Backfill fields if an older local-store.json is missing dues collections. */
+/** Backfill fields if an older local-store.json is missing newer collections. */
 function normalizeLocal(db: LocalDb): LocalDb {
   db.counters.dues_schedules ??= 0;
   db.counters.dues_payments ??= 0;
+  db.counters.expenses ??= 0;
   db.dues_schedules ??= [];
   db.dues_payments ??= [];
+  db.expenses ??= [];
+  const existingBank = db.bank_account ?? null;
+  const hasBankDetails = Boolean(
+    existingBank &&
+      (existingBank.bank_name ||
+        existingBank.account_name ||
+        existingBank.account_number),
+  );
+  db.bank_account = hasBankDetails
+    ? { ...DEFAULT_BANK, ...existingBank }
+    : { ...DEFAULT_BANK };
   return db;
 }
 
@@ -860,6 +908,299 @@ export async function deleteDuesPayment(id: number): Promise<void> {
   }
   const db = await loadLocal();
   db.dues_payments = db.dues_payments.filter((p) => p.id !== id);
+  await saveLocal(db);
+  invalidateStoreCache();
+}
+
+function normalizeExpenseKind(raw: unknown): ExpenseKind {
+  return raw === "member" ? "member" : "miscellaneous";
+}
+
+function normalizeExpenseAllocations(raw: unknown): ExpenseAllocation[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const member_id = Number(row.member_id);
+      const amount = Number(row.amount);
+      if (!Number.isFinite(member_id) || member_id <= 0) return null;
+      if (!Number.isFinite(amount) || amount <= 0) return null;
+      return {
+        member_id,
+        amount: money(amount),
+      } satisfies ExpenseAllocation;
+    })
+    .filter((row): row is ExpenseAllocation => row != null);
+}
+
+function normalizeExpenseCertifications(
+  raw: unknown,
+): ExpenseCertification[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: ExpenseCertification[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const email = String(row.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    out.push({
+      email,
+      name: String(row.name ?? email).trim() || email,
+      at: String(row.at ?? nowIso()),
+    });
+  }
+  return out;
+}
+
+export function expenseIsCertified(
+  certifications: ExpenseCertification[],
+  certifiedAt: string | null,
+): boolean {
+  return Boolean(certifiedAt) || certifications.length >= 2;
+}
+
+function normalizeExpense(raw: Record<string, unknown>): ExpenseRow | null {
+  if (!isAppRow(raw)) return null;
+  const notes = String(raw.notes ?? "").trim();
+  if (!notes) return null;
+  const certifications = normalizeExpenseCertifications(raw.certifications);
+  const certified_at =
+    (raw.certified_at as string | null) ??
+    (certifications.length >= 2
+      ? certifications[1]?.at ?? nowIso()
+      : null);
+  return {
+    id: Number(raw.id),
+    expense_date: String(raw.expense_date ?? "").slice(0, 10),
+    amount: money(raw.amount as string | number),
+    kind: normalizeExpenseKind(raw.kind),
+    notes,
+    allocations: normalizeExpenseAllocations(raw.allocations),
+    certifications,
+    created_by_email: String(raw.created_by_email ?? "")
+      .trim()
+      .toLowerCase(),
+    created_by_name: String(raw.created_by_name ?? "").trim(),
+    created_at: coerceCreatedAt(raw),
+    certified_at,
+  };
+}
+
+function normalizeBankAccount(
+  raw: Record<string, unknown> | null | undefined,
+): BankAccountDetails {
+  if (!raw) return { ...DEFAULT_BANK };
+  const bank_name = String(raw.bank_name ?? "").trim();
+  const account_name = String(raw.account_name ?? "").trim();
+  const account_number = String(raw.account_number ?? "").trim();
+  const bank_code = String(raw.bank_code ?? "").trim();
+  if (!bank_name && !account_name && !account_number) {
+    return { ...DEFAULT_BANK };
+  }
+  return {
+    bank_name,
+    account_name,
+    account_number,
+    bank_code,
+    updated_at: (raw.updated_at as string | null) ?? null,
+    updated_by: (raw.updated_by as string | null) ?? null,
+  };
+}
+
+export const getBankAccountDetails = cache(
+  async (): Promise<BankAccountDetails> => {
+    return cachedLoad("bank_account", async () => {
+      if (isFirestore()) {
+        const snap = await adminDb()!
+          .collection("settings")
+          .doc("bank_account")
+          .get();
+        if (!snap.exists) return { ...DEFAULT_BANK };
+        return normalizeBankAccount(snap.data() as Record<string, unknown>);
+      }
+      const db = await loadLocal();
+      return normalizeBankAccount(db.bank_account);
+    });
+  },
+);
+
+export async function updateBankAccountDetails(input: {
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  bank_code?: string;
+  updated_by: string;
+}): Promise<BankAccountDetails> {
+  const row: BankAccountDetails = {
+    bank_name: input.bank_name.trim(),
+    account_name: input.account_name.trim(),
+    account_number: input.account_number.trim(),
+    bank_code: (input.bank_code ?? "").trim(),
+    updated_at: nowIso(),
+    updated_by: input.updated_by.trim().toLowerCase() || null,
+  };
+  if (isFirestore()) {
+    await adminDb()!
+      .collection("settings")
+      .doc("bank_account")
+      .set(row, { merge: true });
+    invalidateStoreCache();
+    return row;
+  }
+  const db = await loadLocal();
+  db.bank_account = row;
+  await saveLocal(db);
+  invalidateStoreCache();
+  return row;
+}
+
+export const listAllExpenses = cache(async (): Promise<ExpenseRow[]> => {
+  return cachedLoad("expenses", async () => {
+    if (isFirestore()) {
+      const snap = await adminDb()!.collection("expenses").get();
+      return snap.docs
+        .map((d) => normalizeExpense(d.data() as Record<string, unknown>))
+        .filter((d): d is ExpenseRow => d != null)
+        .sort((a, b) => {
+          const byDate = b.expense_date.localeCompare(a.expense_date);
+          if (byDate !== 0) return byDate;
+          return b.id - a.id;
+        });
+    }
+    const db = await loadLocal();
+    return [...db.expenses].sort((a, b) => {
+      const byDate = b.expense_date.localeCompare(a.expense_date);
+      if (byDate !== 0) return byDate;
+      return b.id - a.id;
+    });
+  });
+});
+
+export async function getExpenseById(
+  id: number,
+): Promise<ExpenseRow | null> {
+  if (!Number.isFinite(id) || id <= 0) return null;
+  if (isFirestore()) {
+    const snap = await adminDb()!
+      .collection("expenses")
+      .doc(String(id))
+      .get();
+    if (!snap.exists) return null;
+    return normalizeExpense(snap.data() as Record<string, unknown>);
+  }
+  const db = await loadLocal();
+  return db.expenses.find((e) => e.id === id) ?? null;
+}
+
+export async function listExpensesForMember(
+  memberId: number,
+): Promise<ExpenseRow[]> {
+  return (await listAllExpenses()).filter((e) =>
+    e.allocations.some((a) => a.member_id === memberId),
+  );
+}
+
+export async function createExpense(input: {
+  expense_date: string;
+  amount: number;
+  kind: ExpenseKind;
+  notes: string;
+  allocations: ExpenseAllocation[];
+  created_by_email: string;
+  created_by_name: string;
+}): Promise<ExpenseRow> {
+  const notes = input.notes.trim();
+  if (!notes) throw new Error("Expense notes are required.");
+  const created_at = nowIso();
+  const base = {
+    expense_date: input.expense_date,
+    amount: money(input.amount),
+    kind: input.kind,
+    notes,
+    allocations:
+      input.kind === "member"
+        ? input.allocations.map((a) => ({
+            member_id: a.member_id,
+            amount: money(a.amount),
+          }))
+        : [],
+    certifications: [] as ExpenseCertification[],
+    created_by_email: input.created_by_email.trim().toLowerCase(),
+    created_by_name: input.created_by_name.trim(),
+    created_at,
+    certified_at: null as string | null,
+  };
+  if (isFirestore()) {
+    const id = await firestoreNextId("expenses");
+    const row: ExpenseRow = { id, ...base };
+    await adminDb()!.collection("expenses").doc(String(id)).set(row);
+    invalidateStoreCache();
+    return row;
+  }
+  const db = await loadLocal();
+  const id = await nextLocalId(db, "expenses");
+  const row: ExpenseRow = { id, ...base };
+  db.expenses.push(row);
+  await saveLocal(db);
+  invalidateStoreCache();
+  return row;
+}
+
+export async function certifyExpense(
+  id: number,
+  certifier: { email: string; name: string },
+): Promise<ExpenseRow | null> {
+  const existing = await getExpenseById(id);
+  if (!existing) return null;
+  const email = certifier.email.trim().toLowerCase();
+  if (!email) return existing;
+  if (existing.certifications.some((c) => c.email === email)) {
+    return existing;
+  }
+  const certifications = [
+    ...existing.certifications,
+    {
+      email,
+      name: certifier.name.trim() || email,
+      at: nowIso(),
+    },
+  ];
+  const certified_at =
+    existing.certified_at ??
+    (certifications.length >= 2
+      ? certifications[certifications.length - 1]!.at
+      : null);
+  const patch = { certifications, certified_at };
+  if (isFirestore()) {
+    await adminDb()!
+      .collection("expenses")
+      .doc(String(id))
+      .set(patch, { merge: true });
+    invalidateStoreCache();
+    return { ...existing, ...patch };
+  }
+  const db = await loadLocal();
+  const row = db.expenses.find((e) => e.id === id);
+  if (!row) return null;
+  Object.assign(row, patch);
+  await saveLocal(db);
+  invalidateStoreCache();
+  return { ...row };
+}
+
+export async function deleteExpense(id: number): Promise<void> {
+  if (isFirestore()) {
+    await adminDb()!.collection("expenses").doc(String(id)).delete();
+    invalidateStoreCache();
+    return;
+  }
+  const db = await loadLocal();
+  db.expenses = db.expenses.filter((e) => e.id !== id);
   await saveLocal(db);
   invalidateStoreCache();
 }

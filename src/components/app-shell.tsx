@@ -11,7 +11,14 @@ export function AppShell({
   children,
 }: {
   viewer: ViewerContext;
-  active: "home" | "payments" | "dues" | "archive" | "access" | "profile";
+  active:
+    | "home"
+    | "payments"
+    | "dues"
+    | "expenses"
+    | "archive"
+    | "access"
+    | "profile";
   children: React.ReactNode;
 }) {
   const admin = isAdmin(viewer);
@@ -45,6 +52,13 @@ export function AppShell({
             className={active === "dues" ? "nav-link active" : "nav-link"}
           >
             Dues
+          </Link>
+          <Link
+            href="/expenses"
+            prefetch
+            className={active === "expenses" ? "nav-link active" : "nav-link"}
+          >
+            Expenses
           </Link>
           <Link
             href="/archive"

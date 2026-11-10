@@ -203,9 +203,9 @@ export function LoginForm({
             disabled={pending}
           />
         </label>
-        <label className="field">
-          <span className="field-label-row">
-            <span>Password</span>
+        <div className="field">
+          <div className="field-label-row">
+            <label htmlFor="login-password">Password</label>
             <button
               type="button"
               className="text-link"
@@ -219,15 +219,16 @@ export function LoginForm({
             >
               Forgot password?
             </button>
-          </span>
+          </div>
           <PasswordInput
+            id="login-password"
             inputRef={passwordInputRef}
             name="password"
             required
             autoComplete="current-password"
             disabled={pending}
           />
-        </label>
+        </div>
         <button type="submit" className="btn-primary" disabled={pending}>
           {pending ? "Signing in…" : "Sign in"}
         </button>

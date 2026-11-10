@@ -28,7 +28,11 @@ export function PasswordInput({
       <button
         type="button"
         className="password-eye"
-        onClick={() => setVisible((v) => !v)}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setVisible((v) => !v);
+        }}
         aria-pressed={visible}
         aria-labelledby={labelId}
         tabIndex={-1}

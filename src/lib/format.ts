@@ -12,6 +12,31 @@ export function normalizePaymentTitle(title: string): string {
   return cleaned;
 }
 
+export function formatExpenseKind(
+  kind: "member" | "miscellaneous" | "meeting",
+): string {
+  if (kind === "member") return "Member";
+  if (kind === "meeting") return "Meeting";
+  return "Miscellaneous";
+}
+
+export function formatExpenseFunding(input: {
+  funding_source: "contribution" | "bank" | "both" | null;
+  contribution_title?: string | null;
+  contribution_amount?: string | number | null;
+  bank_amount?: string | number | null;
+}): string {
+  const title = input.contribution_title?.trim() || "Contribution";
+  const contribution = Number(input.contribution_amount ?? 0);
+  const bank = Number(input.bank_amount ?? 0);
+  if (input.funding_source === "both") {
+    return `${title} ${formatMoney(contribution)} + bank ${formatMoney(bank)}`;
+  }
+  if (input.funding_source === "contribution") return title;
+  if (input.funding_source === "bank") return "Bank balance";
+  return "—";
+}
+
 export function formatMoney(value: string | number): string {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return "₦0.00";

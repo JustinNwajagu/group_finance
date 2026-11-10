@@ -78,8 +78,10 @@ export type ExpenseRow = {
   kind: ExpenseKind;
   notes: string;
   allocations: ExpenseAllocation[];
-  funding_source: ExpenseFundingSource | null;
+  funding_source: ExpenseFundingSource;
   payment_request_id: number | null;
+  contribution_amount: string;
+  bank_amount: string;
   certifications: ExpenseCertification[];
   created_by_email: string;
   created_by_name: string;
@@ -916,7 +918,9 @@ export async function deleteDuesPayment(id: number): Promise<void> {
 }
 
 function normalizeExpenseKind(raw: unknown): ExpenseKind {
-  return raw === "member" ? "member" : "miscellaneous";
+  if (raw === "member") return "member";
+  if (raw === "meeting") return "meeting";
+  return "miscellaneous";
 }
 
 function normalizeExpenseAllocations(raw: unknown): ExpenseAllocation[] {
@@ -969,13 +973,14 @@ export function expenseIsCertified(
 
 function normalizeFundingSource(
   raw: unknown,
-  kind: ExpenseKind,
   paymentRequestId: number | null,
-): ExpenseFundingSource | null {
-  if (raw === "contribution" || raw === "bank") return raw;
-  if (kind === "member" && paymentRequestId != null) return "contribution";
-  if (kind === "member") return "bank";
-  return null;
+  contributionAmount: number,
+  bankAmount: number,
+): ExpenseFundingSource {
+  if (raw === "contribution" || raw === "bank" || raw === "both") return raw;
+  if (contributionAmount > 0 && bankAmount > 0) return "both";
+  if (paymentRequestId != null || contributionAmount > 0) return "contribution";
+  return "bank";
 }
 
 function normalizeExpense(raw: Record<string, unknown>): ExpenseRow | null {
@@ -991,19 +996,47 @@ function normalizeExpense(raw: Record<string, unknown>): ExpenseRow | null {
   const payment_request_id =
     Number.isFinite(paymentRaw) && paymentRaw > 0 ? paymentRaw : null;
   const kind = normalizeExpenseKind(raw.kind);
+  const amount = money(raw.amount as string | number);
+  const amountNum = Number(amount);
+
+  let contribution_amount: string;
+  let bank_amount: string;
+  const hasSplit =
+    raw.contribution_amount != null || raw.bank_amount != null;
+  if (hasSplit) {
+    contribution_amount = money(Number(raw.contribution_amount ?? 0));
+    bank_amount = money(Number(raw.bank_amount ?? 0));
+  } else if (raw.funding_source === "contribution" || payment_request_id) {
+    contribution_amount = amount;
+    bank_amount = money(0);
+  } else {
+    contribution_amount = money(0);
+    bank_amount = amount;
+  }
+
+  // Keep total coherent if legacy rows drift.
+  const splitSum = Number(contribution_amount) + Number(bank_amount);
+  if (Math.abs(splitSum - amountNum) > 0.009 && amountNum > 0) {
+    if (Number(bank_amount) <= 0) contribution_amount = amount;
+    else if (Number(contribution_amount) <= 0) bank_amount = amount;
+  }
+
   return {
     id: Number(raw.id),
     expense_date: String(raw.expense_date ?? "").slice(0, 10),
-    amount: money(raw.amount as string | number),
+    amount,
     kind,
     notes,
     allocations: normalizeExpenseAllocations(raw.allocations),
     funding_source: normalizeFundingSource(
       raw.funding_source,
-      kind,
       payment_request_id,
+      Number(contribution_amount),
+      Number(bank_amount),
     ),
     payment_request_id,
+    contribution_amount,
+    bank_amount,
     certifications,
     created_by_email: String(raw.created_by_email ?? "")
       .trim()
@@ -1134,29 +1167,40 @@ export async function createExpense(input: {
   kind: ExpenseKind;
   notes: string;
   allocations: ExpenseAllocation[];
-  funding_source?: ExpenseFundingSource | null;
+  funding_source: ExpenseFundingSource;
   payment_request_id?: number | null;
+  contribution_amount: number;
+  bank_amount: number;
   created_by_email: string;
   created_by_name: string;
 }): Promise<ExpenseRow> {
   const notes = input.notes.trim();
   const created_at = nowIso();
+  const usesContribution =
+    input.funding_source === "contribution" ||
+    input.funding_source === "both";
   const payment_request_id =
-    input.kind === "member" &&
-    input.funding_source === "contribution" &&
+    usesContribution &&
     input.payment_request_id &&
     input.payment_request_id > 0
       ? input.payment_request_id
       : null;
-  const funding_source: ExpenseFundingSource | null =
-    input.kind === "member"
-      ? input.funding_source === "contribution"
-        ? "contribution"
-        : "bank"
-      : null;
+  const contribution_amount = money(
+    usesContribution ? Math.max(0, input.contribution_amount) : 0,
+  );
+  const bank_amount = money(
+    input.funding_source === "bank" || input.funding_source === "both"
+      ? Math.max(0, input.bank_amount)
+      : 0,
+  );
+  const amount = money(
+    Number(contribution_amount) + Number(bank_amount) > 0
+      ? Number(contribution_amount) + Number(bank_amount)
+      : input.amount,
+  );
   const base = {
     expense_date: input.expense_date,
-    amount: money(input.amount),
+    amount,
     kind: input.kind,
     notes,
     allocations:
@@ -1166,8 +1210,10 @@ export async function createExpense(input: {
             amount: money(a.amount),
           }))
         : [],
-    funding_source,
+    funding_source: input.funding_source,
     payment_request_id,
+    contribution_amount,
+    bank_amount,
     certifications: [] as ExpenseCertification[],
     created_by_email: input.created_by_email.trim().toLowerCase(),
     created_by_name: input.created_by_name.trim(),

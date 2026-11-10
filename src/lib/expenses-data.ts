@@ -56,13 +56,21 @@ export function disbursedFromContribution(
   paymentRequestId: number,
 ): number {
   return expenses
-    .filter(
-      (e) =>
-        e.kind === "member" &&
-        e.funding_source === "contribution" &&
-        e.payment_request_id === paymentRequestId,
-    )
-    .reduce((sum, e) => sum + Number(e.amount), 0);
+    .filter((e) => e.payment_request_id === paymentRequestId)
+    .reduce((sum, e) => {
+      const fromContribution = Number(e.contribution_amount);
+      if (Number.isFinite(fromContribution) && fromContribution > 0) {
+        return sum + fromContribution;
+      }
+      // Legacy rows stored the full amount against the contribution.
+      if (
+        e.funding_source === "contribution" ||
+        (e.funding_source !== "bank" && e.payment_request_id != null)
+      ) {
+        return sum + Number(e.amount);
+      }
+      return sum;
+    }, 0);
 }
 
 export const listContributionFundingOptions = cache(

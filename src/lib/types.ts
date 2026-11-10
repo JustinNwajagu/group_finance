@@ -128,10 +128,10 @@ export type DuesYearBoard = {
   total_collected: string;
 };
 
-export type ExpenseKind = "member" | "miscellaneous";
+export type ExpenseKind = "member" | "miscellaneous" | "meeting";
 
-/** Where a member payout is drawn from. */
-export type ExpenseFundingSource = "contribution" | "bank";
+/** Where an expense is drawn from. "both" = contribution pot + bank top-up. */
+export type ExpenseFundingSource = "contribution" | "bank" | "both";
 
 export type ExpenseAllocation = {
   member_id: number;
@@ -148,19 +148,24 @@ export type ExpenseCertification = {
 export type Expense = {
   id: number;
   expense_date: string;
+  /** Total outflow (= contribution_amount + bank_amount). */
   amount: string;
   kind: ExpenseKind;
   /**
-   * Breakdown notes. Optional only when a contribution is paid out in full;
-   * required for bank-funded or partial contribution payouts / miscellaneous.
+   * Notes explaining the spend. Required whenever any bank money is used, or
+   * when a contribution pot is not paid out in full. Optional only for a
+   * contribution-only full remaining payout.
    */
   notes: string;
-  /** Member recipients; empty when kind is miscellaneous. */
+  /** Member recipients; only used when kind is member. */
   allocations: ExpenseAllocation[];
-  /** Member expenses: contribution pot or general bank balance. */
-  funding_source: ExpenseFundingSource | null;
-  /** When funding_source is contribution, the payment request pot used. */
+  funding_source: ExpenseFundingSource;
+  /** Contribution pot when funding includes contribution. */
   payment_request_id: number | null;
+  /** Amount drawn from the contribution pot. */
+  contribution_amount: string;
+  /** Amount drawn from the bank (including top-up when funding is both). */
+  bank_amount: string;
   certifications: ExpenseCertification[];
   created_by_email: string;
   created_by_name: string;

@@ -19,7 +19,12 @@ import {
   listContributionFundingOptions,
   listExpenseViews,
 } from "@/lib/expenses-data";
-import { formatDate, formatMoney } from "@/lib/format";
+import {
+  formatDate,
+  formatExpenseFunding,
+  formatExpenseKind,
+  formatMoney,
+} from "@/lib/format";
 import { listMemberOptions } from "@/lib/data";
 import { getBankAccountDetails } from "@/lib/store";
 
@@ -57,8 +62,9 @@ export default async function ExpensesPage({
           <h1>Expenses</h1>
           <p>
             Bank balance rises with paid contributions and dues, and falls when
-            expenses are certified by two admins. Member payouts can draw from a
-            contribution pot or the bank balance.
+            expenses are certified by two admins. Member, meeting, and
+            miscellaneous expenses can draw from a contribution, the bank, or
+            both.
           </p>
         </div>
         <aside className="bank-corner" aria-label="Bank account details">
@@ -137,14 +143,13 @@ export default async function ExpensesPage({
                           </p>
                           <p className="muted">
                             {formatDate(expense.expense_date)} ·{" "}
-                            {expense.kind === "member"
-                              ? "Member payout"
-                              : "Miscellaneous"}
-                            {expense.kind === "member"
-                              ? expense.funding_source === "contribution"
-                                ? ` · from ${expense.contribution_title ?? "contribution"}`
-                                : " · from bank"
-                              : ""}
+                            {formatExpenseKind(expense.kind)} ·{" "}
+                            {formatExpenseFunding({
+                              funding_source: expense.funding_source,
+                              contribution_title: expense.contribution_title,
+                              contribution_amount: expense.contribution_amount,
+                              bank_amount: expense.bank_amount,
+                            })}
                           </p>
                         </div>
                         <span className="badge-pledge">
@@ -248,17 +253,14 @@ export default async function ExpensesPage({
                       <tr key={expense.id}>
                         <td>{formatDate(expense.expense_date)}</td>
                         <td>{formatMoney(expense.amount)}</td>
-                        <td>
-                          {expense.kind === "member"
-                            ? "Member"
-                            : "Miscellaneous"}
-                        </td>
+                        <td>{formatExpenseKind(expense.kind)}</td>
                         <td className="muted">
-                          {expense.kind !== "member"
-                            ? "—"
-                            : expense.funding_source === "contribution"
-                              ? (expense.contribution_title ?? "Contribution")
-                              : "Bank balance"}
+                          {formatExpenseFunding({
+                            funding_source: expense.funding_source,
+                            contribution_title: expense.contribution_title,
+                            contribution_amount: expense.contribution_amount,
+                            bank_amount: expense.bank_amount,
+                          })}
                         </td>
                         <td>
                           {expense.allocations.length > 0 ? (

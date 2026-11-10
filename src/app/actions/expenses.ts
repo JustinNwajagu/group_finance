@@ -54,6 +54,18 @@ function parseAllocations(formData: FormData): ExpenseAllocation[] {
   return out;
 }
 
+function parseKind(raw: string): ExpenseKind | null {
+  if (raw === "member" || raw === "miscellaneous" || raw === "meeting") {
+    return raw;
+  }
+  return null;
+}
+
+function parseFunding(raw: string): ExpenseFundingSource | null {
+  if (raw === "contribution" || raw === "bank" || raw === "both") return raw;
+  return null;
+}
+
 export async function saveBankAccountDetails(
   formData: FormData,
 ): Promise<void> {
@@ -81,38 +93,67 @@ export async function saveBankAccountDetails(
 export async function recordExpense(formData: FormData): Promise<void> {
   const viewer = await requireAdmin();
   const expense_date = String(formData.get("expense_date") ?? "").trim();
-  const amount = Number(formData.get("amount") ?? "");
-  const kindRaw = String(formData.get("kind") ?? "miscellaneous").trim();
-  const kind: ExpenseKind =
-    kindRaw === "member" ? "member" : "miscellaneous";
+  const kind = parseKind(String(formData.get("kind") ?? "").trim());
+  const funding_source = parseFunding(
+    String(formData.get("funding_source") ?? "").trim(),
+  );
   const notes = String(formData.get("notes") ?? "").trim();
-  const fundingRaw = String(formData.get("funding_source") ?? "").trim();
-  const funding_source: ExpenseFundingSource | null =
-    kind === "member"
-      ? fundingRaw === "contribution"
-        ? "contribution"
-        : "bank"
-      : null;
   const paymentRequestId = Number(formData.get("payment_request_id") ?? "");
 
+  if (!kind) fail("Choose whether this is a member, meeting, or miscellaneous expense.");
+  if (!funding_source) {
+    fail("Choose funding from a contribution, the bank, or both.");
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(expense_date)) {
     fail("Choose a valid expense date.");
   }
+
+  let contribution_amount = 0;
+  let bank_amount = 0;
+
+  if (funding_source === "contribution") {
+    contribution_amount = Number(formData.get("contribution_amount") ?? formData.get("amount") ?? "");
+  } else if (funding_source === "bank") {
+    bank_amount = Number(formData.get("bank_amount") ?? formData.get("amount") ?? "");
+  } else {
+    contribution_amount = Number(formData.get("contribution_amount") ?? "");
+    bank_amount = Number(formData.get("bank_amount") ?? "");
+  }
+
+  if (funding_source === "contribution" || funding_source === "both") {
+    if (!Number.isFinite(contribution_amount) || contribution_amount <= 0) {
+      fail("Enter how much is drawn from the contribution.");
+    }
+  } else {
+    contribution_amount = 0;
+  }
+
+  if (funding_source === "bank" || funding_source === "both") {
+    if (!Number.isFinite(bank_amount) || bank_amount <= 0) {
+      fail(
+        funding_source === "both"
+          ? "Enter how much bank money tops up the contribution."
+          : "Enter how much is drawn from the bank.",
+      );
+    }
+  } else {
+    bank_amount = 0;
+  }
+
+  const amount = contribution_amount + bank_amount;
   if (!Number.isFinite(amount) || amount <= 0) {
     fail("Enter an expense amount greater than zero.");
   }
 
   let allocations: ExpenseAllocation[] = [];
   let payment_request_id: number | null = null;
+  let remaining = 0;
   let fullContributionPayout = false;
 
   if (kind === "member") {
-    if (fundingRaw !== "contribution" && fundingRaw !== "bank") {
-      fail("Choose whether this payout comes from a contribution or the bank.");
-    }
     allocations = parseAllocations(formData);
     if (allocations.length === 0) {
-      fail("Add at least one member recipient and amount.");
+      fail("Select at least one member recipient and amount.");
     }
     const allocTotal = allocations.reduce(
       (sum, a) => sum + Number(a.amount),
@@ -123,52 +164,56 @@ export async function recordExpense(formData: FormData): Promise<void> {
         `Recipient amounts (${allocTotal.toFixed(2)}) must equal the expense total (${amount.toFixed(2)}).`,
       );
     }
+  }
 
-    if (funding_source === "contribution") {
-      if (!Number.isFinite(paymentRequestId) || paymentRequestId <= 0) {
-        fail("Select which contribution this payout comes from.");
-      }
-      const request = await getPaymentRequestById(paymentRequestId);
-      if (!request) fail("That contribution was not found.");
+  if (funding_source === "contribution" || funding_source === "both") {
+    if (!Number.isFinite(paymentRequestId) || paymentRequestId <= 0) {
+      fail("Select which contribution funds this expense.");
+    }
+    const request = await getPaymentRequestById(paymentRequestId);
+    if (!request) fail("That contribution was not found.");
 
-      const options = await listContributionFundingOptions();
-      const option = options.find((o) => o.id === paymentRequestId);
-      const remaining = Number(option?.remaining ?? 0);
-      if (!option || remaining <= 0) {
-        fail("That contribution has no realised amount left to pay out.");
-      }
-      if (amount - remaining > 0.009) {
-        fail(
-          `Payout cannot exceed the remaining realised amount (${remaining.toFixed(2)}).`,
-        );
-      }
+    const options = await listContributionFundingOptions();
+    const option = options.find((o) => o.id === paymentRequestId);
+    remaining = Number(option?.remaining ?? 0);
+    if (!option || remaining <= 0) {
+      fail("That contribution has no realised amount left to draw from.");
+    }
+    if (contribution_amount - remaining > 0.009) {
+      fail(
+        `Contribution draw cannot exceed the remaining realised amount (${remaining.toFixed(2)}).`,
+      );
+    }
 
-      payment_request_id = paymentRequestId;
-      fullContributionPayout = Math.abs(amount - remaining) <= 0.009;
+    payment_request_id = paymentRequestId;
+    fullContributionPayout =
+      funding_source === "contribution" &&
+      Math.abs(contribution_amount - remaining) <= 0.009;
 
-      // Race-safe double-check against live expense rows.
-      const expenses = await listAllExpenses();
-      const liveRemaining =
-        Number(option.realised_total) -
-        disbursedFromContribution(expenses, paymentRequestId);
-      if (amount - liveRemaining > 0.009) {
-        fail(
-          `Payout cannot exceed the remaining realised amount (${Math.max(0, liveRemaining).toFixed(2)}).`,
-        );
-      }
+    const expenses = await listAllExpenses();
+    const liveRemaining =
+      Number(option.realised_total) -
+      disbursedFromContribution(expenses, paymentRequestId);
+    if (contribution_amount - liveRemaining > 0.009) {
+      fail(
+        `Contribution draw cannot exceed the remaining realised amount (${Math.max(0, liveRemaining).toFixed(2)}).`,
+      );
     }
   }
 
-  const notesRequired =
-    kind === "miscellaneous" ||
-    funding_source === "bank" ||
-    (funding_source === "contribution" && !fullContributionPayout);
+  const usesBank = bank_amount > 0;
+  const partialContribution =
+    (funding_source === "contribution" || funding_source === "both") &&
+    !fullContributionPayout;
+  const notesRequired = usesBank || partialContribution;
 
   if (notesRequired && notes.length < 3) {
     fail(
-      funding_source === "contribution"
-        ? "Partial contribution payouts need notes explaining the breakdown."
-        : "Add compulsory notes with the expense breakdown.",
+      usesBank && partialContribution
+        ? "Add notes explaining the bank top-up and why the contribution is not paid out in full."
+        : usesBank
+          ? "Bank-funded expenses need notes explaining the spend."
+          : "Partial contribution payouts need notes explaining why.",
     );
   }
 
@@ -186,6 +231,8 @@ export async function recordExpense(formData: FormData): Promise<void> {
     allocations,
     funding_source,
     payment_request_id,
+    contribution_amount,
+    bank_amount,
     created_by_email: viewer.email,
     created_by_name: viewer.name,
   });

@@ -17,7 +17,11 @@ import {
   formatCoveredMonths,
   formatDuesCount,
 } from "@/lib/dues-months";
-import { formatDate, formatMoney } from "@/lib/format";
+import {
+  formatDate,
+  formatExpenseFunding,
+  formatMoney,
+} from "@/lib/format";
 import { groupPaymentsByTitle } from "@/lib/group";
 
 export const instant = false;
@@ -265,9 +269,12 @@ export default async function MemberDetailPage({
                       </td>
                       <td>{formatMoney(amount)}</td>
                       <td className="muted">
-                        {expense.funding_source === "contribution"
-                          ? (expense.contribution_title ?? "Contribution")
-                          : "Bank balance"}
+                        {formatExpenseFunding({
+                          funding_source: expense.funding_source,
+                          contribution_title: expense.contribution_title,
+                          contribution_amount: expense.contribution_amount,
+                          bank_amount: expense.bank_amount,
+                        })}
                       </td>
                       <td>
                         {expense.certified ? (

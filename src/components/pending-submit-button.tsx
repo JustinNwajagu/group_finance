@@ -7,6 +7,7 @@ type Props = {
   pendingLabel: string;
   className?: string;
   style?: React.CSSProperties;
+  disabled?: boolean;
 };
 
 /** Must be rendered inside a <form> that uses a Server Action. */
@@ -15,6 +16,7 @@ export function PendingSubmitButton({
   pendingLabel,
   className = "btn-primary",
   style,
+  disabled = false,
 }: Props) {
   const { pending } = useFormStatus();
   return (
@@ -22,7 +24,7 @@ export function PendingSubmitButton({
       type="submit"
       className={className}
       style={style}
-      disabled={pending}
+      disabled={pending || disabled}
       aria-busy={pending}
     >
       {pending ? (

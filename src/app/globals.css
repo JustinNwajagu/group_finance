@@ -1276,6 +1276,41 @@ form[aria-busy="true"] button:not([type="submit"]) {
   align-items: center;
 }
 
+.expense-member-picker {
+  grid-column: 1 / -1;
+}
+
+.expense-member-list {
+  display: grid;
+  gap: 0.65rem;
+  max-height: 18rem;
+  overflow: auto;
+  padding: 0.15rem 0.1rem 0.35rem;
+}
+
+.expense-member-row {
+  display: grid;
+  gap: 0.45rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.expense-member-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.expense-member-amount {
+  margin: 0;
+}
+
+@media (min-width: 720px) {
+  .expense-member-row {
+    grid-template-columns: minmax(10rem, 1.2fr) minmax(8rem, 0.9fr);
+    align-items: end;
+  }
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;

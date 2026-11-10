@@ -10,18 +10,22 @@ import {
 import { formatMoney } from "@/lib/format";
 import type { ContributionFundingOption, Member } from "@/lib/types";
 
-type AllocLine = {
-  key: string;
-  member_id: string;
-  amount: string;
-};
-
 type FundingSource = "contribution" | "bank";
 
-let allocKey = 0;
-function nextKey() {
-  allocKey += 1;
-  return `alloc-${allocKey}`;
+/** Split `total` across `count` parts; leftover cents go to the last part. */
+function splitAmount(total: number, count: number): string[] {
+  if (count <= 0 || !Number.isFinite(total) || total <= 0) {
+    return Array.from({ length: Math.max(count, 0) }, () => "");
+  }
+  const cents = Math.round(total * 100);
+  const base = Math.floor(cents / count);
+  const parts = Array.from({ length: count }, () => base);
+  let leftover = cents - base * count;
+  for (let i = parts.length - 1; i >= 0 && leftover > 0; i -= 1) {
+    parts[i]! += 1;
+    leftover -= 1;
+  }
+  return parts.map((c) => (c / 100).toFixed(2));
 }
 
 export function RecordExpenseForm({
@@ -40,9 +44,10 @@ export function RecordExpenseForm({
   const [contributionId, setContributionId] = useState("");
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<AllocLine[]>([
-    { key: nextKey(), member_id: "", amount: "" },
-  ]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
+  const [amountByMember, setAmountByMember] = useState<Record<number, string>>(
+    {},
+  );
 
   const selectedContribution = useMemo(
     () =>
@@ -54,17 +59,18 @@ export function RecordExpenseForm({
     ? Number(selectedContribution.remaining)
     : 0;
 
+  const expenseAmount = Number(amount);
   const allocTotal = useMemo(
     () =>
-      lines.reduce((sum, line) => {
-        const n = Number(line.amount);
+      selectedMemberIds.reduce((sum, id) => {
+        const n = Number(amountByMember[id] ?? "");
         return Number.isFinite(n) ? sum + n : sum;
       }, 0),
-    [lines],
+    [selectedMemberIds, amountByMember],
   );
-  const expenseAmount = Number(amount);
   const amountMismatch =
     kind === "member" &&
+    selectedMemberIds.length > 0 &&
     Number.isFinite(expenseAmount) &&
     expenseAmount > 0 &&
     Math.abs(allocTotal - expenseAmount) > 0.009;
@@ -89,17 +95,56 @@ export function RecordExpenseForm({
       ? Math.max(0, remaining - (expenseAmount > 0 ? expenseAmount : 0))
       : null;
 
+  function redistribute(
+    memberIds: number[],
+    totalRaw: string,
+  ): Record<number, string> {
+    const total = Number(totalRaw);
+    const parts = splitAmount(
+      Number.isFinite(total) && total > 0 ? total : 0,
+      memberIds.length,
+    );
+    const next: Record<number, string> = {};
+    memberIds.forEach((id, index) => {
+      next[id] = parts[index] ?? "";
+    });
+    return next;
+  }
+
   function applyContribution(id: string) {
     setContributionId(id);
     const option = contributions.find((c) => String(c.id) === id);
     if (!option) return;
     const nextAmount = option.remaining;
     setAmount(nextAmount);
-    setLines((prev) => {
-      if (prev.length === 1) {
-        return [{ ...prev[0]!, amount: nextAmount }];
+    setAmountByMember((prev) => {
+      if (selectedMemberIds.length === 0) return prev;
+      return redistribute(selectedMemberIds, nextAmount);
+    });
+  }
+
+  function setExpenseAmount(value: string) {
+    setAmount(value);
+    if (selectedMemberIds.length > 0) {
+      setAmountByMember(redistribute(selectedMemberIds, value));
+    }
+  }
+
+  function toggleMember(memberId: number, checked: boolean) {
+    const nextIds = checked
+      ? [...selectedMemberIds, memberId]
+      : selectedMemberIds.filter((id) => id !== memberId);
+    setSelectedMemberIds(nextIds);
+    setAmountByMember((prev) => {
+      if (!checked) {
+        if (nextIds.length === 0) {
+          const rest = { ...prev };
+          delete rest[memberId];
+          return rest;
+        }
+        return redistribute(nextIds, amount);
       }
-      return prev;
+      return redistribute(nextIds, amount);
     });
   }
 
@@ -108,8 +153,8 @@ export function RecordExpenseForm({
     if (next === "miscellaneous") {
       setFunding("bank");
       setContributionId("");
-    } else if (!funding) {
-      setFunding("contribution");
+      setSelectedMemberIds([]);
+      setAmountByMember({});
     }
   }
 
@@ -215,9 +260,9 @@ export function RecordExpenseForm({
               {selectedContribution ? (
                 <span className="field-hint">
                   Realised {formatMoney(selectedContribution.realised_total)}.
-                  Paying out fills the amount with the remaining{" "}
-                  {formatMoney(selectedContribution.remaining)} and subtracts
-                  member payouts from that pot
+                  Amount fills with remaining{" "}
+                  {formatMoney(selectedContribution.remaining)}; select one or
+                  more members below to receive it
                   {contributionLeftAfterPayout != null
                     ? ` (left after this: ${formatMoney(contributionLeftAfterPayout)})`
                     : ""}
@@ -225,15 +270,15 @@ export function RecordExpenseForm({
                 </span>
               ) : (
                 <span className="field-hint">
-                  Prefer a concluded contribution. Selecting one fills the
-                  amount with its remaining realised total.
+                  Prefer a concluded contribution. Then select the member(s)
+                  who receive the payout.
                 </span>
               )}
             </label>
           ) : (
             <p className="field-hint" style={{ margin: 0 }}>
               Drawn from the group bank balance ({formatMoney(bankBalance)}).
-              Notes are required.
+              Select one or more members below. Notes are required.
             </p>
           )}
         </>
@@ -248,16 +293,7 @@ export function RecordExpenseForm({
           step="0.01"
           required
           value={amount}
-          onChange={(e) => {
-            const value = e.target.value;
-            setAmount(value);
-            setLines((prev) => {
-              if (prev.length === 1) {
-                return [{ ...prev[0]!, amount: value }];
-              }
-              return prev;
-            });
-          }}
+          onChange={(e) => setExpenseAmount(e.target.value)}
           max={
             kind === "member" &&
             funding === "contribution" &&
@@ -269,91 +305,72 @@ export function RecordExpenseForm({
       </label>
 
       {kind === "member" ? (
-        <div className="expense-alloc-block">
+        <fieldset className="field expense-kind-fieldset expense-member-picker">
+          <legend>Members receiving this payout</legend>
           <p className="field-hint" style={{ marginTop: 0 }}>
-            Document each member and the amount they receive. Totals must match
-            the expense amount
-            {selectedContribution
-              ? "; that amount is subtracted from the contribution pot"
+            Select one or more members. Amounts start equal-split and can be
+            edited; they must still total the expense amount
+            {funding === "contribution"
+              ? ", which is subtracted from the contribution pot"
               : ""}
             .
           </p>
-          {lines.map((line, index) => (
-            <div className="expense-alloc-row" key={line.key}>
-              <label className="field">
-                Member
-                <select
-                  name="alloc_member_id"
-                  required
-                  value={line.member_id}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setLines((prev) =>
-                      prev.map((row, i) =>
-                        i === index ? { ...row, member_id: value } : row,
-                      ),
-                    );
-                  }}
-                >
-                  <option value="">Select member</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                Amount received (₦)
-                <input
-                  name="alloc_amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  value={line.amount}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setLines((prev) =>
-                      prev.map((row, i) =>
-                        i === index ? { ...row, amount: value } : row,
-                      ),
-                    );
-                  }}
-                />
-              </label>
-              {lines.length > 1 ? (
-                <button
-                  type="button"
-                  className="text-link"
-                  onClick={() =>
-                    setLines((prev) => prev.filter((_, i) => i !== index))
-                  }
-                >
-                  Remove
-                </button>
-              ) : null}
-            </div>
-          ))}
+          <div className="expense-member-list">
+            {members.map((m) => {
+              const checked = selectedMemberIds.includes(m.id);
+              return (
+                <div key={m.id} className="expense-member-row">
+                  <label className="expense-kind-option">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => toggleMember(m.id, e.target.checked)}
+                    />
+                    {m.name}
+                  </label>
+                  {checked ? (
+                    <>
+                      <input type="hidden" name="alloc_member_id" value={m.id} />
+                      <label className="field expense-member-amount">
+                        Amount received (₦)
+                        <input
+                          name="alloc_amount"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          required
+                          value={amountByMember[m.id] ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setAmountByMember((prev) => ({
+                              ...prev,
+                              [m.id]: value,
+                            }));
+                          }}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
           <div className="expense-alloc-meta">
-            <button
-              type="button"
-              className="text-link"
-              onClick={() =>
-                setLines((prev) => [
-                  ...prev,
-                  { key: nextKey(), member_id: "", amount: "" },
-                ])
-              }
-            >
-              + Add member
-            </button>
+            <span className="muted">
+              {selectedMemberIds.length} member
+              {selectedMemberIds.length === 1 ? "" : "s"} selected
+            </span>
             <span className={amountMismatch ? "form-error" : "muted"}>
               Recipients total {formatMoney(allocTotal)}
               {amountMismatch ? " (must match expense amount)" : ""}
             </span>
           </div>
-        </div>
+          {selectedMemberIds.length === 0 ? (
+            <p className="form-error" role="alert" style={{ margin: 0 }}>
+              Select at least one member.
+            </p>
+          ) : null}
+        </fieldset>
       ) : null}
 
       <label className="field">
@@ -387,6 +404,7 @@ export function RecordExpenseForm({
           className="btn-primary"
           idleLabel="Record expense"
           pendingLabel="Saving…"
+          disabled={kind === "member" && selectedMemberIds.length === 0}
         />
         <FormPendingStatus message="Saving expense…" />
       </div>

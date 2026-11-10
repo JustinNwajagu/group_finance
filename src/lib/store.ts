@@ -247,6 +247,22 @@ export async function listMembersWithLogin(): Promise<MemberRow[]> {
   return (await listAllMembers()).filter((m) => Boolean(m.auth_uid));
 }
 
+/** Find a roster member linked to a login / contact email. */
+export async function getMemberByLoginEmail(
+  email: string,
+): Promise<MemberRow | null> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return null;
+  const members = await listAllMembers();
+  return (
+    members.find((m) => {
+      const login = (m.login_email ?? "").trim().toLowerCase();
+      const contact = (m.email ?? "").trim().toLowerCase();
+      return login === normalized || contact === normalized;
+    }) ?? null
+  );
+}
+
 export async function countMembers(): Promise<number> {
   return (await listAllMembers()).length;
 }

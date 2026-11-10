@@ -40,7 +40,6 @@ function MemberList({
               <Link className="row-link" href={`/members/${m.id}`}>
                 {m.name}
               </Link>
-              {m.email ? <span className="muted"> · {m.email}</span> : null}
               {m.status ? (
                 <span
                   className={

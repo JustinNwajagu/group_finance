@@ -41,13 +41,20 @@ export default async function MemberDetailPage({
     memberDuesSummary(id),
   ]);
   const groups = groupPaymentsByTitle(payments);
-  const contactBits = [
-    member.email || null,
-    member.phone || null,
-    member.login_email && member.login_email !== member.email
-      ? `Login ${member.login_email}`
-      : null,
-  ].filter(Boolean);
+  const viewerEmail = viewer.email.trim().toLowerCase();
+  const isSelf =
+    (member.login_email ?? "").trim().toLowerCase() === viewerEmail ||
+    (member.email ?? "").trim().toLowerCase() === viewerEmail;
+  const showContact = admin || isSelf;
+  const contactBits = showContact
+    ? [
+        member.email || null,
+        member.phone || null,
+        member.login_email && member.login_email !== member.email
+          ? `Login ${member.login_email}`
+          : null,
+      ].filter(Boolean)
+    : [];
 
   return (
     <AppShell viewer={viewer} active="home">
@@ -57,11 +64,15 @@ export default async function MemberDetailPage({
             <Link href="/">← Home</Link>
           </p>
           <h1>{member.name}</h1>
-          <p>
-            {contactBits.length > 0
-              ? contactBits.join(" · ")
-              : "No email or phone on file"}
-          </p>
+          {showContact ? (
+            <p>
+              {contactBits.length > 0
+                ? contactBits.join(" · ")
+                : "No email or phone on file"}
+            </p>
+          ) : (
+            <p className="muted">Contact details are private.</p>
+          )}
           <div className="stat-line">
             <div>
               <strong>

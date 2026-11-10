@@ -11,7 +11,7 @@ export function AppShell({
   children,
 }: {
   viewer: ViewerContext;
-  active: "home" | "payments" | "dues" | "archive" | "access";
+  active: "home" | "payments" | "dues" | "archive" | "access" | "profile";
   children: React.ReactNode;
 }) {
   const admin = isAdmin(viewer);
@@ -64,7 +64,15 @@ export function AppShell({
           ) : null}
         </nav>
         <div className="viewer">
-          <span className="viewer-name">{viewer.name}</span>
+          <Link
+            href="/profile"
+            className={
+              active === "profile" ? "viewer-name is-active" : "viewer-name"
+            }
+            title="Your account"
+          >
+            {viewer.name}
+          </Link>
           <span className="viewer-role">
             {viewer.access?.role ?? "guest"}
             {viewer.simulated ? " · local preview" : ""}

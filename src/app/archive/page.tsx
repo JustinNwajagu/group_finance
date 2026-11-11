@@ -83,6 +83,8 @@ export default async function ArchivePage({
           cleared: "Contribution cleared — member is outstanding again.",
           amended: "Contribution list updated.",
           concluded: "Payment archived.",
+          concluded_transferred:
+            "Payment archived and remaining balance transferred to the bank.",
           reopened: "Payment reopened — see Payments.",
           bulk_contributions: bulkTitle
             ? `Imported ${bulkCount ?? ""} contribution row(s) for “${bulkTitle}” into Archive (deadline already passed).`

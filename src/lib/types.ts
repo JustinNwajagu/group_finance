@@ -28,6 +28,11 @@ export type PaymentRequest = {
   amount: string;
   deadline: string;
   concluded_at: string | null;
+  /**
+   * Realised contribution amount released into general bank funds (no longer
+   * earmarked for this contribution pot). Does not change ledger totals.
+   */
+  released_to_bank: string;
   created_at: string;
 };
 

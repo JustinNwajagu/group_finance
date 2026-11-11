@@ -275,7 +275,7 @@ export function ContributionBoard({
             <form
               action={concludePaymentRequest}
               className="inline-form"
-              style={{ gap: "0.5rem", flexWrap: "wrap" }}
+              style={{ gap: "0.5rem", flexWrap: "wrap", alignItems: "end" }}
             >
               <input type="hidden" name="id" value={request.id} />
               <input type="hidden" name="return_to" value="/archive" />
@@ -287,6 +287,13 @@ export function ContributionBoard({
                   defaultValue={today}
                   required
                 />
+              </label>
+              <label
+                className="expense-kind-option"
+                style={{ marginBottom: "0.35rem" }}
+              >
+                <input type="checkbox" name="transfer_to_bank" value="1" />
+                Transfer remaining balance to bank
               </label>
               <PendingSubmitButton
                 idleLabel="Conclude payment"

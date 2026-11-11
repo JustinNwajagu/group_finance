@@ -1262,12 +1262,58 @@ form[aria-busy="true"] button:not([type="submit"]) {
   margin-top: 0;
 }
 
-.expenses-aside input,
+.expenses-aside input:not([type="radio"]):not([type="checkbox"]),
 .expenses-aside select,
 .expenses-aside textarea {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.expense-kind-fieldset {
+  display: grid;
+  gap: 0.45rem;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin: 0;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.expense-kind-fieldset legend {
+  padding: 0 0.25rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.expense-kind-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.95rem;
+}
+
+.expense-kind-option {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.expense-kind-option input[type="radio"],
+.expense-kind-option input[type="checkbox"],
+.expense-member-row input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  min-width: 1rem;
+  margin: 0;
+  accent-color: var(--sea);
+  flex: 0 0 auto;
 }
 
 .expenses-main .table-wrap {
@@ -1349,30 +1395,6 @@ form[aria-busy="true"] button:not([type="submit"]) {
   gap: 0.75rem 1rem;
   align-items: center;
   margin-top: 0.75rem;
-}
-
-.expense-kind-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  min-width: 0;
-}
-
-.expense-kind-fieldset legend {
-  margin-bottom: 0.35rem;
-  font-weight: 600;
-}
-
-.expense-kind-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
-}
-
-.expense-kind-option {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
 }
 
 .expense-alloc-block {

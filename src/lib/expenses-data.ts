@@ -96,7 +96,11 @@ export const listContributionFundingOptions = cache(
       .map((request) => {
         const realised = realisedByRequest.get(request.id) ?? 0;
         const disbursed = disbursedFromContribution(expenses, request.id);
-        const remaining = Math.max(0, realised - disbursed);
+        const released = Number(request.released_to_bank ?? 0);
+        const remaining = Math.max(
+          0,
+          realised - disbursed - (Number.isFinite(released) ? released : 0),
+        );
         return {
           id: request.id,
           title: request.title,
@@ -105,13 +109,40 @@ export const listContributionFundingOptions = cache(
           remaining: remaining.toFixed(2),
         } satisfies ContributionFundingOption;
       })
-      .filter((row) => Number(row.realised_total) > 0)
+      .filter((row) => Number(row.remaining) > 0.009)
       .sort((a, b) => {
         if (a.concluded !== b.concluded) return a.concluded ? -1 : 1;
         return b.id - a.id;
       });
   },
 );
+
+/** Remaining realised amount still earmarked on a contribution pot. */
+export async function getContributionRemaining(
+  paymentRequestId: number,
+): Promise<{ realised: number; remaining: number; released: number } | null> {
+  const [request, payments, expenses] = await Promise.all([
+    listAllPaymentRequestRows().then(
+      (rows) => rows.find((r) => r.id === paymentRequestId) ?? null,
+    ),
+    listAllPaymentRows(),
+    listAllExpenses(),
+  ]);
+  if (!request) return null;
+  const realised = payments
+    .filter(
+      (p) => p.payment_request_id === paymentRequestId && p.status === "paid",
+    )
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+  const disbursed = disbursedFromContribution(expenses, paymentRequestId);
+  const releasedRaw = Number(request.released_to_bank ?? 0);
+  const released = Number.isFinite(releasedRaw) ? releasedRaw : 0;
+  return {
+    realised,
+    remaining: Math.max(0, realised - disbursed - released),
+    released,
+  };
+}
 
 export const listExpenseViews = cache(async (): Promise<ExpenseView[]> => {
   const [expenses, members, requests] = await Promise.all([

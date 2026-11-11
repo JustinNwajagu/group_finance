@@ -36,6 +36,8 @@ export type PaymentRequestRow = {
   amount: string;
   deadline: string;
   concluded_at: string | null;
+  /** Amount of realised funds released to general bank (not expense outflow). */
+  released_to_bank: string;
   created_at: string;
 };
 
@@ -402,6 +404,7 @@ function normalizePaymentRequest(
     amount: money(raw.amount as string | number),
     deadline: String(raw.deadline ?? ""),
     concluded_at: (raw.concluded_at as string | null) ?? null,
+    released_to_bank: money(Number(raw.released_to_bank ?? 0)),
     created_at: String(raw.created_at ?? nowIso()),
   };
 }
@@ -434,6 +437,7 @@ export async function createPaymentRequestRow(input: {
     amount: money(input.amount),
     deadline: input.deadline,
     concluded_at: input.concluded_at ?? null,
+    released_to_bank: money(0),
     created_at,
   };
   if (isFirestore()) {
@@ -494,20 +498,26 @@ export async function getPaymentRequestById(
 
 export async function updatePaymentRequestRow(
   id: number,
-  patch: Partial<Pick<PaymentRequestRow, "concluded_at" | "title">>,
+  patch: Partial<
+    Pick<PaymentRequestRow, "concluded_at" | "title" | "released_to_bank">
+  >,
 ): Promise<void> {
+  const cleaned = { ...patch };
+  if (cleaned.released_to_bank != null) {
+    cleaned.released_to_bank = money(cleaned.released_to_bank);
+  }
   if (isFirestore()) {
     await adminDb()!
       .collection("payment_requests")
       .doc(String(id))
-      .set(patch, { merge: true });
+      .set(cleaned, { merge: true });
     invalidateStoreCache();
     return;
   }
   const db = await loadLocal();
   const row = db.payment_requests.find((r) => r.id === id);
   if (!row) return;
-  Object.assign(row, patch);
+  Object.assign(row, cleaned);
   await saveLocal(db);
   invalidateStoreCache();
 }

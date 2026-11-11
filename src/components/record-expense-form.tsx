@@ -35,12 +35,12 @@ export function RecordExpenseForm({
   members,
   contributions,
   today,
-  bankBalance,
 }: {
   members: Member[];
   contributions: ContributionFundingOption[];
   today: string;
-  bankBalance: string;
+  /** @deprecated kept optional for call-site compatibility */
+  bankBalance?: string;
 }) {
   const [kind, setKind] = useState<ExpenseKind>("miscellaneous");
   const [funding, setFunding] = useState<ExpenseFundingSource>("contribution");
@@ -281,13 +281,6 @@ export function RecordExpenseForm({
             </label>
           ))}
         </div>
-        <p className="field-hint" style={{ marginBottom: 0 }}>
-          {funding === "both"
-            ? "Split the total between a contribution pot and a bank top-up."
-            : funding === "bank"
-              ? `Drawn from the group bank balance (${formatMoney(bankBalance)}). Notes are required.`
-              : "Drawn from a contribution pot. Notes are required unless the remaining realised amount is paid out in full."}
-        </p>
       </fieldset>
 
       {usesContribution ? (
@@ -301,14 +294,9 @@ export function RecordExpenseForm({
           >
             <option value="">Select contribution</option>
             {contributions.map((c) => (
-              <option
-                key={c.id}
-                value={c.id}
-                disabled={Number(c.remaining) <= 0}
-              >
+              <option key={c.id} value={c.id}>
                 {c.title}
-                {c.concluded ? " (concluded)" : " (open)"} · realised{" "}
-                {formatMoney(c.realised_total)} · left{" "}
+                {c.concluded ? " (concluded)" : " (open)"} · left{" "}
                 {formatMoney(c.remaining)}
               </option>
             ))}

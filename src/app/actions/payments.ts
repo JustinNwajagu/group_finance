@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { listMemberOptions } from "@/lib/data";
+import { getContributionRemaining } from "@/lib/expenses-data";
 import {
   createPaymentRequestRow,
   createPaymentRow,
@@ -35,6 +36,7 @@ function revalidateDashboards(...extra: string[]) {
   revalidatePath("/payments");
   revalidatePath("/archive");
   revalidatePath("/members");
+  revalidatePath("/expenses");
   for (const path of extra) revalidatePath(path);
 }
 
@@ -67,16 +69,38 @@ export async function concludePaymentRequest(formData: FormData): Promise<void> 
   const id = Number(formData.get("id"));
   const concludedDate = String(formData.get("concluded_date") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/archive");
+  const transferToBank =
+    String(formData.get("transfer_to_bank") ?? "").trim() === "1";
 
   if (!Number.isFinite(id) || id <= 0) failPayments("Invalid payment.");
+
+  const request = await getPaymentRequestById(id);
+  if (!request) failPayments("Payment request not found.");
 
   const when = /^\d{4}-\d{2}-\d{2}$/.test(concludedDate)
     ? `${concludedDate}T12:00:00.000Z`
     : new Date().toISOString();
 
-  await updatePaymentRequestRow(id, { concluded_at: when });
+  const patch: {
+    concluded_at: string;
+    released_to_bank?: string;
+  } = { concluded_at: when };
+
+  if (transferToBank) {
+    const pot = await getContributionRemaining(id);
+    const remaining = pot?.remaining ?? 0;
+    if (remaining > 0.009) {
+      const alreadyReleased = pot?.released ?? 0;
+      patch.released_to_bank = (alreadyReleased + remaining).toFixed(2);
+    }
+  }
+
+  await updatePaymentRequestRow(id, patch);
   revalidateDashboards();
-  okReturn(returnTo.startsWith("/archive") ? returnTo : "/archive", "concluded");
+  okReturn(
+    returnTo.startsWith("/archive") ? returnTo : "/archive",
+    transferToBank ? "concluded_transferred" : "concluded",
+  );
 }
 
 export async function reopenPaymentRequest(formData: FormData): Promise<void> {

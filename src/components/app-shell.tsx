@@ -4,8 +4,9 @@ import { BrandLogo } from "@/components/brand-logo";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type { ViewerContext } from "@/lib/auth";
 import { homePathForRole, isAdmin } from "@/lib/auth";
+import { getExcoSeatForEmail } from "@/lib/exco";
 
-export function AppShell({
+export async function AppShell({
   viewer,
   active,
   children,
@@ -24,6 +25,10 @@ export function AppShell({
 }) {
   const admin = isAdmin(viewer);
   const homeHref = homePathForRole(viewer.access?.role ?? "member");
+  const exco = await getExcoSeatForEmail(viewer.email);
+  const roleLabel = exco
+    ? exco.label
+    : (viewer.access?.role ?? "guest");
 
   return (
     <div className="shell">
@@ -98,7 +103,8 @@ export function AppShell({
             {viewer.name}
           </Link>
           <span className="viewer-role">
-            {viewer.access?.role ?? "guest"}
+            {roleLabel}
+            {exco?.grants_admin ? " · admin" : ""}
             {viewer.simulated ? " · local preview" : ""}
           </span>
           <form action={signOut} style={{ margin: 0 }}>

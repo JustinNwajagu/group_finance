@@ -11,6 +11,7 @@ import {
   memberPaymentStats,
 } from "@/lib/data";
 import { memberDuesSummary } from "@/lib/dues-data";
+import { getExcoSeatForMember } from "@/lib/exco";
 import { listMemberExpenseReceipts } from "@/lib/expenses-data";
 import {
   DUES_MONTH_LABELS,
@@ -39,13 +40,15 @@ export default async function MemberDetailPage({
   const member = await getMember(id);
   if (!member) notFound();
 
-  const [payments, paidTotal, stats, dues, expenseReceipts] = await Promise.all([
-    listPaymentsForMember(id),
-    memberContribution(id),
-    memberPaymentStats(id),
-    memberDuesSummary(id),
-    listMemberExpenseReceipts(id),
-  ]);
+  const [payments, paidTotal, stats, dues, expenseReceipts, exco] =
+    await Promise.all([
+      listPaymentsForMember(id),
+      memberContribution(id),
+      memberPaymentStats(id),
+      memberDuesSummary(id),
+      listMemberExpenseReceipts(id),
+      getExcoSeatForMember(id),
+    ]);
   const expensesReceived = expenseReceipts
     .filter((row) => row.expense.certified)
     .reduce((sum, row) => sum + Number(row.amount), 0)
@@ -73,7 +76,19 @@ export default async function MemberDetailPage({
           <p className="muted" style={{ margin: 0 }}>
             <Link href="/">← Home</Link>
           </p>
-          <h1>{member.name}</h1>
+          <h1>
+            {member.name}
+            {exco ? (
+              <span
+                className={
+                  exco.grants_admin ? "badge badge-admin" : "badge badge-exco"
+                }
+                style={{ marginLeft: "0.55rem", verticalAlign: "middle" }}
+              >
+                {exco.label}
+              </span>
+            ) : null}
+          </h1>
           {showContact ? (
             <p>
               {contactBits.length > 0

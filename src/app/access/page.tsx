@@ -5,8 +5,8 @@ import {
   deleteLoginAction,
   rejectAccessRequest,
   sendMemberPasswordReset,
-  setUserRoleAction,
 } from "@/app/actions/access-requests";
+import { assignExcoOfficeAction } from "@/app/actions/exco";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { requireAdmin, adminEmail } from "@/lib/auth";
@@ -16,13 +16,10 @@ import {
   loginCapacity,
 } from "@/lib/access-requests";
 import { isAdminEmail } from "@/lib/config";
-import { listMembersWithLogin } from "@/lib/store";
+import { listExcoSeatViews } from "@/lib/exco";
 import { formatTimestamp } from "@/lib/format";
-import {
-  ensurePrimaryAdminRole,
-  listUserRoles,
-  resolveAppRole,
-} from "@/lib/user-roles";
+import { listAllMembers, listMembersWithLogin } from "@/lib/store";
+import { ensurePrimaryAdminRole, resolveAppRole } from "@/lib/user-roles";
 
 export const instant = false;
 
@@ -38,13 +35,14 @@ export default async function AccessPage({
   const error = typeof params.error === "string" ? params.error : undefined;
   const link = typeof params.link === "string" ? params.link : undefined;
   await ensurePrimaryAdminRole();
-  const [pending, unlinkable, withLogin, capacity, storedRoles] =
+  const [pending, unlinkable, withLogin, capacity, allMembers, excoSeats] =
     await Promise.all([
       listAccessRequests("pending"),
       listMembersWithoutLogin(),
       listMembersWithLogin(),
       loginCapacity(),
-      listUserRoles(),
+      listAllMembers(),
+      listExcoSeatViews(),
     ]);
   const atLoginCap = capacity.remaining < 1;
   const roleByEmail = new Map(
@@ -56,12 +54,11 @@ export default async function AccessPage({
     ),
   );
   const primaryAdmin = adminEmail();
-  const loginEmails = new Set(
-    withLogin
-      .map((m) => (m.login_email || m.email || "").toLowerCase())
-      .filter(Boolean),
+  const excoByMemberId = new Map(
+    excoSeats
+      .filter((s) => s.member_id != null)
+      .map((s) => [s.member_id as number, s]),
   );
-  const extraRoles = storedRoles.filter((r) => !loginEmails.has(r.email));
 
   return (
     <AppShell viewer={viewer} active="access">
@@ -72,6 +69,7 @@ export default async function AccessPage({
             Roster members do not get login automatically. Approve requests by
             linking to an existing member or creating a new one. Logins cannot
             exceed the member count ({capacity.logins}/{capacity.members} used).
+            Admin rights follow EXCO offices (President and Treasurer only).
           </p>
         </div>
       </div>
@@ -85,7 +83,7 @@ export default async function AccessPage({
           rejected: "Request rejected.",
           login_deleted: "Login removed. The member stays on the roster.",
           reset_sent: "Password reset link ready to share.",
-          role_updated: "User role updated.",
+          exco_updated: "EXCO position updated.",
         }}
       />
 
@@ -102,6 +100,61 @@ export default async function AccessPage({
       ) : null}
 
       <div className="stack">
+        <section className="panel">
+          <h2>EXCO positions</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Move offices after an election. Only President and Treasurer have
+            admin rights; other EXCO roles are visible but not admin.
+          </p>
+          <div className="exco-assign-grid">
+            {excoSeats.map((seat) => (
+              <form
+                key={seat.office}
+                action={assignExcoOfficeAction}
+                className="exco-assign-card"
+              >
+                <input type="hidden" name="office" value={seat.office} />
+                <div className="exco-assign-head">
+                  <strong>{seat.label}</strong>
+                  {seat.grants_admin ? (
+                    <span className="badge badge-admin">admin</span>
+                  ) : (
+                    <span className="badge badge-exco">exco</span>
+                  )}
+                </div>
+                <p className="muted" style={{ margin: 0 }}>
+                  Slate: {seat.holder_name}
+                </p>
+                <label className="field">
+                  Member
+                  <select
+                    name="member_id"
+                    defaultValue={
+                      seat.member_id != null ? String(seat.member_id) : "none"
+                    }
+                    aria-label={`Assign ${seat.label}`}
+                  >
+                    <option value="none">Vacant</option>
+                    {allMembers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                        {excoByMemberId.get(m.id)?.office === seat.office
+                          ? ""
+                          : excoByMemberId.has(m.id)
+                            ? ` (currently ${excoByMemberId.get(m.id)!.label})`
+                            : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="submit" className="btn-primary">
+                  Save {seat.label}
+                </button>
+              </form>
+            ))}
+          </div>
+        </section>
+
         <section className="panel">
           <h2>Pending requests</h2>
           {pending.length === 0 ? (
@@ -187,10 +240,10 @@ export default async function AccessPage({
           <h2>Active logins</h2>
           <p className="muted" style={{ marginTop: 0 }}>
             Deleting a login removes sign-in access only. The member stays on
-            the roster. Admins can promote or demote logins between{" "}
-            <strong>admin</strong> and <strong>member</strong>.
+            the roster. Admin access is granted by EXCO office (President /
+            Treasurer), not by a separate role toggle.
           </p>
-          {withLogin.length === 0 && extraRoles.length === 0 ? (
+          {withLogin.length === 0 ? (
             <div className="hero-empty">No member logins yet.</div>
           ) : (
             <div className="table-wrap">
@@ -199,7 +252,7 @@ export default async function AccessPage({
                   <tr>
                     <th>Member</th>
                     <th>Login email</th>
-                    <th>Role</th>
+                    <th>Access</th>
                     <th>Phone</th>
                     <th>Action</th>
                   </tr>
@@ -208,37 +261,35 @@ export default async function AccessPage({
                   {withLogin.map((m) => {
                     const email = (m.login_email || m.email || "").toLowerCase();
                     const role = roleByEmail.get(email) ?? "member";
+                    const seat = excoByMemberId.get(m.id);
                     const locked = isAdminEmail(email);
                     return (
                       <tr key={m.id}>
-                        <td>{m.name}</td>
+                        <td>
+                          {m.name}
+                          {seat ? (
+                            <span
+                              className={
+                                seat.grants_admin
+                                  ? "badge badge-admin"
+                                  : "badge badge-exco"
+                              }
+                              style={{ marginLeft: "0.4rem" }}
+                            >
+                              {seat.label}
+                            </span>
+                          ) : null}
+                        </td>
                         <td>{email || "—"}</td>
                         <td>
                           {locked ? (
+                            <span className="badge badge-admin">
+                              primary admin
+                            </span>
+                          ) : role === "admin" ? (
                             <span className="badge badge-admin">admin</span>
                           ) : (
-                            <form
-                              action={setUserRoleAction}
-                              className="inline-form"
-                              style={{
-                                display: "flex",
-                                gap: "0.35rem",
-                                alignItems: "center",
-                              }}
-                            >
-                              <input type="hidden" name="email" value={email} />
-                              <select
-                                name="role"
-                                defaultValue={role}
-                                aria-label={`Role for ${m.name}`}
-                              >
-                                <option value="member">member</option>
-                                <option value="admin">admin</option>
-                              </select>
-                              <button type="submit" className="btn-ghost">
-                                Save
-                              </button>
-                            </form>
+                            <span className="badge badge-member">member</span>
                           )}
                         </td>
                         <td>{m.phone || "—"}</td>
@@ -277,50 +328,6 @@ export default async function AccessPage({
                       </tr>
                     );
                   })}
-                  {extraRoles.map((row) => (
-                    <tr key={`role-${row.email}`}>
-                      <td className="muted">
-                        {row.email === primaryAdmin
-                          ? "Primary admin"
-                          : "Account"}
-                      </td>
-                      <td>{row.email}</td>
-                      <td>
-                        {isAdminEmail(row.email) ? (
-                          <span className="badge badge-admin">admin</span>
-                        ) : (
-                          <form
-                            action={setUserRoleAction}
-                            className="inline-form"
-                            style={{
-                              display: "flex",
-                              gap: "0.35rem",
-                              alignItems: "center",
-                            }}
-                          >
-                            <input
-                              type="hidden"
-                              name="email"
-                              value={row.email}
-                            />
-                            <select
-                              name="role"
-                              defaultValue={row.role}
-                              aria-label={`Role for ${row.email}`}
-                            >
-                              <option value="member">member</option>
-                              <option value="admin">admin</option>
-                            </select>
-                            <button type="submit" className="btn-ghost">
-                              Save
-                            </button>
-                          </form>
-                        )}
-                      </td>
-                      <td className="muted">—</td>
-                      <td className="muted">—</td>
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>
@@ -330,8 +337,9 @@ export default async function AccessPage({
         <section className="panel">
           <h2>Primary admin</h2>
           <p style={{ marginTop: 0 }}>
-            <strong>{primaryAdmin}</strong> is always an admin and cannot be
-            demoted.
+            <strong>{primaryAdmin}</strong> is a break-glass admin mailbox and
+            cannot be demoted. Day-to-day admin rights belong to the President
+            and Treasurer EXCO offices.
           </p>
         </section>
 

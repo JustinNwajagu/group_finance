@@ -55,14 +55,16 @@ function normalizeRole(raw: unknown): "admin" | "member" {
 
 /**
  * Effective app role for a signed-in email.
- * The configured ADMIN_EMAIL is always admin and cannot be demoted.
+ * Admin rights come from EXCO (President / Treasurer). The configured
+ * ADMIN_EMAIL remains a break-glass admin and cannot be demoted.
  */
 export async function resolveAppRole(email: string): Promise<AppRole> {
   const normalized = email.trim().toLowerCase();
   if (!normalized) return "member";
   if (isAdminEmail(normalized)) return "admin";
-  const row = await getUserRole(normalized);
-  return row?.role === "admin" ? "admin" : "member";
+  const { resolveAdminFromExco } = await import("./exco");
+  if (await resolveAdminFromExco(normalized)) return "admin";
+  return "member";
 }
 
 export const getUserRole = cache(async (

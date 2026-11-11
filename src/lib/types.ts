@@ -2,6 +2,36 @@ export type AppRole = "admin" | "member" | "pending";
 
 export type PaymentStatus = "pledge" | "paid";
 
+/** Class executive offices. Admin rights attach only to President and Treasurer. */
+export type ExcoOffice =
+  | "president"
+  | "vice_president"
+  | "secretary"
+  | "treasurer"
+  | "provost";
+
+export type ExcoSeat = {
+  office: ExcoOffice;
+  member_id: number | null;
+  /** Election-slate display name (kept when a member is linked or vacant). */
+  holder_name: string;
+  updated_at: string | null;
+  updated_by: string | null;
+};
+
+export type ExcoSeatView = ExcoSeat & {
+  label: string;
+  member_name: string | null;
+  display_name: string;
+  grants_admin: boolean;
+};
+
+export type ExcoBoard = {
+  seats: ExcoSeat[];
+  updated_at: string | null;
+  updated_by: string | null;
+};
+
 export type AppUser = {
   id: number;
   cursor_sub: string | null;

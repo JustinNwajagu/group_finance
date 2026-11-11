@@ -12,7 +12,8 @@ import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers, requestedPaymentCount } from "@/lib/data";
 import { listDuesSchedules } from "@/lib/dues-data";
 import { formatDuesCount } from "@/lib/dues-months";
-import type { MemberContribution } from "@/lib/types";
+import { excoByMemberIdMap, listExcoSeatViews } from "@/lib/exco";
+import type { ExcoSeatView, MemberContribution } from "@/lib/types";
 
 export const instant = false;
 
@@ -20,24 +21,53 @@ async function HomeRoster({
   membersPromise,
   contributionCountPromise,
   duesYearCountPromise,
+  excoPromise,
+  excoByMemberPromise,
   q,
   admin,
 }: {
   membersPromise: Promise<MemberContribution[]>;
   contributionCountPromise: Promise<number>;
   duesYearCountPromise: Promise<number>;
+  excoPromise: Promise<ExcoSeatView[]>;
+  excoByMemberPromise: Promise<Map<number, ExcoSeatView>>;
   q: string;
   admin: boolean;
 }) {
   await connection();
-  const [members, contributionCount, duesYearCount] = await Promise.all([
-    membersPromise,
-    contributionCountPromise,
-    duesYearCountPromise,
-  ]);
+  const [members, contributionCount, duesYearCount, excoSeats, excoByMember] =
+    await Promise.all([
+      membersPromise,
+      contributionCountPromise,
+      duesYearCountPromise,
+      excoPromise,
+      excoByMemberPromise,
+    ]);
 
   return (
     <div className="stack">
+      <section className="panel">
+        <div className="panel-heading-row">
+          <h2>EXCO</h2>
+          <p className="panel-heading-meta">
+            Admin rights sit with President and Treasurer only
+          </p>
+        </div>
+        <div className="exco-grid">
+          {excoSeats.map((seat) => (
+            <div key={seat.office} className="exco-seat">
+              <span className="exco-seat-office">{seat.label}</span>
+              <span className="exco-seat-name">{seat.display_name}</span>
+              {seat.grants_admin ? (
+                <span className="badge badge-admin">admin</span>
+              ) : (
+                <span className="badge badge-exco">exco</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-heading-row">
           <h2>Roster</h2>
@@ -67,30 +97,45 @@ async function HomeRoster({
                 </tr>
               </thead>
               <tbody>
-                {members.map((m, index) => (
-                  <tr key={m.id}>
-                    <td className="num muted">{index + 1}</td>
-                    <td>
-                      <Link className="row-link" href={`/members/${m.id}`}>
-                        {m.name}
-                      </Link>
-                    </td>
-                    <td className="num">
-                      {m.contribution_count}
-                      <span className="muted">/{m.payment_count}</span>
-                    </td>
-                    <td className="num">
-                      {m.dues_years_count > 0 ? (
-                        <>
-                          {formatDuesCount(m.dues_count)}
-                          <span className="muted">/{m.dues_years_count}</span>
-                        </>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {members.map((m, index) => {
+                  const seat = excoByMember.get(m.id);
+                  return (
+                    <tr key={m.id}>
+                      <td className="num muted">{index + 1}</td>
+                      <td>
+                        <Link className="row-link" href={`/members/${m.id}`}>
+                          {m.name}
+                        </Link>
+                        {seat ? (
+                          <span
+                            className={
+                              seat.grants_admin
+                                ? "badge badge-admin"
+                                : "badge badge-exco"
+                            }
+                            style={{ marginLeft: "0.45rem" }}
+                          >
+                            {seat.label}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="num">
+                        {m.contribution_count}
+                        <span className="muted">/{m.payment_count}</span>
+                      </td>
+                      <td className="num">
+                        {m.dues_years_count > 0 ? (
+                          <>
+                            {formatDuesCount(m.dues_count)}
+                            <span className="muted">/{m.dues_years_count}</span>
+                          </>
+                        ) : (
+                          <span className="muted">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -141,6 +186,8 @@ export default async function HomePage({
   const membersPromise = listMembers(q);
   const contributionCountPromise = requestedPaymentCount();
   const duesYearCountPromise = listDuesSchedules().then((rows) => rows.length);
+  const excoPromise = listExcoSeatViews();
+  const excoByMemberPromise = excoByMemberIdMap();
   const viewer = await viewerPromise;
   const admin = isAdmin(viewer);
   const error = typeof params.error === "string" ? params.error : undefined;
@@ -175,6 +222,8 @@ export default async function HomePage({
           membersPromise={membersPromise}
           contributionCountPromise={contributionCountPromise}
           duesYearCountPromise={duesYearCountPromise}
+          excoPromise={excoPromise}
+          excoByMemberPromise={excoByMemberPromise}
           q={q}
           admin={admin}
         />

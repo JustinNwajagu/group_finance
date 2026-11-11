@@ -10,6 +10,9 @@ import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import { compareMembersByName } from "./member-sort";
 import type {
   BankAccountDetails,
+  ExcoBoard,
+  ExcoOffice,
+  ExcoSeat,
   ExpenseAllocation,
   ExpenseCertification,
   ExpenseFundingSource,
@@ -107,6 +110,50 @@ const DEFAULT_BANK: BankAccountDetails = {
   updated_by: null,
 };
 
+export type ExcoSeatRow = ExcoSeat;
+
+const DEFAULT_EXCO_BOARD: ExcoBoard = {
+  seats: [
+    {
+      office: "president",
+      member_id: null,
+      holder_name: "Mr Udeoba Donald Chisom",
+      updated_at: null,
+      updated_by: null,
+    },
+    {
+      office: "vice_president",
+      member_id: null,
+      holder_name: "Mr Ozochi Chukwuma",
+      updated_at: null,
+      updated_by: null,
+    },
+    {
+      office: "secretary",
+      member_id: null,
+      holder_name: "Rev Fr. Udeh Stephen",
+      updated_at: null,
+      updated_by: null,
+    },
+    {
+      office: "treasurer",
+      member_id: null,
+      holder_name: "Rev Fr Nwafor Emmanuel",
+      updated_at: null,
+      updated_by: null,
+    },
+    {
+      office: "provost",
+      member_id: null,
+      holder_name: "Mr Ezeiyi Benjamin",
+      updated_at: null,
+      updated_by: null,
+    },
+  ],
+  updated_at: null,
+  updated_by: null,
+};
+
 type LocalDb = {
   counters: {
     members: number;
@@ -123,6 +170,7 @@ type LocalDb = {
   dues_payments: DuesPaymentRow[];
   expenses: ExpenseRow[];
   bank_account: BankAccountDetails;
+  exco: ExcoBoard;
 };
 
 type GlobalStore = typeof globalThis & {
@@ -147,6 +195,64 @@ function emptyLocal(): LocalDb {
     dues_payments: [],
     expenses: [],
     bank_account: { ...DEFAULT_BANK },
+    exco: {
+      seats: DEFAULT_EXCO_BOARD.seats.map((s) => ({ ...s })),
+      updated_at: null,
+      updated_by: null,
+    },
+  };
+}
+
+function normalizeExcoBoard(
+  raw: Record<string, unknown> | ExcoBoard | null | undefined,
+): ExcoBoard {
+  const seatsRaw = Array.isArray((raw as ExcoBoard | null)?.seats)
+    ? ((raw as ExcoBoard).seats as ExcoSeat[])
+    : Array.isArray((raw as { seats?: unknown } | null)?.seats)
+      ? (((raw as { seats: unknown }).seats as ExcoSeat[]) ?? [])
+      : [];
+  const byOffice = new Map<ExcoOffice, ExcoSeat>();
+  for (const seat of seatsRaw) {
+    if (!seat || typeof seat !== "object") continue;
+    const office = String((seat as ExcoSeat).office ?? "") as ExcoOffice;
+    if (
+      office !== "president" &&
+      office !== "vice_president" &&
+      office !== "secretary" &&
+      office !== "treasurer" &&
+      office !== "provost"
+    ) {
+      continue;
+    }
+    const memberRaw = (seat as ExcoSeat).member_id;
+    const member_id =
+      memberRaw == null || memberRaw === ("" as unknown)
+        ? null
+        : Number(memberRaw);
+    byOffice.set(office, {
+      office,
+      member_id:
+        member_id != null && Number.isFinite(member_id) && member_id > 0
+          ? member_id
+          : null,
+      holder_name: String((seat as ExcoSeat).holder_name ?? "").trim(),
+      updated_at: ((seat as ExcoSeat).updated_at as string | null) ?? null,
+      updated_by: ((seat as ExcoSeat).updated_by as string | null) ?? null,
+    });
+  }
+  const seats = DEFAULT_EXCO_BOARD.seats.map((fallback) => {
+    const existing = byOffice.get(fallback.office);
+    if (!existing) return { ...fallback };
+    return {
+      ...fallback,
+      ...existing,
+      holder_name: existing.holder_name || fallback.holder_name,
+    };
+  });
+  return {
+    seats,
+    updated_at: ((raw as ExcoBoard | null)?.updated_at as string | null) ?? null,
+    updated_by: ((raw as ExcoBoard | null)?.updated_by as string | null) ?? null,
   };
 }
 
@@ -168,6 +274,7 @@ function normalizeLocal(db: LocalDb): LocalDb {
   db.bank_account = hasBankDetails
     ? { ...DEFAULT_BANK, ...existingBank }
     : { ...DEFAULT_BANK };
+  db.exco = normalizeExcoBoard(db.exco);
   return db;
 }
 
@@ -1169,6 +1276,124 @@ export async function updateBankAccountDetails(input: {
   await saveLocal(db);
   invalidateStoreCache();
   return row;
+}
+
+async function readExcoBoardRaw(): Promise<ExcoBoard> {
+  if (isFirestore()) {
+    const snap = await adminDb()!.collection("settings").doc("exco").get();
+    if (!snap.exists) return normalizeExcoBoard(DEFAULT_EXCO_BOARD);
+    return normalizeExcoBoard(snap.data() as Record<string, unknown>);
+  }
+  const db = await loadLocal();
+  return normalizeExcoBoard(db.exco);
+}
+
+async function writeExcoBoard(board: ExcoBoard): Promise<ExcoBoard> {
+  const normalized = normalizeExcoBoard(board);
+  if (isFirestore()) {
+    await adminDb()!
+      .collection("settings")
+      .doc("exco")
+      .set(normalized, { merge: true });
+  } else {
+    const db = await loadLocal();
+    db.exco = normalized;
+    await saveLocal(db);
+  }
+  invalidateStoreCache();
+  return normalized;
+}
+
+/**
+ * Auto-link vacant EXCO seats to roster members using the election slate
+ * match names. Persists when any link is made so positions stay movable later.
+ */
+async function ensureExcoMemberLinks(board: ExcoBoard): Promise<ExcoBoard> {
+  const needsLink = board.seats.some((s) => s.member_id == null);
+  if (!needsLink) return board;
+
+  const { DEFAULT_EXCO_SLATE, matchMemberIdForSlate } = await import("./exco");
+  const members = await listAllMembers();
+  if (members.length === 0) return board;
+
+  let changed = false;
+  const seats = board.seats.map((seat) => {
+    if (seat.member_id != null) return seat;
+    const slate = DEFAULT_EXCO_SLATE.find((row) => row.office === seat.office);
+    if (!slate) return seat;
+    const member_id = matchMemberIdForSlate(members, slate.match_names);
+    if (member_id == null) return seat;
+    changed = true;
+    return {
+      ...seat,
+      member_id,
+      holder_name: seat.holder_name || slate.holder_name,
+      updated_at: nowIso(),
+      updated_by: "system",
+    };
+  });
+
+  if (!changed) return board;
+  return writeExcoBoard({
+    seats,
+    updated_at: nowIso(),
+    updated_by: "system",
+  });
+}
+
+export const getExcoBoard = cache(async (): Promise<ExcoBoard> => {
+  return cachedLoad("exco", async () => {
+    const board = await readExcoBoardRaw();
+    return ensureExcoMemberLinks(board);
+  });
+});
+
+/**
+ * Assign (or clear) an EXCO office. One member may hold only one office;
+ * assigning someone who already holds another office moves them.
+ */
+export async function assignExcoOffice(input: {
+  office: ExcoOffice;
+  member_id: number | null;
+  holder_name?: string | null;
+  updated_by: string;
+}): Promise<ExcoBoard> {
+  const board = await getExcoBoard();
+  const memberId = input.member_id;
+  if (memberId != null) {
+    const member = await getMemberById(memberId);
+    if (!member) throw new Error("Member not found.");
+  }
+
+  const updated_at = nowIso();
+  const updated_by = input.updated_by.trim().toLowerCase() || null;
+  const holderOverride = input.holder_name?.trim() || null;
+
+  const seats = board.seats.map((seat) => {
+    // Clear this member from any other office first.
+    if (
+      memberId != null &&
+      seat.member_id === memberId &&
+      seat.office !== input.office
+    ) {
+      return {
+        ...seat,
+        member_id: null,
+        updated_at,
+        updated_by,
+      };
+    }
+    if (seat.office !== input.office) return seat;
+    return {
+      ...seat,
+      member_id: memberId,
+      holder_name: holderOverride || seat.holder_name,
+      updated_at,
+      updated_by,
+    };
+  });
+
+  return writeExcoBoard({ seats, updated_at, updated_by });
 }
 
 export const listAllExpenses = cache(async (): Promise<ExpenseRow[]> => {

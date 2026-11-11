@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { ProfilePasswordReset } from "@/components/profile-password-reset";
 import { requireAccess } from "@/lib/auth";
 import { firebaseClientConfig } from "@/lib/config";
+import { getExcoSeatForEmail } from "@/lib/exco";
 import { getMemberByLoginEmail } from "@/lib/store";
 
 export const instant = false;
@@ -11,7 +12,10 @@ export const instant = false;
 export default async function ProfilePage() {
   await connection();
   const viewer = await requireAccess();
-  const member = await getMemberByLoginEmail(viewer.email);
+  const [member, exco] = await Promise.all([
+    getMemberByLoginEmail(viewer.email),
+    getExcoSeatForEmail(viewer.email),
+  ]);
   const config = firebaseClientConfig();
 
   return (
@@ -39,9 +43,16 @@ export default async function ProfilePage() {
               <dd>{viewer.email}</dd>
             </div>
             <div>
-              <dt>Role</dt>
+              <dt>EXCO</dt>
+              <dd>{exco ? exco.label : "—"}</dd>
+            </div>
+            <div>
+              <dt>Access</dt>
               <dd style={{ textTransform: "capitalize" }}>
                 {viewer.access?.role ?? "member"}
+                {exco && !exco.grants_admin
+                  ? " (EXCO without admin rights)"
+                  : ""}
               </dd>
             </div>
           </dl>

@@ -246,6 +246,8 @@ a.viewer-name.is-active {
   border-radius: 18px;
   padding: 1.25rem;
   box-shadow: var(--shadow);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .panel + .panel {
@@ -292,6 +294,8 @@ table.data td {
   padding: 0.75rem 0.55rem;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+  max-width: 18rem;
+  overflow-wrap: anywhere;
 }
 
 table.data th {
@@ -470,13 +474,16 @@ table.dues-grid td.dues-month-tip:focus-visible::before {
 .exco-grid {
   display: grid;
   gap: 0.85rem;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+  width: 100%;
+  min-width: 0;
 }
 
 .exco-seat {
   display: grid;
   gap: 0.25rem;
   align-content: start;
+  justify-items: start;
   padding: 0.85rem 0.95rem;
   border: 1px solid var(--line);
   border-radius: 0.75rem;
@@ -485,6 +492,8 @@ table.dues-grid td.dues-month-tip:focus-visible::before {
     rgba(255, 255, 255, 0.55),
     rgba(31, 122, 108, 0.06)
   );
+  min-width: 0;
+  overflow: hidden;
 }
 
 .exco-seat-office {
@@ -498,12 +507,22 @@ table.dues-grid td.dues-month-tip:focus-visible::before {
   font-weight: 700;
   color: var(--ink);
   line-height: 1.3;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.exco-seat .badge {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .exco-assign-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  width: 100%;
+  min-width: 0;
 }
 
 .exco-assign-card {
@@ -513,13 +532,56 @@ table.dues-grid td.dues-month-tip:focus-visible::before {
   border: 1px solid var(--line);
   border-radius: 0.75rem;
   background: rgba(255, 255, 255, 0.5);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.exco-assign-card .field,
+.exco-assign-card select,
+.exco-assign-card button {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.exco-assign-card select {
+  width: 100%;
 }
 
 .exco-assign-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.exco-assign-head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.exco-assign-card .muted {
+  overflow-wrap: anywhere;
+}
+
+.member-exco-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.member-exco-cell .badge,
+.exco-assign-head .badge,
+table.data td .badge {
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .badge-pending {

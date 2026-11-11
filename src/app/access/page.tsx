@@ -266,31 +266,34 @@ export default async function AccessPage({
                     return (
                       <tr key={m.id}>
                         <td>
-                          {m.name}
-                          {seat ? (
-                            <span
-                              className={
-                                seat.grants_admin
-                                  ? "badge badge-admin"
-                                  : "badge badge-exco"
-                              }
-                              style={{ marginLeft: "0.4rem" }}
-                            >
-                              {seat.label}
-                            </span>
-                          ) : null}
+                          <div className="member-exco-cell">
+                            <span>{m.name}</span>
+                            {seat ? (
+                              <span
+                                className={
+                                  seat.grants_admin
+                                    ? "badge badge-admin"
+                                    : "badge badge-exco"
+                                }
+                              >
+                                {seat.label}
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
                         <td>{email || "—"}</td>
                         <td>
-                          {locked ? (
-                            <span className="badge badge-admin">
-                              primary admin
-                            </span>
-                          ) : role === "admin" ? (
-                            <span className="badge badge-admin">admin</span>
-                          ) : (
-                            <span className="badge badge-member">member</span>
-                          )}
+                          <div className="member-exco-cell">
+                            {locked ? (
+                              <span className="badge badge-admin">
+                                primary admin
+                              </span>
+                            ) : role === "admin" ? (
+                              <span className="badge badge-admin">admin</span>
+                            ) : (
+                              <span className="badge badge-member">member</span>
+                            )}
+                          </div>
                         </td>
                         <td>{m.phone || "—"}</td>
                         <td>

@@ -815,6 +815,10 @@ textarea {
   margin-top: 0.35rem;
 }
 
+.contrib-board-switch {
+  max-width: 28rem;
+}
+
 .archive-boards {
   display: grid;
   gap: 0.65rem;

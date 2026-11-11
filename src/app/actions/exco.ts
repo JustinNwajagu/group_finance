@@ -18,6 +18,7 @@ export async function assignExcoOfficeAction(
   }
 
   let member_id: number | null = null;
+  let holder_name: string | null = null;
   if (memberRaw && memberRaw !== "none") {
     const id = Number(memberRaw);
     if (!Number.isFinite(id) || id <= 0) {
@@ -28,12 +29,14 @@ export async function assignExcoOfficeAction(
       redirect("/access?error=" + encodeURIComponent("Member not found."));
     }
     member_id = id;
+    holder_name = member.name;
   }
 
   try {
     await assignExcoOffice({
       office: officeRaw,
       member_id,
+      holder_name,
       updated_by: viewer.email,
     });
   } catch (err) {

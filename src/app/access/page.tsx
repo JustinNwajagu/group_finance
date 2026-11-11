@@ -123,9 +123,6 @@ export default async function AccessPage({
                     <span className="badge badge-exco">exco</span>
                   )}
                 </div>
-                <p className="muted" style={{ margin: 0 }}>
-                  Slate: {seat.holder_name}
-                </p>
                 <label className="field">
                   Member
                   <select

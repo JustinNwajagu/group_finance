@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { bulkImportContributions } from "@/app/actions/bulk-import";
 import { createPaymentRequest } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
-import { ContributionBoard } from "@/components/contribution-board";
+import { CurrentContributions } from "@/components/current-contributions";
 import { Flash } from "@/components/flash";
 import { PageFallback } from "@/components/page-fallback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
@@ -34,20 +34,7 @@ async function PaymentsBody({
       <div className="dash-main">
         <section className="panel">
           <h2>Current contributions</h2>
-          {boards.length === 0 ? (
-            <div className="hero-empty">No open contribution requests.</div>
-          ) : (
-            <div className="contrib-boards">
-              {boards.map((board) => (
-                <ContributionBoard
-                  key={board.request.id}
-                  board={board}
-                  isAdmin={admin}
-                  returnTo="/payments"
-                />
-              ))}
-            </div>
-          )}
+          <CurrentContributions boards={boards} isAdmin={admin} />
         </section>
       </div>
 

@@ -35,6 +35,8 @@ export default async function AccessPage({
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const error = typeof params.error === "string" ? params.error : undefined;
   const link = typeof params.link === "string" ? params.link : undefined;
+  const createdName =
+    typeof params.name === "string" ? params.name.trim() : "";
   await ensurePrimaryAdminRole();
   const [pending, unlinkable, withLogin, capacity, allMembers, excoSeats] =
     await Promise.all([
@@ -80,7 +82,10 @@ export default async function AccessPage({
         error={error}
         messages={{
           approved:
-            "Request approved. Share the password link with the member.",
+            "Request approved and linked to an existing member.",
+          member_created: createdName
+            ? `New member “${createdName}” created on the roster and login approved.`
+            : "New member created on the roster and login approved.",
           rejected: "Request rejected.",
           login_deleted: "Login removed. The member stays on the roster.",
           reset_sent: "Password reset link ready to share.",

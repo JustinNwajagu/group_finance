@@ -233,13 +233,18 @@ export async function approveAccessRequest(
 
     revalidatePath("/access");
     revalidatePath("/");
-    if (result.passwordResetLink) {
-      redirect(
-        "/access?ok=approved&link=" +
-          encodeURIComponent(result.passwordResetLink),
-      );
+    revalidatePath("/members");
+    const q = new URLSearchParams();
+    if (mode === "create") {
+      q.set("ok", "member_created");
+      q.set("name", result.member.name);
+    } else {
+      q.set("ok", "approved");
     }
-    redirect("/access?ok=approved");
+    if (result.passwordResetLink) {
+      q.set("link", result.passwordResetLink);
+    }
+    redirect(`/access?${q.toString()}`);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Could not approve this request.";

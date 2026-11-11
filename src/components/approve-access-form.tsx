@@ -85,9 +85,21 @@ export function ApproveAccessForm({
           ))}
         </select>
       </label>
+      {mode === "create" ? (
+        <p className="muted" style={{ margin: 0 }}>
+          Approving will add this person to the roster as a new member and
+          create their login.
+        </p>
+      ) : null}
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
         <PendingSubmitButton
-          idleLabel="Approve & create login"
+          idleLabel={
+            mode === "create"
+              ? "Approve & create member"
+              : mode === "link"
+                ? "Approve & link login"
+                : "Approve"
+          }
           pendingLabel="Approving…"
         />
       </div>

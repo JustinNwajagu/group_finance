@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
+import { deleteMemberAction } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmActionForm } from "@/components/confirm-action-form";
+import { Flash } from "@/components/flash";
 import { PaymentGroups } from "@/components/payment-groups";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
   getMember,
@@ -13,6 +17,7 @@ import {
 import { memberDuesSummary } from "@/lib/dues-data";
 import { getExcoSeatForMember } from "@/lib/exco";
 import { listMemberExpenseReceipts } from "@/lib/expenses-data";
+import { countPaymentsForMember } from "@/lib/store";
 import {
   DUES_MONTH_LABELS,
   formatCoveredMonths,
@@ -29,6 +34,7 @@ export const instant = false;
 
 export default async function MemberDetailPage({
   params,
+  searchParams,
 }: PageProps<"/members/[id]">) {
   await connection();
   const viewer = await requireAccess();
@@ -36,11 +42,14 @@ export default async function MemberDetailPage({
   const { id: raw } = await params;
   const id = Number(raw);
   if (!Number.isFinite(id)) notFound();
+  const paramsQuery = await searchParams;
+  const error =
+    typeof paramsQuery.error === "string" ? paramsQuery.error : undefined;
 
   const member = await getMember(id);
   if (!member) notFound();
 
-  const [payments, paidTotal, stats, dues, expenseReceipts, exco] =
+  const [payments, paidTotal, stats, dues, expenseReceipts, exco, paymentCounts] =
     await Promise.all([
       listPaymentsForMember(id),
       memberContribution(id),
@@ -48,7 +57,13 @@ export default async function MemberDetailPage({
       memberDuesSummary(id),
       listMemberExpenseReceipts(id),
       getExcoSeatForMember(id),
+      countPaymentsForMember(id),
     ]);
+  const canDeleteMember =
+    admin &&
+    paymentCounts.total === 0 &&
+    !exco &&
+    expenseReceipts.length === 0;
   const expensesReceived = expenseReceipts
     .filter((row) => row.expense.certified)
     .reduce((sum, row) => sum + Number(row.amount), 0)
@@ -140,6 +155,8 @@ export default async function MemberDetailPage({
           </div>
         </div>
       </div>
+
+      <Flash ok={undefined} error={error} messages={{}} />
 
       <div className="stack">
         <section className="panel">
@@ -322,6 +339,50 @@ export default async function MemberDetailPage({
             </div>
           )}
         </section>
+
+        {admin ? (
+          <section className="panel">
+            <h2>Remove member</h2>
+            {paymentCounts.total > 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {member.name} has {paymentCounts.contributions} contribution
+                payment{paymentCounts.contributions === 1 ? "" : "s"}
+                {paymentCounts.dues > 0
+                  ? ` and ${paymentCounts.dues} dues payment${paymentCounts.dues === 1 ? "" : "s"}`
+                  : ""}
+                , so they cannot be deleted from the roster.
+              </p>
+            ) : expenseReceipts.length > 0 ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {member.name} is named on an expense payout, so they cannot be
+                deleted from the roster.
+              </p>
+            ) : exco ? (
+              <p className="muted" style={{ margin: 0 }}>
+                {member.name} holds the {exco.label} office. Reassign that EXCO
+                seat on Access before deleting this member.
+              </p>
+            ) : canDeleteMember ? (
+              <>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  Permanently remove this roster member. Only allowed when they
+                  have no contribution or dues payments.
+                </p>
+                <ConfirmActionForm
+                  action={deleteMemberAction}
+                  message={`Permanently delete ${member.name} from the roster? This cannot be undone.`}
+                >
+                  <input type="hidden" name="member_id" value={member.id} />
+                  <PendingSubmitButton
+                    className="btn-ghost"
+                    idleLabel="Delete member"
+                    pendingLabel="Deleting…"
+                  />
+                </ConfirmActionForm>
+              </>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </AppShell>
   );

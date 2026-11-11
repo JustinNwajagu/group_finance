@@ -407,6 +407,19 @@ export async function updateMemberRow(
   invalidateStoreCache();
 }
 
+export async function deleteMemberRow(id: number): Promise<void> {
+  if (!Number.isFinite(id) || id <= 0) return;
+  if (isFirestore()) {
+    await adminDb()!.collection("members").doc(String(id)).delete();
+    invalidateStoreCache();
+    return;
+  }
+  const db = await loadLocal();
+  db.members = db.members.filter((m) => m.id !== id);
+  await saveLocal(db);
+  invalidateStoreCache();
+}
+
 /** Roster members that do not yet have a linked login. */
 export async function listMembersWithoutLogin(): Promise<MemberRow[]> {
   return (await listAllMembers()).filter((m) => !m.auth_uid);
@@ -997,6 +1010,25 @@ export async function listDuesPaymentsForMember(
   memberId: number,
 ): Promise<DuesPaymentRow[]> {
   return (await listAllDuesPayments()).filter((p) => p.member_id === memberId);
+}
+
+/** Contribution + dues payment rows tied to a roster member. */
+export async function countPaymentsForMember(memberId: number): Promise<{
+  contributions: number;
+  dues: number;
+  total: number;
+}> {
+  const [payments, dues] = await Promise.all([
+    listAllPaymentRows(),
+    listAllDuesPayments(),
+  ]);
+  const contributions = payments.filter((p) => p.member_id === memberId).length;
+  const duesCount = dues.filter((p) => p.member_id === memberId).length;
+  return {
+    contributions,
+    dues: duesCount,
+    total: contributions + duesCount,
+  };
 }
 
 export async function getDuesPaymentById(

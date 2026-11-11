@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ContributionBoard } from "@/components/contribution-board";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { ContributionLists } from "@/lib/types";
 
 export function CurrentContributions({
@@ -20,42 +21,67 @@ export function CurrentContributions({
       }),
     [boards],
   );
-  const [selectedId, setSelectedId] = useState(
-    () => String(sorted[0]?.request.id ?? ""),
+  const [openId, setOpenId] = useState<number | null>(
+    () => sorted[0]?.request.id ?? null,
   );
 
   if (sorted.length === 0) {
     return <div className="hero-empty">No open contribution requests.</div>;
   }
 
-  const selected =
-    sorted.find((board) => String(board.request.id) === selectedId) ??
-    sorted[0];
-
   return (
-    <div className="contrib-boards">
-      {sorted.length > 1 ? (
-        <label className="field contrib-board-switch">
-          Open contribution
-          <select
-            value={String(selected.request.id)}
-            onChange={(e) => setSelectedId(e.target.value)}
-            aria-label="Select open contribution"
+    <div className="archive-boards">
+      {sorted.map((board) => {
+        const { request, pledge_total, realised_total } = board;
+        const open = openId === request.id;
+        const panelId = `current-board-${request.id}`;
+        return (
+          <div
+            key={request.id}
+            className={`archive-item${open ? " is-open" : ""}`}
           >
-            {sorted.map((board) => (
-              <option key={board.request.id} value={board.request.id}>
-                {board.request.title}
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
-      <ContributionBoard
-        key={selected.request.id}
-        board={selected}
-        isAdmin={isAdmin}
-        returnTo="/payments"
-      />
+            <button
+              type="button"
+              className="archive-item-toggle"
+              aria-expanded={open}
+              aria-controls={panelId}
+              onClick={() =>
+                setOpenId((current) =>
+                  current === request.id ? null : request.id,
+                )
+              }
+            >
+              <span className="archive-item-main">
+                <span className="archive-item-title">{request.title}</span>
+                <span className="archive-item-meta muted">
+                  Expected {formatMoney(request.amount)}
+                  {" · "}
+                  Deadline {formatDate(request.deadline)}
+                  {" · Open"}
+                  {" · "}
+                  Realised {formatMoney(realised_total)}
+                  {Number(pledge_total) > 0
+                    ? ` · Pledges ${formatMoney(pledge_total)}`
+                    : ""}
+                </span>
+              </span>
+              <span className="archive-item-chevron" aria-hidden="true">
+                {open ? "▾" : "▸"}
+              </span>
+            </button>
+            {open ? (
+              <div id={panelId} className="archive-item-body">
+                <ContributionBoard
+                  board={board}
+                  isAdmin={isAdmin}
+                  returnTo="/payments"
+                  hideHeader
+                />
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
     </div>
   );
 }

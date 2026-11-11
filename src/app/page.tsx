@@ -209,6 +209,7 @@ export default async function HomePage({
         error={error}
         messages={{
           member: "Member added.",
+          member_deleted: "Member removed from the roster.",
         }}
       />
 

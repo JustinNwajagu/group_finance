@@ -5,6 +5,7 @@ import {
   REGULATIONS_INTRO,
   REGULATIONS_TITLE,
   REGULATION_SECTIONS,
+  REGULATION_SIGNATORIES,
 } from "@/lib/regulations";
 
 export const instant = false;
@@ -33,6 +34,15 @@ export default async function RegulationsPage() {
             </ul>
           </section>
         ))}
+
+        <footer className="panel regulations-signatories">
+          {REGULATION_SIGNATORIES.map((signatory) => (
+            <div key={signatory.role} className="signatory">
+              <span className="signatory-name">{signatory.name}</span>
+              <span className="signatory-role">{signatory.role}</span>
+            </div>
+          ))}
+        </footer>
       </div>
     </AppShell>
   );

@@ -59,3 +59,8 @@ export const REGULATION_SECTIONS: RegulationSection[] = [
     ],
   },
 ];
+
+export const REGULATION_SIGNATORIES = [
+  { role: "President", name: "Udeoba Donald" },
+  { role: "Secretary", name: "Udeh Stephen" },
+] as const;

@@ -8,6 +8,11 @@ import { isFirestore } from "./config";
 import { normalizePaymentTitle } from "./format";
 import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
 import { compareMembersByName } from "./member-sort";
+import {
+  defaultRegulationsDoc,
+  normalizeRegulationsDoc,
+  type RegulationsDoc,
+} from "./regulations";
 import type {
   BankAccountDetails,
   ExcoBoard,
@@ -171,6 +176,7 @@ type LocalDb = {
   expenses: ExpenseRow[];
   bank_account: BankAccountDetails;
   exco: ExcoBoard;
+  regulations: RegulationsDoc;
 };
 
 type GlobalStore = typeof globalThis & {
@@ -200,6 +206,7 @@ function emptyLocal(): LocalDb {
       updated_at: null,
       updated_by: null,
     },
+    regulations: defaultRegulationsDoc(),
   };
 }
 
@@ -275,6 +282,7 @@ function normalizeLocal(db: LocalDb): LocalDb {
     ? { ...DEFAULT_BANK, ...existingBank }
     : { ...DEFAULT_BANK };
   db.exco = normalizeExcoBoard(db.exco);
+  db.regulations = normalizeRegulationsDoc(db.regulations);
   return db;
 }
 
@@ -1394,6 +1402,47 @@ export async function assignExcoOffice(input: {
   });
 
   return writeExcoBoard({ seats, updated_at, updated_by });
+}
+
+export const getRegulations = cache(async (): Promise<RegulationsDoc> => {
+  return cachedLoad("regulations", async () => {
+    if (isFirestore()) {
+      const snap = await adminDb()!.collection("settings").doc("regulations").get();
+      if (!snap.exists) return defaultRegulationsDoc();
+      return normalizeRegulationsDoc(snap.data() as Record<string, unknown>);
+    }
+    const db = await loadLocal();
+    return normalizeRegulationsDoc(db.regulations);
+  });
+});
+
+export async function saveRegulations(input: {
+  title: string;
+  intro: string;
+  sections: RegulationsDoc["sections"];
+  signatories: RegulationsDoc["signatories"];
+  updated_by: string;
+}): Promise<RegulationsDoc> {
+  const doc = normalizeRegulationsDoc({
+    title: input.title,
+    intro: input.intro,
+    sections: input.sections,
+    signatories: input.signatories,
+    updated_at: nowIso(),
+    updated_by: input.updated_by.trim().toLowerCase() || null,
+  });
+  if (isFirestore()) {
+    await adminDb()!
+      .collection("settings")
+      .doc("regulations")
+      .set(doc, { merge: true });
+  } else {
+    const db = await loadLocal();
+    db.regulations = doc;
+    await saveLocal(db);
+  }
+  invalidateStoreCache();
+  return doc;
 }
 
 export const listAllExpenses = cache(async (): Promise<ExpenseRow[]> => {

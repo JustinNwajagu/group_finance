@@ -1735,6 +1735,22 @@ form[aria-busy="true"] button:not([type="submit"]) {
   max-width: 46rem;
 }
 
+.regulations-edit-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.regulations-edit-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .signatory {
   display: grid;
   gap: 0.2rem;

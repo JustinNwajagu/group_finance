@@ -124,6 +124,9 @@ export type DuesSchedule = {
   year: number;
   title: string;
   monthly_amount: string;
+  /** Last day members are expected to pay for this year. */
+  deadline: string;
+  concluded_at: string | null;
   created_at: string;
 };
 

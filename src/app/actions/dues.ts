@@ -25,21 +25,30 @@ import {
   listAllDuesSchedules,
   listDuesPaymentsForMember,
   listDuesPaymentsForSchedule,
+  updateDuesScheduleRow,
 } from "@/lib/store";
 
-function failDues(msg: string, year?: number): never {
+function failDues(msg: string, year?: number, returnTo = "/dues"): never {
   const q = new URLSearchParams({ error: msg });
   if (year) q.set("year", String(year));
-  redirect(`/dues?${q.toString()}`);
+  const base = returnTo.startsWith("/") ? returnTo.split("?")[0] : "/dues";
+  redirect(`${base}?${q.toString()}`);
 }
 
-function okDues(ok: string, year: number): never {
-  redirect(`/dues?year=${year}&ok=${ok}`);
+function okDues(
+  ok: string,
+  year: number,
+  returnTo = "/dues",
+): never {
+  const base = returnTo.startsWith("/") ? returnTo.split("?")[0] : "/dues";
+  const q = new URLSearchParams({ year: String(year), ok });
+  redirect(`${base}?${q.toString()}`);
 }
 
 function revalidateDues(...extra: string[]) {
   revalidatePath("/");
   revalidatePath("/dues");
+  revalidatePath("/archive");
   revalidatePath("/members");
   for (const path of extra) revalidatePath(path);
 }
@@ -49,6 +58,7 @@ export async function createDuesYear(formData: FormData): Promise<void> {
 
   const year = Number(formData.get("year"));
   const amountRaw = String(formData.get("monthly_amount") ?? "").trim();
+  const deadline = String(formData.get("deadline") ?? "").trim();
   const monthly = Number(amountRaw);
 
   if (!Number.isFinite(year) || year < 2000 || year > 2100) {
@@ -57,25 +67,71 @@ export async function createDuesYear(formData: FormData): Promise<void> {
   if (!Number.isFinite(monthly) || monthly <= 0) {
     failDues("Enter a valid monthly dues amount.", year);
   }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+    failDues("Choose a payment deadline.", year);
+  }
 
   const existing = await getDuesScheduleByYear(year);
   if (existing) {
     failDues(`Dues for ${year} already exist.`, year);
   }
 
+  const today = todayIsoDate();
+  const archived = deadline < today;
   await createDuesSchedule({
     year,
     monthly_amount: monthly,
     title: `${year} Dues`,
+    deadline,
+    concluded_at: archived ? `${deadline}T12:00:00.000Z` : null,
   });
   revalidateDues();
+  if (archived) {
+    redirect(`/archive?ok=year_archived&year=${year}`);
+  }
   okDues("year", year);
+}
+
+export async function concludeDuesYear(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const concludedDate = String(formData.get("concluded_date") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/archive");
+
+  if (!Number.isFinite(id) || id <= 0) failDues("Invalid dues year.");
+  const schedule = await getDuesScheduleById(id);
+  if (!schedule) failDues("Dues year not found.");
+
+  const when = /^\d{4}-\d{2}-\d{2}$/.test(concludedDate)
+    ? `${concludedDate}T12:00:00.000Z`
+    : new Date().toISOString();
+
+  await updateDuesScheduleRow(id, { concluded_at: when });
+  revalidateDues();
+  const dest = returnTo.startsWith("/archive") ? returnTo : "/archive";
+  redirect(
+    `${dest.split("?")[0]}?ok=dues_concluded&year=${schedule.year}`,
+  );
+}
+
+export async function reopenDuesYear(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id) || id <= 0) failDues("Invalid dues year.");
+
+  const schedule = await getDuesScheduleById(id);
+  if (!schedule) failDues("Dues year not found.");
+
+  await updateDuesScheduleRow(id, { concluded_at: null });
+  revalidateDues();
+  redirect(`/dues?year=${schedule.year}&ok=dues_reopened`);
 }
 
 async function ensureScheduleForYear(
   year: number,
   monthly: number,
   titleHint: string,
+  deadlineHint?: string,
 ) {
   const existing = await getDuesScheduleByYear(year);
   if (!existing) {
@@ -83,6 +139,7 @@ async function ensureScheduleForYear(
       year,
       monthly_amount: monthly,
       title: titleHint || `${year} Dues`,
+      deadline: deadlineHint || `${year}-12-31`,
     });
   }
   if (Math.abs(Number(existing.monthly_amount) - monthly) > 0.009) {
@@ -104,23 +161,28 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const yearFromRaw = String(formData.get("year_from") ?? "").trim();
   const yearToRaw = String(formData.get("year_to") ?? "").trim();
+  const returnToRaw = String(formData.get("return_to") ?? "").trim();
   const amount = Number(amountRaw);
+  const returnTo =
+    returnToRaw.startsWith("/archive") || returnToRaw.startsWith("/dues")
+      ? returnToRaw.split("?")[0]
+      : "/dues";
 
   if (!Number.isFinite(scheduleId) || scheduleId <= 0) {
-    failDues("Choose a dues year.");
+    failDues("Choose a dues year.", undefined, returnTo);
   }
   if (!Number.isFinite(memberId) || memberId <= 0) {
-    failDues("Choose a member.");
+    failDues("Choose a member.", undefined, returnTo);
   }
   if (!Number.isFinite(amount) || amount <= 0) {
-    failDues("Enter a valid amount paid.");
+    failDues("Enter a valid amount paid.", undefined, returnTo);
   }
 
   const schedule = await getDuesScheduleById(scheduleId);
-  if (!schedule) failDues("Dues year not found.");
+  if (!schedule) failDues("Dues year not found.", undefined, returnTo);
 
   const member = await getMemberById(memberId);
-  if (!member) failDues("Member not found.", schedule.year);
+  if (!member) failDues("Member not found.", schedule.year, returnTo);
 
   const monthly = Number(schedule.monthly_amount);
   const months = monthsFromAmount(amount, monthly);
@@ -128,12 +190,13 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     failDues(
       `Amount must be a whole multiple of the monthly due (${schedule.monthly_amount}).`,
       schedule.year,
+      returnTo,
     );
   }
 
   const today = todayIsoDate();
   if (paymentDateRaw && !isPaymentDateAllowed(paymentDateRaw, today)) {
-    failDues("Payment date cannot be in the future.", schedule.year);
+    failDues("Payment date cannot be in the future.", schedule.year, returnTo);
   }
   const payment_date = /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
     ? paymentDateRaw
@@ -154,6 +217,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
         ? "This payment covers more than 12 months. Select a year range to split the breakdown."
         : `${member.name} only has ${remainingCurrent} unpaid month${remainingCurrent === 1 ? "" : "s"} left in ${schedule.year}. Select a year range to apply the rest to other years.`,
       schedule.year,
+      returnTo,
     );
   }
 
@@ -164,6 +228,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
       failDues(
         `${member.name} only has ${remainingCurrent} unpaid month${remainingCurrent === 1 ? "" : "s"} left in ${schedule.year}.`,
         schedule.year,
+        returnTo,
       );
     }
     await createDuesPayment({
@@ -175,7 +240,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
       notes,
     });
     revalidateDues(`/members/${memberId}`);
-    okDues("recorded", schedule.year);
+    okDues("recorded", schedule.year, returnTo);
   }
 
   const yearFrom = Number(yearFromRaw || schedule.year);
@@ -188,7 +253,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     yearFrom > 2100 ||
     yearTo > 2100
   ) {
-    failDues("Enter a valid year range (2000–2100).", schedule.year);
+    failDues("Enter a valid year range (2000–2100).", schedule.year, returnTo);
   }
 
   const start = Math.min(yearFrom, yearTo);
@@ -198,6 +263,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     failDues(
       `${months} months need at least ${Math.ceil(months / 12)} year(s). Widen the year range.`,
       schedule.year,
+      returnTo,
     );
   }
 
@@ -208,6 +274,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
       year,
       monthly,
       year === schedule.year ? schedule.title : `${year} Dues`,
+      schedule.deadline,
     );
     schedulesByYear.set(year, row);
   }
@@ -236,13 +303,18 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     failDues(
       `Not enough unpaid months for ${member.name} across ${start}–${end}. Open more years or reduce the amount.`,
       schedule.year,
+      returnTo,
     );
   }
 
   for (const allocation of allocations) {
     const scheduleForYear = schedulesByYear.get(allocation.year);
     if (!scheduleForYear) {
-      failDues(`Dues year ${allocation.year} is missing.`, schedule.year);
+      failDues(
+        `Dues year ${allocation.year} is missing.`,
+        schedule.year,
+        returnTo,
+      );
     }
     const sliceAmount = allocation.covered_months.length * monthly;
     await createDuesPayment({
@@ -256,21 +328,32 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
   }
 
   revalidateDues(`/members/${memberId}`);
-  okDues("recorded", schedule.year);
+  okDues("recorded", schedule.year, returnTo);
 }
 
 export async function removeDuesPayment(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
-  if (!Number.isFinite(id) || id <= 0) failDues("Invalid dues payment.");
+  const returnToRaw = String(formData.get("return_to") ?? "").trim();
+  const returnTo =
+    returnToRaw.startsWith("/archive") || returnToRaw.startsWith("/dues")
+      ? returnToRaw.split("?")[0]
+      : "/dues";
+  if (!Number.isFinite(id) || id <= 0) {
+    failDues("Invalid dues payment.", undefined, returnTo);
+  }
 
   const payment = await getDuesPaymentById(id);
-  if (!payment) failDues("Dues payment not found.");
+  if (!payment) failDues("Dues payment not found.", undefined, returnTo);
 
   const schedule = await getDuesScheduleById(payment.dues_schedule_id);
   await deleteDuesPayment(id);
   revalidateDues(`/members/${payment.member_id}`);
-  okDues("cleared", schedule?.year ?? new Date().getFullYear());
+  okDues(
+    "cleared",
+    schedule?.year ?? new Date().getFullYear(),
+    returnTo,
+  );
 }
 
 export async function deleteDuesYear(formData: FormData): Promise<void> {

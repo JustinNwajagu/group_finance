@@ -240,6 +240,13 @@ a.viewer-name.is-active {
   max-width: 38rem;
 }
 
+.page-head-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
 .panel {
   background: rgba(255, 255, 255, 0.66);
   border: 1px solid var(--line);

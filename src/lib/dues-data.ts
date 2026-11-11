@@ -59,6 +59,16 @@ export async function listDuesSchedules(): Promise<DuesScheduleRow[]> {
   return listAllDuesSchedules();
 }
 
+export async function listOpenDuesSchedules(): Promise<DuesScheduleRow[]> {
+  const all = await listAllDuesSchedules();
+  return all.filter((s) => !s.concluded_at);
+}
+
+export async function listConcludedDuesSchedules(): Promise<DuesScheduleRow[]> {
+  const all = await listAllDuesSchedules();
+  return all.filter((s) => Boolean(s.concluded_at));
+}
+
 export async function getDuesBoard(
   scheduleIdOrYear: number,
   byYear = false,

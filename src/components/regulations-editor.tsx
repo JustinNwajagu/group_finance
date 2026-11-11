@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { saveRegulationsAction } from "@/app/actions/regulations";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type {
@@ -11,6 +11,7 @@ import type {
 
 type EditableSection = RegulationSection;
 type EditableSignatory = RegulationSignatory;
+type EditorMode = "edit" | "add" | "details";
 
 export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
   const [title, setTitle] = useState(doc.title);
@@ -21,6 +22,20 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
   const [signatories, setSignatories] = useState<EditableSignatory[]>(
     doc.signatories.map((s) => ({ ...s })),
   );
+  const [mode, setMode] = useState<EditorMode>("edit");
+  const [selectedId, setSelectedId] = useState(doc.sections[0]?.id ?? "");
+  const [draftNew, setDraftNew] = useState<EditableSection>({
+    id: `new-${Date.now()}`,
+    title: "",
+    items: [""],
+  });
+
+  const selectedIndex = useMemo(
+    () => sections.findIndex((s) => s.id === selectedId),
+    [sections, selectedId],
+  );
+  const selected =
+    selectedIndex >= 0 ? sections[selectedIndex] : sections[0] ?? null;
 
   function updateSection(index: number, patch: Partial<EditableSection>) {
     setSections((prev) =>
@@ -34,131 +49,237 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
     );
   }
 
+  function removeSelectedRule() {
+    if (sections.length <= 1 || selectedIndex < 0) return;
+    const next = sections.filter((_, i) => i !== selectedIndex);
+    setSections(next);
+    setSelectedId(next[Math.max(0, selectedIndex - 1)]?.id ?? "");
+  }
+
+  const submitSections =
+    mode === "add" ? [...sections, draftNew] : sections;
+
   return (
     <section className="panel">
       <h2>Edit regulations</h2>
       <p className="muted" style={{ marginTop: 0 }}>
-        Admins can revise existing rules or add new ones. Members see the saved
-        text on this page.
+        Choose a rule to revise or delete, add a new rule, or update the page
+        title, intro, and signatories.
       </p>
       <form action={saveRegulationsAction} className="form-grid">
-        <input type="hidden" name="section_count" value={sections.length} />
+        <input type="hidden" name="section_count" value={submitSections.length} />
         <input type="hidden" name="signatory_count" value={signatories.length} />
 
+        {/* Always post title/intro/signatories so partial edits don't wipe them. */}
+        <input type="hidden" name="title" value={title} />
+        <input type="hidden" name="intro" value={intro} />
+        {signatories.map((row, index) => (
+          <div key={`hidden-signatory-${index}`}>
+            <input
+              type="hidden"
+              name={`signatory_role_${index}`}
+              value={row.role}
+            />
+            <input
+              type="hidden"
+              name={`signatory_name_${index}`}
+              value={row.name}
+            />
+          </div>
+        ))}
+
+        {/* Always post every section (edited + untouched) so saves stay complete. */}
+        {submitSections.map((section, index) => (
+          <div key={`hidden-section-${section.id || index}`}>
+            <input
+              type="hidden"
+              name={`section_id_${index}`}
+              value={section.id}
+            />
+            <input
+              type="hidden"
+              name={`section_title_${index}`}
+              value={section.title}
+            />
+            <input
+              type="hidden"
+              name={`section_items_${index}`}
+              value={section.items.join("\n")}
+            />
+          </div>
+        ))}
+
         <label className="field">
-          Title
-          <input
-            name="title"
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </label>
-        <label className="field">
-          Intro
-          <textarea
-            name="intro"
-            rows={3}
-            required
-            value={intro}
-            onChange={(e) => setIntro(e.target.value)}
-          />
+          What do you want to change?
+          <select
+            value={mode}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next === "edit" || next === "add" || next === "details") {
+                setMode(next);
+              }
+              if (next === "add") {
+                setDraftNew({
+                  id: `new-${Date.now()}`,
+                  title: "",
+                  items: [""],
+                });
+              }
+            }}
+          >
+            <option value="edit">Edit or delete an existing rule</option>
+            <option value="add">Add a new rule</option>
+            <option value="details">Edit title, intro, or signatories</option>
+          </select>
         </label>
 
-        <div className="stack" style={{ gap: "0.85rem" }}>
-          {sections.map((section, index) => (
-            <div key={section.id || `section-${index}`} className="regulations-edit-card">
-              <input type="hidden" name={`section_id_${index}`} value={section.id} />
-              <div className="regulations-edit-card-head">
-                <strong>Rule {index + 1}</strong>
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() =>
-                    setSections((prev) => prev.filter((_, i) => i !== index))
-                  }
-                  disabled={sections.length <= 1}
-                >
-                  Remove
-                </button>
+        {mode === "edit" ? (
+          <>
+            <label className="field">
+              Select rule
+              <select
+                value={selected?.id ?? ""}
+                onChange={(e) => setSelectedId(e.target.value)}
+              >
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {selected && selectedIndex >= 0 ? (
+              <div className="regulations-edit-card">
+                <div className="regulations-edit-card-head">
+                  <strong>Editing rule</strong>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={removeSelectedRule}
+                    disabled={sections.length <= 1}
+                  >
+                    Delete rule
+                  </button>
+                </div>
+                <label className="field">
+                  Section title
+                  <input
+                    required
+                    value={selected.title}
+                    onChange={(e) =>
+                      updateSection(selectedIndex, { title: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  Rules (one per line)
+                  <textarea
+                    rows={5}
+                    required
+                    value={selected.items.join("\n")}
+                    onChange={(e) =>
+                      updateSection(selectedIndex, {
+                        items: e.target.value.split(/\r?\n/),
+                      })
+                    }
+                  />
+                </label>
               </div>
-              <label className="field">
-                Section title
-                <input
-                  name={`section_title_${index}`}
-                  required
-                  value={section.title}
-                  onChange={(e) =>
-                    updateSection(index, { title: e.target.value })
-                  }
-                />
-              </label>
-              <label className="field">
-                Rules (one per line)
-                <textarea
-                  name={`section_items_${index}`}
-                  rows={4}
-                  required
-                  value={section.items.join("\n")}
-                  onChange={(e) =>
-                    updateSection(index, {
-                      items: e.target.value.split(/\r?\n/),
-                    })
-                  }
-                />
-              </label>
-            </div>
-          ))}
-        </div>
+            ) : null}
+          </>
+        ) : null}
 
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={() =>
-            setSections((prev) => [
-              ...prev,
-              {
-                id: `new-${Date.now()}`,
-                title: `${prev.length + 1}. New rule`,
-                items: [""],
-              },
-            ])
-          }
-        >
-          Add rule
-        </button>
-
-        <div className="stack" style={{ gap: "0.75rem" }}>
-          <h3 style={{ margin: 0 }}>Signatories</h3>
-          {signatories.map((row, index) => (
-            <div key={`${row.role}-${index}`} className="form-grid two">
-              <label className="field">
-                Role
-                <input
-                  name={`signatory_role_${index}`}
-                  required
-                  value={row.role}
-                  onChange={(e) =>
-                    updateSignatory(index, { role: e.target.value })
-                  }
-                />
-              </label>
-              <label className="field">
-                Name
-                <input
-                  name={`signatory_name_${index}`}
-                  required
-                  value={row.name}
-                  onChange={(e) =>
-                    updateSignatory(index, { name: e.target.value })
-                  }
-                />
-              </label>
+        {mode === "add" ? (
+          <div className="regulations-edit-card">
+            <div className="regulations-edit-card-head">
+              <strong>New rule</strong>
             </div>
-          ))}
-        </div>
+            <label className="field">
+              Section title
+              <input
+                required
+                value={draftNew.title}
+                onChange={(e) =>
+                  setDraftNew((prev) => ({ ...prev, title: e.target.value }))
+                }
+                placeholder={`${sections.length + 1}. New rule`}
+              />
+            </label>
+            <label className="field">
+              Rules (one per line)
+              <textarea
+                rows={5}
+                required
+                value={draftNew.items.join("\n")}
+                onChange={(e) =>
+                  setDraftNew((prev) => ({
+                    ...prev,
+                    items: e.target.value.split(/\r?\n/),
+                  }))
+                }
+              />
+            </label>
+          </div>
+        ) : null}
+
+        {mode === "details" ? (
+          <>
+            <label className="field">
+              Title
+              <input
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </label>
+            <label className="field">
+              Intro
+              <textarea
+                rows={3}
+                required
+                value={intro}
+                onChange={(e) => setIntro(e.target.value)}
+              />
+            </label>
+            <div className="stack" style={{ gap: "0.75rem" }}>
+              <h3 style={{ margin: 0 }}>Signatories</h3>
+              {signatories.map((row, index) => (
+                <div key={`${row.role}-${index}`} className="form-grid two">
+                  <label className="field">
+                    Role
+                    <input
+                      required
+                      value={row.role}
+                      onChange={(e) =>
+                        updateSignatory(index, { role: e.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="field">
+                    Name
+                    <input
+                      required
+                      value={row.name}
+                      onChange={(e) =>
+                        updateSignatory(index, { name: e.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
         <PendingSubmitButton
-          idleLabel="Save regulations"
+          idleLabel={
+            mode === "add"
+              ? "Save new rule"
+              : mode === "edit"
+                ? "Save rule changes"
+                : "Save page details"
+          }
           pendingLabel="Saving…"
         />
       </form>

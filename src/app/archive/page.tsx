@@ -1,10 +1,13 @@
 import { connection } from "next/server";
+import { recordDuesPayment } from "@/app/actions/dues";
 import { recordMemberContribution } from "@/app/actions/payments";
 import {
   AmendArchivedForm,
   type ExistingContribution,
 } from "@/components/amend-archived-form";
+import { AmendArchivedDuesForm } from "@/components/amend-archived-dues-form";
 import { ArchiveBoards } from "@/components/archive-boards";
+import { ArchiveDuesBoards } from "@/components/archive-dues-boards";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
@@ -13,6 +16,11 @@ import {
   listContributionBoards,
   listMemberOptions,
 } from "@/lib/data";
+import {
+  getDuesBoard,
+  listConcludedDuesSchedules,
+} from "@/lib/dues-data";
+import { todayIsoDate } from "@/lib/format";
 import { listAllPaymentRows } from "@/lib/store";
 
 export const instant = false;
@@ -28,6 +36,7 @@ export default async function ArchivePage({
   const membersPromise = listMemberOptions();
   const requestsPromise = listAllPaymentRequests();
   const paymentsPromise = listAllPaymentRows();
+  const concludedDuesPromise = listConcludedDuesSchedules();
   const params = await searchParams;
   const viewer = await viewerPromise;
   const error = typeof params.error === "string" ? params.error : undefined;
@@ -37,12 +46,14 @@ export default async function ArchivePage({
   const bulkTitle =
     typeof params.title === "string" ? params.title : undefined;
   const admin = isAdmin(viewer);
-  const [allBoards, members, allRequests, allPayments] = await Promise.all([
-    boardsPromise,
-    admin ? membersPromise : Promise.resolve([]),
-    admin ? requestsPromise : Promise.resolve([]),
-    admin ? paymentsPromise : Promise.resolve([]),
-  ]);
+  const [allBoards, members, allRequests, allPayments, concludedDues] =
+    await Promise.all([
+      boardsPromise,
+      admin ? membersPromise : Promise.resolve([]),
+      admin ? requestsPromise : Promise.resolve([]),
+      admin ? paymentsPromise : Promise.resolve([]),
+      concludedDuesPromise,
+    ]);
   const boards = allBoards.filter((b) => b.request.concluded_at);
   const requests = allRequests.filter((r) => r.concluded_at);
   const archivedRequestIds = new Set(requests.map((r) => r.id));
@@ -56,7 +67,14 @@ export default async function ArchivePage({
       notes: p.notes,
     };
   }
-  const today = new Date().toISOString().slice(0, 10);
+
+  const duesBoards = (
+    await Promise.all(concludedDues.map((s) => getDuesBoard(s.id)))
+  ).filter((b): b is NonNullable<typeof b> => b != null);
+
+  const today = todayIsoDate();
+  const showAside =
+    admin && (requests.length > 0 || concludedDues.length > 0);
 
   return (
     <AppShell viewer={viewer} active="archive">
@@ -64,9 +82,8 @@ export default async function ArchivePage({
         <div>
           <h1>Archive</h1>
           <p>
-            Concluded and archived payment requests. Lists stay visible; admins
-            can still amend contributions or clear the concluded date to reopen
-            a payment.
+            Concluded contributions and dues years. Lists stay visible; admins
+            can still amend records or clear a concluded date to reopen.
           </p>
         </div>
       </div>
@@ -75,47 +92,76 @@ export default async function ArchivePage({
         ok={ok}
         error={error}
         messages={{
-          recorded: "Member marked as contributed.",
+          recorded: "Record updated.",
           contributed: "Member marked as contributed.",
           pledged: "Member marked as contributed (pledge).",
           paid: "Status set to paid.",
           status: "Contribution status updated.",
-          cleared: "Member marked as not yet contributed.",
+          cleared: "Record cleared.",
           amended: "Contribution list updated.",
           concluded: "Payment archived.",
           concluded_transferred:
             "Payment archived and remaining balance transferred to the bank.",
           reopened: "Payment reopened — see Payments.",
+          dues_concluded: "Dues year archived.",
+          year_archived: "Dues year opened already archived (deadline passed).",
           bulk_contributions: bulkTitle
             ? `Imported ${bulkCount ?? ""} contribution row(s) for “${bulkTitle}” into Archive (deadline already passed).`
             : "Contribution spreadsheet imported into Archive.",
+          bulk_dues: bulkTitle
+            ? `Imported ${bulkCount ?? ""} dues row(s) for “${bulkTitle}” into Archive.`
+            : "Dues spreadsheet imported into Archive.",
         }}
       />
 
-      <div
-        className={
-          admin && requests.length > 0 ? "dash-layout" : "stack"
-        }
-      >
-        <div className="dash-main">
+      <div className={showAside ? "dash-layout" : "stack"}>
+        <div className="dash-main stack">
           <section className="panel">
-            <h2>Concluded payments</h2>
+            <h2>Concluded contributions</h2>
             <ArchiveBoards boards={boards} isAdmin={admin} />
+          </section>
+
+          <section className="panel">
+            <h2>Concluded dues</h2>
+            <ArchiveDuesBoards boards={duesBoards} isAdmin={admin} />
           </section>
         </div>
 
-        {admin && requests.length > 0 ? (
-          <aside className="dash-aside">
-            <section className="panel">
-              <h2>Amend archived contribution</h2>
-              <AmendArchivedForm
-                action={recordMemberContribution}
-                requests={requests}
-                members={members}
-                existing={existing}
-                today={today}
-              />
-            </section>
+        {showAside ? (
+          <aside className="dash-aside stack">
+            {requests.length > 0 ? (
+              <section className="panel">
+                <h2>Amend archived contribution</h2>
+                <AmendArchivedForm
+                  action={recordMemberContribution}
+                  requests={requests}
+                  members={members}
+                  existing={existing}
+                  today={today}
+                />
+              </section>
+            ) : null}
+
+            {concludedDues.length > 0 ? (
+              <section className="panel">
+                <h2>Amend archived dues</h2>
+                <AmendArchivedDuesForm
+                  action={recordDuesPayment}
+                  schedules={duesBoards.map((b) => b.schedule)}
+                  boards={duesBoards.map((b) => ({
+                    schedule: b.schedule,
+                    remainingByMember: Object.fromEntries(
+                      b.rows.map((row) => [
+                        row.member.id,
+                        row.remaining_months,
+                      ]),
+                    ),
+                  }))}
+                  members={members}
+                  today={today}
+                />
+              </section>
+            ) : null}
           </aside>
         ) : null}
       </div>

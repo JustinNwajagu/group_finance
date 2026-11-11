@@ -31,6 +31,7 @@ import {
   getDuesScheduleByYear,
   listAllMembers,
   listDuesPaymentsForSchedule,
+  updateDuesScheduleRow,
   updatePaymentRow,
 } from "@/lib/store";
 
@@ -215,6 +216,7 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
   const file = formData.get("file");
   const monthlyRaw = String(formData.get("monthly_amount") ?? "").trim();
   const yearRaw = String(formData.get("year") ?? "").trim();
+  const deadline = String(formData.get("deadline") ?? "").trim();
   const monthly = Number(monthlyRaw);
 
   if (!(file instanceof File) || file.size === 0) {
@@ -222,6 +224,9 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
   }
   if (!Number.isFinite(monthly) || monthly <= 0) {
     fail("/dues", "Enter a valid monthly dues amount.");
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) {
+    fail("/dues", "Choose a payment deadline.");
   }
 
   const parsed = await parseUploadedSheet(file);
@@ -243,12 +248,16 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
   const headerIssues = requireColumns(parsed, ["member", "amount"]);
   if (headerIssues.length) fail("/dues", formatIssues(headerIssues));
 
+  const today = todayIsoDate();
+  const archived = deadline < today;
   let schedule = await getDuesScheduleByYear(year);
   if (!schedule) {
     schedule = await createDuesSchedule({
       year,
       monthly_amount: monthly,
       title: parsed.title,
+      deadline,
+      concluded_at: archived ? `${deadline}T12:00:00.000Z` : null,
     });
   } else if (Math.abs(Number(schedule.monthly_amount) - monthly) > 0.009) {
     fail(
@@ -370,10 +379,21 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
     });
   }
 
+  if (archived && !schedule.concluded_at) {
+    await updateDuesScheduleRow(schedule.id, {
+      deadline,
+      concluded_at: `${deadline}T12:00:00.000Z`,
+    });
+  } else if (schedule.deadline !== deadline) {
+    await updateDuesScheduleRow(schedule.id, { deadline });
+  }
+
   revalidatePath("/");
   revalidatePath("/dues");
+  revalidatePath("/archive");
   revalidatePath("/members");
-  ok("/dues", "bulk_dues", {
+  const dest = archived || schedule.concluded_at ? "/archive" : "/dues";
+  ok(dest, "bulk_dues", {
     year: String(year),
     count: String(prepared.length),
     title: parsed.title,

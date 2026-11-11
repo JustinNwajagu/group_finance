@@ -19,6 +19,7 @@ export function RecordDuesForm({
   today,
   members,
   yearOptions,
+  returnTo = "/dues",
 }: {
   action: (formData: FormData) => Promise<void>;
   scheduleId: number;
@@ -27,6 +28,7 @@ export function RecordDuesForm({
   today: string;
   members: MemberOption[];
   yearOptions: number[];
+  returnTo?: string;
 }) {
   const [memberId, setMemberId] = useState("");
   const [amount, setAmount] = useState("");
@@ -68,6 +70,7 @@ export function RecordDuesForm({
   return (
     <form action={action} className="form-grid">
       <input type="hidden" name="dues_schedule_id" value={scheduleId} />
+      <input type="hidden" name="return_to" value={returnTo} />
       <label className="field">
         Member
         <select

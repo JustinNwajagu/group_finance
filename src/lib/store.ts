@@ -67,6 +67,9 @@ export type DuesScheduleRow = {
   /** Display title — often from an uploaded document name. */
   title: string;
   monthly_amount: string;
+  /** Last day members are expected to pay for this year. */
+  deadline: string;
+  concluded_at: string | null;
   created_at: string;
 };
 
@@ -803,6 +806,15 @@ function normalizeDuesSchedule(
   const year = Number(raw.year);
   if (!Number.isFinite(year) || year < 2000) return null;
   const titleRaw = normalizePaymentTitle(String(raw.title ?? ""));
+  const deadlineRaw = String(raw.deadline ?? "").trim();
+  const deadline = /^\d{4}-\d{2}-\d{2}$/.test(deadlineRaw)
+    ? deadlineRaw
+    : `${year}-12-31`;
+  const concludedRaw = raw.concluded_at;
+  const concluded_at =
+    typeof concludedRaw === "string" && concludedRaw.trim()
+      ? concludedRaw.trim()
+      : null;
   return {
     id: Number(raw.id),
     year,
@@ -812,6 +824,8 @@ function normalizeDuesSchedule(
         (raw.amount as string | number | undefined) ??
         0,
     ),
+    deadline,
+    concluded_at,
     created_at: String(raw.created_at ?? nowIso()),
   };
 }
@@ -921,15 +935,23 @@ export async function createDuesSchedule(input: {
   year: number;
   monthly_amount: number;
   title?: string;
+  deadline?: string;
+  concluded_at?: string | null;
 }): Promise<DuesScheduleRow> {
   await ensureLegacyDuesMigrated();
   const created_at = nowIso();
+  const deadlineRaw = String(input.deadline ?? "").trim();
+  const deadline = /^\d{4}-\d{2}-\d{2}$/.test(deadlineRaw)
+    ? deadlineRaw
+    : `${input.year}-12-31`;
   const rowBase = {
     year: input.year,
     title:
       normalizePaymentTitle(input.title?.trim() || `${input.year} Dues`) ||
       `${input.year} Dues`,
     monthly_amount: money(input.monthly_amount),
+    deadline,
+    concluded_at: input.concluded_at ?? null,
     created_at,
   };
   if (isFirestore()) {
@@ -983,6 +1005,36 @@ export async function getDuesScheduleByYear(
 ): Promise<DuesScheduleRow | null> {
   const all = await listAllDuesSchedules();
   return all.find((s) => s.year === year) ?? null;
+}
+
+export async function updateDuesScheduleRow(
+  id: number,
+  patch: Partial<
+    Pick<DuesScheduleRow, "concluded_at" | "title" | "deadline" | "monthly_amount">
+  >,
+): Promise<void> {
+  const cleaned: Record<string, unknown> = { ...patch };
+  if (cleaned.monthly_amount != null) {
+    cleaned.monthly_amount = money(cleaned.monthly_amount as string | number);
+  }
+  if (cleaned.title != null) {
+    cleaned.title =
+      normalizePaymentTitle(String(cleaned.title)) || String(cleaned.title);
+  }
+  if (isFirestore()) {
+    await adminDb()!
+      .collection("dues_schedules")
+      .doc(String(id))
+      .set(cleaned, { merge: true });
+    invalidateStoreCache();
+    return;
+  }
+  const db = await loadLocal();
+  const row = db.dues_schedules.find((r) => r.id === id);
+  if (!row) return;
+  Object.assign(row, cleaned);
+  await saveLocal(db);
+  invalidateStoreCache();
 }
 
 export const listAllDuesPayments = cache(async (): Promise<DuesPaymentRow[]> => {

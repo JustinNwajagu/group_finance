@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { connection } from "next/server";
 import { bulkImportDues } from "@/app/actions/bulk-import";
 import {
+  concludeDuesYear,
   createDuesYear,
   deleteDuesYear,
   recordDuesPayment,
@@ -9,16 +11,15 @@ import {
 } from "@/app/actions/dues";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
+import { DuesYearTable } from "@/components/dues-year-table";
+import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordDuesForm } from "@/components/record-dues-form";
 import { requireAccess, isAdmin } from "@/lib/auth";
-import { getDuesBoard, listDuesSchedules } from "@/lib/dues-data";
-import {
-  DUES_MONTH_LABELS,
-  formatCoveredMonths,
-} from "@/lib/dues-months";
-import { formatDate, formatMoney } from "@/lib/format";
+import { getDuesBoard, listOpenDuesSchedules } from "@/lib/dues-data";
+import { formatCoveredMonths } from "@/lib/dues-months";
+import { formatDate, formatMoney, todayIsoDate } from "@/lib/format";
 import { listMemberOptions } from "@/lib/data";
 
 export const instant = false;
@@ -30,12 +31,13 @@ export default async function DuesPage({
 }) {
   await connection();
   const viewerPromise = requireAccess();
-  const schedulesPromise = listDuesSchedules();
+  const schedulesPromise = listOpenDuesSchedules();
   const params = await searchParams;
   const viewer = await viewerPromise;
   const admin = isAdmin(viewer);
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
+  const q = typeof params.q === "string" ? params.q : "";
   const bulkCount =
     typeof params.count === "string" ? params.count : undefined;
   const bulkTitle =
@@ -60,8 +62,28 @@ export default async function DuesPage({
     admin ? listMemberOptions() : Promise.resolve([]),
   ]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const monthly = board ? Number(board.schedule.monthly_amount) : 0;
+  const qLower = q.trim().toLowerCase();
+  const filteredBoard = board
+    ? {
+        ...board,
+        rows: qLower
+          ? board.rows.filter(
+              (row) =>
+                row.member.name.toLowerCase().includes(qLower) ||
+                (row.member.email ?? "").toLowerCase().includes(qLower),
+            )
+          : board.rows,
+      }
+    : null;
+
+  const yearQuery = (year: number) => {
+    const params = new URLSearchParams();
+    params.set("year", String(year));
+    if (q.trim()) params.set("q", q);
+    return `/dues?${params.toString()}`;
+  };
 
   return (
     <AppShell viewer={viewer} active="dues">
@@ -71,26 +93,36 @@ export default async function DuesPage({
           <p>
             Monthly dues run January–December each year. Amount paid ÷ monthly
             due = months covered. Payments that cover more than one year are
-            split across a year range you choose.
+            split across a year range you choose. Concluded years move to
+            Archive.
           </p>
         </div>
-        {schedules.length > 0 ? (
-          <div className="dues-year-switch" role="navigation" aria-label="Dues years">
-            {schedules.map((s) => (
-              <Link
-                key={s.id}
-                href={`/dues?year=${s.year}`}
-                className={
-                  selectedSchedule?.id === s.id
-                    ? "dues-year-chip active"
-                    : "dues-year-chip"
-                }
-              >
-                {s.year}
-              </Link>
-            ))}
-          </div>
-        ) : null}
+        <div className="page-head-tools">
+          <Suspense fallback={null}>
+            <FilterBar placeholder="Filter members…" />
+          </Suspense>
+          {schedules.length > 0 ? (
+            <div
+              className="dues-year-switch"
+              role="navigation"
+              aria-label="Dues years"
+            >
+              {schedules.map((s) => (
+                <Link
+                  key={s.id}
+                  href={yearQuery(s.year)}
+                  className={
+                    selectedSchedule?.id === s.id
+                      ? "dues-year-chip active"
+                      : "dues-year-chip"
+                  }
+                >
+                  {s.year}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <Flash
@@ -101,6 +133,8 @@ export default async function DuesPage({
           recorded: "Dues payment recorded.",
           cleared: "Dues payment removed.",
           year_deleted: "Dues year removed.",
+          dues_reopened: "Dues year reopened.",
+          dues_concluded: "Dues year archived.",
           bulk_dues: bulkTitle
             ? `Imported ${bulkCount ?? ""} dues row(s) for “${bulkTitle}”${
                 bulkYear ? ` (${bulkYear})` : ""
@@ -111,88 +145,39 @@ export default async function DuesPage({
 
       <div className={admin ? "dash-layout" : "stack"}>
         <div className="dash-main">
-        <section className="panel">
-          <div className="panel-heading-row">
-            <h2>
-              {board
-                ? board.schedule.title || `${board.schedule.year} dues`
-                : "Year tracker"}
-            </h2>
-            {board ? (
-              <p className="panel-heading-meta">
-                Monthly {formatMoney(board.schedule.monthly_amount)} · Collected{" "}
-                <strong>{formatMoney(board.total_collected)}</strong>
-              </p>
-            ) : null}
-          </div>
+          <section className="panel">
+            <div className="panel-heading-row">
+              <h2>
+                {board
+                  ? board.schedule.title || `${board.schedule.year} dues`
+                  : "Year tracker"}
+              </h2>
+              {board ? (
+                <p className="panel-heading-meta">
+                  Monthly {formatMoney(board.schedule.monthly_amount)} ·
+                  Deadline {formatDate(board.schedule.deadline)} · Collected{" "}
+                  <strong>{formatMoney(board.total_collected)}</strong>
+                </p>
+              ) : null}
+            </div>
 
-          {!board ? (
-            <div className="hero-empty">
-              {admin
-                ? "Open a dues year to start tracking Jan–Dec payments."
-                : "No dues year has been opened yet."}
-            </div>
-          ) : (
-            <div className="table-wrap dues-table-wrap">
-              <table className="data dues-grid">
-                <thead>
-                  <tr>
-                    <th className="num">#</th>
-                    <th>Member</th>
-                    {DUES_MONTH_LABELS.map((label) => (
-                      <th key={label} className="dues-month">
-                        {label}
-                      </th>
-                    ))}
-                    <th className="num">Paid</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {board.rows.map((row, index) => (
-                    <tr key={row.member.id}>
-                      <td className="num muted">{index + 1}</td>
-                      <td>
-                        <Link
-                          className="row-link"
-                          href={`/members/${row.member.id}`}
-                        >
-                          {row.member.name}
-                        </Link>
-                      </td>
-                      {row.months_paid.map((paid, i) => (
-                        <td
-                          key={DUES_MONTH_LABELS[i]}
-                          className={
-                            paid
-                              ? "dues-month dues-paid dues-month-tip"
-                              : "dues-month dues-month-tip"
-                          }
-                          data-tip={
-                            paid
-                              ? `${DUES_MONTH_LABELS[i]} · Paid`
-                              : `${DUES_MONTH_LABELS[i]} · Unpaid`
-                          }
-                        >
-                          <span className="dues-month-mark" aria-hidden="true">
-                            {paid ? "●" : "·"}
-                          </span>
-                          <span className="sr-only">
-                            {paid
-                              ? `${DUES_MONTH_LABELS[i]} paid`
-                              : `${DUES_MONTH_LABELS[i]} unpaid`}
-                          </span>
-                        </td>
-                      ))}
-                      <td className="num">
-                        {row.months_count}/12
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+            {!filteredBoard ? (
+              <div className="hero-empty">
+                {admin
+                  ? "Open a dues year to start tracking Jan–Dec payments."
+                  : "No open dues year right now."}
+              </div>
+            ) : (
+              <DuesYearTable
+                board={filteredBoard}
+                emptyLabel={
+                  q
+                    ? "No members match that filter."
+                    : "No members on the roster yet."
+                }
+              />
+            )}
+          </section>
         </div>
 
         {admin ? (
@@ -224,6 +209,33 @@ export default async function DuesPage({
                 />
               )}
             </section>
+
+            {board ? (
+              <section className="panel">
+                <h2>Conclude dues year</h2>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  Moves {board.schedule.year} into Archive. Admins can still
+                  amend payments there, or clear the concluded date to reopen.
+                </p>
+                <form action={concludeDuesYear} className="form-grid">
+                  <input type="hidden" name="id" value={board.schedule.id} />
+                  <input type="hidden" name="return_to" value="/archive" />
+                  <label className="field">
+                    Conclude date
+                    <input
+                      name="concluded_date"
+                      type="date"
+                      defaultValue={today}
+                      required
+                    />
+                  </label>
+                  <PendingSubmitButton
+                    idleLabel={`Conclude ${board.schedule.year} dues`}
+                    pendingLabel="Concluding…"
+                  />
+                </form>
+              </section>
+            ) : null}
 
             {board ? (
               <section className="panel">
@@ -291,9 +303,23 @@ export default async function DuesPage({
                     />
                   </label>
                 </div>
+                <label className="field">
+                  Payment deadline
+                  <input
+                    name="deadline"
+                    type="date"
+                    required
+                    defaultValue={`${
+                      schedules.some((s) => s.year === currentYear)
+                        ? currentYear + 1
+                        : currentYear
+                    }-12-31`}
+                  />
+                </label>
                 <p className="muted" style={{ margin: 0 }}>
                   Creates a Jan–Dec tracker for that year. One schedule per year;
-                  monthly amount is fixed for everyone.
+                  monthly amount is fixed for everyone. A past deadline opens
+                  the year already archived.
                 </p>
                 <PendingSubmitButton
                   idleLabel="Open year"
@@ -349,6 +375,17 @@ export default async function DuesPage({
                     />
                   </label>
                 </div>
+                <label className="field">
+                  Payment deadline
+                  <input
+                    name="deadline"
+                    type="date"
+                    required
+                    defaultValue={
+                      board?.schedule.deadline ?? `${selectedYear}-12-31`
+                    }
+                  />
+                </label>
                 <PendingSubmitButton
                   idleLabel="Validate & import"
                   pendingLabel="Validating & uploading…"
@@ -380,7 +417,8 @@ export default async function DuesPage({
                             <td>{p.member_name}</td>
                             <td>{formatMoney(p.amount)}</td>
                             <td className="muted">
-                              {monthCount} ({formatCoveredMonths(p.covered_months)})
+                              {monthCount} (
+                              {formatCoveredMonths(p.covered_months)})
                             </td>
                             <td className="muted">{p.notes || "—"}</td>
                             <td>

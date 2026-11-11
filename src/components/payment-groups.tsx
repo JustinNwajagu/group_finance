@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { markPaymentPaid } from "@/app/actions/payments";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatDate, formatMoney, formatTimestamp } from "@/lib/format";
 import type { PaymentTitleGroup } from "@/lib/group";
 import type { PaymentWithMember } from "@/lib/types";
@@ -75,13 +76,12 @@ export function PaymentGroups({
                         {p.status === "pledge" ? (
                           <form action={markPaymentPaid} className="inline-form">
                             <input type="hidden" name="id" value={p.id} />
-                            <button
-                              type="submit"
+                            <PendingSubmitButton
                               className="btn-ghost"
                               style={{ padding: "0.3rem 0.65rem" }}
-                            >
-                              Mark paid
-                            </button>
+                              idleLabel="Mark paid"
+                              pendingLabel="Updating…"
+                            />
                           </form>
                         ) : (
                           <span className="muted">—</span>

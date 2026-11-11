@@ -62,9 +62,17 @@ export function ProfilePasswordReset({
         type="button"
         className="btn-primary"
         disabled={pending}
+        aria-busy={pending}
         onClick={onRequest}
       >
-        {pending ? "Sending…" : "Send password reset email"}
+        {pending ? (
+          <>
+            <span className="btn-spinner" aria-hidden />
+            Sending…
+          </>
+        ) : (
+          "Send password reset email"
+        )}
       </button>
       <p className="muted" style={{ margin: 0, fontSize: "0.88rem" }}>
         We&apos;ll email a link to choose a new password for this login. The

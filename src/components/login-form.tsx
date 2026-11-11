@@ -229,8 +229,20 @@ export function LoginForm({
             disabled={pending}
           />
         </div>
-        <button type="submit" className="btn-primary" disabled={pending}>
-          {pending ? "Signing in…" : "Sign in"}
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? (
+            <>
+              <span className="btn-spinner" aria-hidden />
+              Signing in…
+            </>
+          ) : (
+            "Sign in"
+          )}
         </button>
       </form>
 
@@ -403,8 +415,20 @@ function ForgotPasswordDialog({
           <button type="button" className="btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary" disabled={pending}>
-            {pending ? "Sending…" : "Send reset link"}
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={pending}
+            aria-busy={pending}
+          >
+            {pending ? (
+              <>
+                <span className="btn-spinner" aria-hidden />
+                Sending…
+              </>
+            ) : (
+              "Send reset link"
+            )}
           </button>
         </div>
       </form>
@@ -539,8 +563,20 @@ function AccessRequestDialog({
           <button type="button" className="btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary" disabled={pending}>
-            {pending ? "Sending…" : "Submit request"}
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={pending}
+            aria-busy={pending}
+          >
+            {pending ? (
+              <>
+                <span className="btn-spinner" aria-hidden />
+                Sending…
+              </>
+            ) : (
+              "Submit request"
+            )}
           </button>
         </div>
       </form>

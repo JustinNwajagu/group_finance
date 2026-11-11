@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { approveAccessRequest } from "@/app/actions/access-requests";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type { Member } from "@/lib/types";
 
 export function ApproveAccessForm({
@@ -85,9 +86,10 @@ export function ApproveAccessForm({
         </select>
       </label>
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <button type="submit" className="btn-primary">
-          Approve &amp; create login
-        </button>
+        <PendingSubmitButton
+          idleLabel="Approve & create login"
+          pendingLabel="Approving…"
+        />
       </div>
     </form>
   );

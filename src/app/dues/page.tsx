@@ -7,14 +7,10 @@ import {
   recordDuesPayment,
   removeDuesPayment,
 } from "@/app/actions/dues";
-import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
 import { Flash } from "@/components/flash";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordDuesForm } from "@/components/record-dues-form";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { getDuesBoard, listDuesSchedules } from "@/lib/dues-data";
@@ -267,7 +263,6 @@ export default async function DuesPage({
             <section className="panel">
               <h2>Open dues year</h2>
               <form action={createDuesYear} className="form-grid">
-                <FormBusyMarker />
                 <div className="form-grid two">
                   <label className="field">
                     Year
@@ -319,7 +314,6 @@ export default async function DuesPage({
                 fails validation.
               </p>
               <form action={bulkImportDues} className="form-grid">
-                <FormBusyMarker />
                 <label className="field">
                   Spreadsheet
                   <input
@@ -355,7 +349,6 @@ export default async function DuesPage({
                     />
                   </label>
                 </div>
-                <FormPendingStatus message="Validating spreadsheet and uploading dues…" />
                 <PendingSubmitButton
                   idleLabel="Validate & import"
                   pendingLabel="Validating & uploading…"
@@ -393,16 +386,15 @@ export default async function DuesPage({
                             <td>
                               <form action={removeDuesPayment}>
                                 <input type="hidden" name="id" value={p.id} />
-                                <button
-                                  type="submit"
+                                <PendingSubmitButton
                                   className="btn-ghost"
                                   style={{
                                     padding: "0.15rem 0.45rem",
                                     fontSize: "0.8rem",
                                   }}
-                                >
-                                  Remove
-                                </button>
+                                  idleLabel="Remove"
+                                  pendingLabel="Removing…"
+                                />
                               </form>
                             </td>
                           </tr>

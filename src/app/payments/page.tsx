@@ -2,15 +2,11 @@ import { Suspense } from "react";
 import { connection } from "next/server";
 import { bulkImportContributions } from "@/app/actions/bulk-import";
 import { createPaymentRequest } from "@/app/actions/payments";
-import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
 import { Flash } from "@/components/flash";
 import { PageFallback } from "@/components/page-fallback";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listContributionBoards, listMemberOptions } from "@/lib/data";
 import type { ContributionLists, Member } from "@/lib/types";
@@ -65,7 +61,6 @@ async function PaymentsBody({
               </p>
             ) : (
               <form action={createPaymentRequest} className="form-grid">
-                <FormBusyMarker />
                 <label className="field">
                   Title
                   <input name="title" required autoComplete="off" />
@@ -114,7 +109,6 @@ async function PaymentsBody({
               </p>
             ) : (
               <form action={bulkImportContributions} className="form-grid">
-                <FormBusyMarker />
                 <label className="field">
                   Spreadsheet
                   <input
@@ -146,7 +140,6 @@ async function PaymentsBody({
                     />
                   </label>
                 </div>
-                <FormPendingStatus message="Validating spreadsheet and uploading contributions…" />
                 <PendingSubmitButton
                   idleLabel="Validate & import"
                   pendingLabel="Validating & uploading…"

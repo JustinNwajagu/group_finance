@@ -1,11 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { FormBusyMarker } from "@/components/action-form";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { monthsFromAmount } from "@/lib/dues-months";
 import { formatMoney } from "@/lib/format";
 
@@ -71,7 +67,6 @@ export function RecordDuesForm({
 
   return (
     <form action={action} className="form-grid">
-      <FormBusyMarker />
       <input type="hidden" name="dues_schedule_id" value={scheduleId} />
       <label className="field">
         Member
@@ -188,7 +183,6 @@ export function RecordDuesForm({
           placeholder="Bank transfer ref, cash collector, etc."
         />
       </label>
-      <FormPendingStatus message="Saving dues payment…" />
       <PendingSubmitButton
         idleLabel="Save dues payment"
         pendingLabel="Saving…"

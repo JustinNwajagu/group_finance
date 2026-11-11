@@ -9,6 +9,7 @@ import { assignExcoOfficeAction } from "@/app/actions/exco";
 import { ApproveAccessForm } from "@/components/approve-access-form";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAdmin, adminEmail } from "@/lib/auth";
 import {
   listAccessRequests,
@@ -147,9 +148,10 @@ export default async function AccessPage({
                     ))}
                   </select>
                 </label>
-                <button type="submit" className="btn-primary">
-                  Save {seat.label}
-                </button>
+                <PendingSubmitButton
+                  idleLabel={`Save ${seat.label}`}
+                  pendingLabel="Saving…"
+                />
               </form>
             ))}
           </div>
@@ -178,9 +180,11 @@ export default async function AccessPage({
 
                   <form action={rejectAccessRequest}>
                     <input type="hidden" name="id" value={r.id} />
-                    <button type="submit" className="btn-ghost">
-                      Reject
-                    </button>
+                    <PendingSubmitButton
+                      className="btn-ghost"
+                      idleLabel="Reject"
+                      pendingLabel="Rejecting…"
+                    />
                   </form>
                 </div>
               ))}
@@ -262,9 +266,11 @@ export default async function AccessPage({
                                 name="member_id"
                                 value={m.id}
                               />
-                              <button type="submit" className="btn-ghost">
-                                Reset password
-                              </button>
+                              <PendingSubmitButton
+                                className="btn-ghost"
+                                idleLabel="Reset password"
+                                pendingLabel="Sending…"
+                              />
                             </form>
                             {!locked ? (
                               <form action={deleteLoginAction}>
@@ -273,9 +279,11 @@ export default async function AccessPage({
                                   name="member_id"
                                   value={m.id}
                                 />
-                                <button type="submit" className="btn-ghost">
-                                  Delete login
-                                </button>
+                                <PendingSubmitButton
+                                  className="btn-ghost"
+                                  idleLabel="Delete login"
+                                  pendingLabel="Deleting…"
+                                />
                               </form>
                             ) : null}
                           </div>
@@ -304,9 +312,11 @@ export default async function AccessPage({
             {viewer.name} · {viewer.email} · {viewer.access?.role}
           </p>
           <form action={signOut}>
-            <button type="submit" className="btn-ghost">
-              Sign out
-            </button>
+            <PendingSubmitButton
+              className="btn-ghost"
+              idleLabel="Sign out"
+              pendingLabel="Signing out…"
+            />
           </form>
         </section>
       </div>

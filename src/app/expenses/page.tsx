@@ -5,13 +5,9 @@ import {
   removeExpense,
   saveBankAccountDetails,
 } from "@/app/actions/expenses";
-import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordExpenseForm } from "@/components/record-expense-form";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
@@ -211,7 +207,6 @@ export default async function ExpensesPage({
                         <div className="expense-card-actions">
                           {!alreadySigned ? (
                             <form action={certifyExpenseAction}>
-                              <FormBusyMarker />
                               <input
                                 type="hidden"
                                 name="expense_id"
@@ -229,7 +224,6 @@ export default async function ExpensesPage({
                             </p>
                           )}
                           <form action={removeExpense}>
-                            <FormBusyMarker />
                             <input
                               type="hidden"
                               name="expense_id"
@@ -336,7 +330,6 @@ export default async function ExpensesPage({
             <section className="panel">
               <h2>Bank account details</h2>
               <form action={saveBankAccountDetails} className="form-grid">
-                <FormBusyMarker />
                 <label className="field">
                   Bank
                   <input
@@ -379,7 +372,6 @@ export default async function ExpensesPage({
                     idleLabel="Save bank details"
                     pendingLabel="Saving…"
                   />
-                  <FormPendingStatus message="Saving bank details…" />
                 </div>
               </form>
             </section>

@@ -1,11 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FormBusyMarker } from "@/components/action-form";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatDate, formatMoney, todayIsoDate } from "@/lib/format";
 import type { Member, PaymentRequest, PaymentStatus } from "@/lib/types";
 
@@ -67,7 +63,6 @@ export function AmendArchivedForm({
 
   return (
     <form action={action} className="form-grid">
-      <FormBusyMarker />
       <input type="hidden" name="return_to" value="/archive" />
       <label className="field">
         Payment title
@@ -176,7 +171,6 @@ export function AmendArchivedForm({
           record for this archived payment).
         </p>
       ) : null}
-      <FormPendingStatus message="Saving contribution…" />
       <PendingSubmitButton
         idleLabel={outstanding ? "Mark not yet contributed" : "Save contribution"}
         pendingLabel="Saving…"

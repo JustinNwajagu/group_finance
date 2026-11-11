@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { createMember } from "@/app/actions/members";
-import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
@@ -143,7 +142,6 @@ async function HomeRoster({
         <section className="panel">
           <h2>Add member</h2>
           <form action={createMember} className="form-grid">
-            <FormBusyMarker />
             <label className="field">
               Name
               <input name="name" required autoComplete="off" />

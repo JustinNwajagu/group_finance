@@ -39,14 +39,10 @@ export function PendingSubmitButton({
   );
 }
 
-/** Status line under a form while the Server Action runs. */
-export function FormPendingStatus({ message }: { message: string }) {
-  const { pending } = useFormStatus();
-  if (!pending) return null;
-  return (
-    <p className="form-pending" role="status" aria-live="polite">
-      <span className="btn-spinner" aria-hidden />
-      {message}
-    </p>
-  );
+/**
+ * Legacy no-op. Prefer PendingSubmitButton so loading stays on the control
+ * that was clicked, not elsewhere in the form.
+ */
+export function FormPendingStatus(_props: { message: string }) {
+  return null;
 }

@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { saveRegulationsAction } from "@/app/actions/regulations";
-import { FormBusyMarker } from "@/components/action-form";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type {
   RegulationSection,
   RegulationSignatory,
@@ -46,7 +42,6 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
         text on this page.
       </p>
       <form action={saveRegulationsAction} className="form-grid">
-        <FormBusyMarker />
         <input type="hidden" name="section_count" value={sections.length} />
         <input type="hidden" name="signatory_count" value={signatories.length} />
 
@@ -162,8 +157,6 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
             </div>
           ))}
         </div>
-
-        <FormPendingStatus message="Saving regulations…" />
         <PendingSubmitButton
           idleLabel="Save regulations"
           pendingLabel="Saving…"

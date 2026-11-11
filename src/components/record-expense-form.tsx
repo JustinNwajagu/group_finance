@@ -2,11 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { recordExpense } from "@/app/actions/expenses";
-import { FormBusyMarker } from "@/components/action-form";
-import {
-  FormPendingStatus,
-  PendingSubmitButton,
-} from "@/components/pending-submit-button";
+import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatMoney } from "@/lib/format";
 import type {
   ContributionFundingOption,
@@ -224,7 +220,6 @@ export function RecordExpenseForm({
 
   return (
     <form action={recordExpense} className="form-grid">
-      <FormBusyMarker />
       <label className="field">
         Date
         <input
@@ -462,7 +457,6 @@ export function RecordExpenseForm({
           pendingLabel="Saving…"
           disabled={kind === "member" && selectedMemberIds.length === 0}
         />
-        <FormPendingStatus message="Saving expense…" />
       </div>
     </form>
   );

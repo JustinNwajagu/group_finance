@@ -17,6 +17,7 @@ export function AppShell({
     | "dues"
     | "expenses"
     | "archive"
+    | "regulations"
     | "access"
     | "profile";
   children: React.ReactNode;
@@ -66,6 +67,15 @@ export function AppShell({
             className={active === "archive" ? "nav-link active" : "nav-link"}
           >
             Archive
+          </Link>
+          <Link
+            href="/regulations"
+            prefetch
+            className={
+              active === "regulations" ? "nav-link active" : "nav-link"
+            }
+          >
+            Regulations
           </Link>
           {admin ? (
             <Link

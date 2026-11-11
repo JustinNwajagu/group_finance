@@ -1526,6 +1526,27 @@ form[aria-busy="true"] button:not([type="submit"]) {
   font-size: 0.9rem;
 }
 
+.regulations-stack {
+  max-width: 46rem;
+}
+
+.regulations-section h2 {
+  margin-bottom: 0.65rem;
+}
+
+.regulations-list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.55rem;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.regulations-list li::marker {
+  color: var(--sea-deep);
+}
+
 @media (max-width: 720px) {
   .topbar {
     grid-template-columns: 1fr;

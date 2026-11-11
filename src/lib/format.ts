@@ -48,6 +48,23 @@ export function formatMoney(value: string | number): string {
   }).format(n);
 }
 
+/** Calendar date in local machine timezone as YYYY-MM-DD. */
+export function todayIsoDate(now = new Date()): string {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** True when value is YYYY-MM-DD and not after today. */
+export function isPaymentDateAllowed(
+  value: string,
+  today = todayIsoDate(),
+): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  return value <= today;
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
   const raw = value.includes("T") ? value : `${value}T12:00:00`;

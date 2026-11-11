@@ -159,6 +159,7 @@ export function ContributionBoard({
   const outstandingEmpty = concluded
     ? "No one left without a record."
     : "Everyone has a pledge or payment.";
+  const hasMemberPayments = contributed.length + pledged.length > 0;
 
   return (
     <article className={`contrib-board${hideHeader ? " contrib-board-embedded" : ""}`}>
@@ -311,19 +312,26 @@ export function ContributionBoard({
             </form>
           )}
 
-          <ConfirmActionForm
-            action={deletePaymentRequest}
-            message={`Permanently delete “${request.title}” and all of its contribution records? This cannot be undone.`}
-            className="inline-form"
-          >
-            <input type="hidden" name="id" value={request.id} />
-            <input type="hidden" name="return_to" value={returnTo} />
-            <PendingSubmitButton
-              className="btn-ghost"
-              idleLabel="Remove contribution"
-              pendingLabel="Removing…"
-            />
-          </ConfirmActionForm>
+          {hasMemberPayments ? (
+            <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+              This contribution has member payments, so it cannot be removed.
+              Clear those records first if it was created by mistake.
+            </p>
+          ) : (
+            <ConfirmActionForm
+              action={deletePaymentRequest}
+              message={`Permanently delete “${request.title}”? This cannot be undone.`}
+              className="inline-form"
+            >
+              <input type="hidden" name="id" value={request.id} />
+              <input type="hidden" name="return_to" value={returnTo} />
+              <PendingSubmitButton
+                className="btn-ghost"
+                idleLabel="Remove contribution"
+                pendingLabel="Removing…"
+              />
+            </ConfirmActionForm>
+          )}
 
           <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
             Contributed means paid only. Pledges stay in Pledged and do not count

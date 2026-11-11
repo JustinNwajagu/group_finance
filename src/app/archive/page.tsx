@@ -80,7 +80,7 @@ export default async function ArchivePage({
           pledged: "Member marked as contributed (pledge).",
           paid: "Status set to paid.",
           status: "Contribution status updated.",
-          cleared: "Contribution cleared — member is outstanding again.",
+          cleared: "Member marked as not yet contributed.",
           amended: "Contribution list updated.",
           concluded: "Payment archived.",
           concluded_transferred:

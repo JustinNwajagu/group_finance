@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { saveBoardContribution } from "@/app/actions/payments";
 import { FormBusyMarker } from "@/components/action-form";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, todayIsoDate } from "@/lib/format";
 import type { PaymentStatus } from "@/lib/types";
 
 type ContributeDialogProps = {
@@ -40,7 +40,7 @@ export function ContributeDialog({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [open, setOpen] = useState(false);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIsoDate();
   const amountDefault = defaultAmount && Number(defaultAmount) > 0
     ? defaultAmount
     : minAmount;
@@ -135,6 +135,7 @@ export function ContributeDialog({
             <input
               name="payment_date"
               type="date"
+              max={today}
               defaultValue={defaultDate || (defaultStatus === "paid" ? today : "")}
               required={defaultStatus === "paid"}
             />

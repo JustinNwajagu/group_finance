@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { listMemberOptions } from "@/lib/data";
 import { getContributionRemaining } from "@/lib/expenses-data";
+import { isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
 import {
   createPaymentRequestRow,
   createPaymentRow,
@@ -15,6 +16,7 @@ import {
   getPaymentRequestById,
   getMemberById,
   listAllExpenses,
+  listAllPaymentRows,
   updatePaymentRequestRow,
   updatePaymentRow,
 } from "@/lib/store";
@@ -124,6 +126,16 @@ export async function deletePaymentRequest(formData: FormData): Promise<void> {
   const request = await getPaymentRequestById(id);
   if (!request) failPayments("Payment request not found.");
 
+  const paymentCount = (await listAllPaymentRows()).filter(
+    (p) => p.payment_request_id === id,
+  ).length;
+  if (paymentCount > 0) {
+    failReturn(
+      returnTo,
+      "This contribution already has member payments. Clear those records before removing it.",
+    );
+  }
+
   const linked = (await listAllExpenses()).some(
     (e) => e.payment_request_id === id,
   );
@@ -154,17 +166,20 @@ export async function recordMemberContribution(
   const paymentDateRaw = String(formData.get("payment_date") ?? "").trim();
   const notes = String(formData.get("notes") ?? "").trim() || null;
   const returnTo = String(formData.get("return_to") ?? "/payments");
-  const amount = Number(amountRaw);
+  const outstanding =
+    statusRaw === "outstanding" ||
+    statusRaw === "none" ||
+    statusRaw === "cleared" ||
+    statusRaw === "not_yet" ||
+    statusRaw === "not-yet-contributed";
   const status = statusRaw === "paid" ? "paid" : "pledge";
+  const today = todayIsoDate();
 
   if (!Number.isFinite(requestId) || requestId <= 0) {
     failReturn(returnTo, "Choose a payment title.");
   }
   if (!Number.isFinite(memberId) || memberId <= 0) {
     failReturn(returnTo, "Choose a member.");
-  }
-  if (!Number.isFinite(amount) || amount < 0) {
-    failReturn(returnTo, "Enter a valid amount.");
   }
 
   const request = await getPaymentRequestById(requestId);
@@ -173,6 +188,18 @@ export async function recordMemberContribution(
   const member = await getMemberById(memberId);
   if (!member) failReturn(returnTo, "Member not found.");
 
+  if (outstanding) {
+    const existing = await findPaymentForMemberRequest(requestId, memberId);
+    if (existing) await deletePaymentRow(existing.id);
+    revalidateDashboards(`/members/${memberId}`);
+    okReturn(returnTo, "cleared");
+  }
+
+  const amount = Number(amountRaw);
+  if (!Number.isFinite(amount) || amount < 0) {
+    failReturn(returnTo, "Enter a valid amount.");
+  }
+
   if (amount + 1e-9 < Number(request.amount)) {
     failReturn(
       returnTo,
@@ -180,11 +207,15 @@ export async function recordMemberContribution(
     );
   }
 
+  if (paymentDateRaw && !isPaymentDateAllowed(paymentDateRaw, today)) {
+    failReturn(returnTo, "Payment date cannot be in the future.");
+  }
+
   const paymentDate =
     status === "paid"
       ? /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
         ? paymentDateRaw
-        : new Date().toISOString().slice(0, 10)
+        : today
       : /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
         ? paymentDateRaw
         : null;
@@ -225,6 +256,7 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
   const returnTo = String(formData.get("return_to") ?? "/payments");
   const status = statusRaw === "paid" ? "paid" : "pledge";
   const amount = Number(amountRaw);
+  const today = todayIsoDate();
 
   if (!Number.isFinite(requestId) || requestId <= 0) {
     failReturn(returnTo, "Invalid payment.");
@@ -249,11 +281,15 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
   const member = await getMemberById(memberId);
   if (!member) failReturn(returnTo, "Member not found.");
 
+  if (paymentDateRaw && !isPaymentDateAllowed(paymentDateRaw, today)) {
+    failReturn(returnTo, "Payment date cannot be in the future.");
+  }
+
   const paymentDate =
     status === "paid"
       ? /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
         ? paymentDateRaw
-        : new Date().toISOString().slice(0, 10)
+        : today
       : /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
         ? paymentDateRaw
         : null;

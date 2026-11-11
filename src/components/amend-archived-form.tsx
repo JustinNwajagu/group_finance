@@ -6,7 +6,7 @@ import {
   FormPendingStatus,
   PendingSubmitButton,
 } from "@/components/pending-submit-button";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, todayIsoDate } from "@/lib/format";
 import type { Member, PaymentRequest, PaymentStatus } from "@/lib/types";
 
 export type ExistingContribution = {
@@ -15,6 +15,8 @@ export type ExistingContribution = {
   payment_date: string | null;
   notes: string | null;
 };
+
+type AmendStatus = PaymentStatus | "outstanding";
 
 type Props = {
   action: (formData: FormData) => Promise<void>;
@@ -36,10 +38,11 @@ export function AmendArchivedForm({
   existing,
   today,
 }: Props) {
+  const maxDate = today || todayIsoDate();
   const [requestId, setRequestId] = useState("");
   const [memberId, setMemberId] = useState("");
   const [amount, setAmount] = useState("");
-  const [status, setStatus] = useState<PaymentStatus>("pledge");
+  const [status, setStatus] = useState<AmendStatus>("outstanding");
   const [paymentDate, setPaymentDate] = useState(today);
   const [notes, setNotes] = useState("");
 
@@ -55,10 +58,12 @@ export function AmendArchivedForm({
     }
     const request = requests.find((r) => String(r.id) === nextRequestId);
     setAmount(request?.amount ?? "");
-    setStatus("pledge");
-    setPaymentDate(today);
+    setStatus("outstanding");
+    setPaymentDate("");
     setNotes("");
   }
+
+  const outstanding = status === "outstanding";
 
   return (
     <form action={action} className="form-grid">
@@ -117,9 +122,10 @@ export function AmendArchivedForm({
             type="number"
             min="0"
             step="0.01"
-            required
+            required={!outstanding}
+            disabled={outstanding}
             placeholder="0.00"
-            value={amount}
+            value={outstanding ? "" : amount}
             onChange={(e) => setAmount(e.target.value)}
           />
         </label>
@@ -128,21 +134,28 @@ export function AmendArchivedForm({
           <select
             name="status"
             value={status}
-            onChange={(e) =>
-              setStatus(e.target.value === "paid" ? "paid" : "pledge")
-            }
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next === "paid" || next === "pledge" || next === "outstanding") {
+                setStatus(next);
+              }
+            }}
           >
+            <option value="outstanding">Not yet contributed</option>
             <option value="pledge">Pledge</option>
             <option value="paid">Paid</option>
           </select>
         </label>
       </div>
       <label className="field">
-        Payment date (optional)
+        Payment date{outstanding ? " (n/a)" : status === "paid" ? "" : " (optional)"}
         <input
           name="payment_date"
           type="date"
-          value={paymentDate}
+          max={maxDate}
+          disabled={outstanding}
+          required={!outstanding && status === "paid"}
+          value={outstanding ? "" : paymentDate}
           onChange={(e) => setPaymentDate(e.target.value)}
         />
       </label>
@@ -154,11 +167,18 @@ export function AmendArchivedForm({
           placeholder="Bank transfer ref, cash collector, etc."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          disabled={outstanding}
         />
       </label>
+      {outstanding ? (
+        <p className="muted" style={{ margin: 0 }}>
+          Saves this member as not yet contributed (clears any pledge or paid
+          record for this archived payment).
+        </p>
+      ) : null}
       <FormPendingStatus message="Saving contribution…" />
       <PendingSubmitButton
-        idleLabel="Save contribution"
+        idleLabel={outstanding ? "Mark not yet contributed" : "Save contribution"}
         pendingLabel="Saving…"
       />
     </form>

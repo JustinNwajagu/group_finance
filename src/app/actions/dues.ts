@@ -12,6 +12,7 @@ import {
   monthsFromAmount,
   takeNextUnpaidMonths,
 } from "@/lib/dues-months";
+import { isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
 import {
   createDuesPayment,
   createDuesSchedule,
@@ -130,9 +131,13 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     );
   }
 
+  const today = todayIsoDate();
+  if (paymentDateRaw && !isPaymentDateAllowed(paymentDateRaw, today)) {
+    failDues("Payment date cannot be in the future.", schedule.year);
+  }
   const payment_date = /^\d{4}-\d{2}-\d{2}$/.test(paymentDateRaw)
     ? paymentDateRaw
-    : new Date().toISOString().slice(0, 10);
+    : today;
 
   const existingCurrent = (await listDuesPaymentsForSchedule(schedule.id)).filter(
     (p) => p.member_id === memberId,

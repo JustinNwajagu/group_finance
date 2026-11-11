@@ -21,6 +21,7 @@ import {
   monthsFromAmount as monthsFromDueAmount,
   takeNextUnpaidMonths,
 } from "@/lib/dues-months";
+import { isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
 import {
   createDuesPayment,
   createDuesSchedule,
@@ -136,6 +137,13 @@ export async function bulkImportContributions(
       });
       return;
     }
+    if (paymentDate && !isPaymentDateAllowed(paymentDate)) {
+      issues.push({
+        row: rowNum,
+        message: "Payment date cannot be in the future.",
+      });
+      return;
+    }
 
     prepared.push({
       memberId: member.id,
@@ -143,7 +151,7 @@ export async function bulkImportContributions(
       status,
       payment_date:
         status === "paid"
-          ? paymentDate || new Date().toISOString().slice(0, 10)
+          ? paymentDate || todayIsoDate()
           : paymentDate,
       notes,
     });
@@ -305,6 +313,13 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
       });
       return;
     }
+    if (paymentDate && !isPaymentDateAllowed(paymentDate)) {
+      issues.push({
+        row: rowNum,
+        message: "Payment date cannot be in the future.",
+      });
+      return;
+    }
 
     const paid =
       paidByMember.get(member.id) ??
@@ -334,7 +349,7 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
       memberId: member.id,
       amount,
       covered_months: covered,
-      payment_date: paymentDate || new Date().toISOString().slice(0, 10),
+      payment_date: paymentDate || todayIsoDate(),
       notes,
     });
   });

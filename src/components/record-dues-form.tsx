@@ -172,7 +172,13 @@ export function RecordDuesForm({
 
       <label className="field">
         Payment date
-        <input name="payment_date" type="date" required defaultValue={today} />
+        <input
+          name="payment_date"
+          type="date"
+          required
+          max={today}
+          defaultValue={today}
+        />
       </label>
       <label className="field">
         Notes (optional)

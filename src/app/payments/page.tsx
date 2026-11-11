@@ -1,10 +1,7 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { bulkImportContributions } from "@/app/actions/bulk-import";
-import {
-  createPaymentRequest,
-  recordMemberContribution,
-} from "@/app/actions/payments";
+import { createPaymentRequest } from "@/app/actions/payments";
 import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
 import { ContributionBoard } from "@/components/contribution-board";
@@ -15,13 +12,8 @@ import {
   PendingSubmitButton,
 } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
-import {
-  listContributionBoards,
-  listMemberOptions,
-  listOpenPaymentRequests,
-} from "@/lib/data";
-import { formatDate, formatMoney } from "@/lib/format";
-import type { ContributionLists, Member, PaymentRequest } from "@/lib/types";
+import { listContributionBoards, listMemberOptions } from "@/lib/data";
+import type { ContributionLists, Member } from "@/lib/types";
 
 export const instant = false;
 
@@ -29,18 +21,15 @@ async function PaymentsBody({
   admin,
   boardsPromise,
   membersPromise,
-  requestsPromise,
 }: {
   admin: boolean;
   boardsPromise: Promise<ContributionLists[]>;
   membersPromise: Promise<Member[]>;
-  requestsPromise: Promise<PaymentRequest[]>;
 }) {
   await connection();
-  const [boards, members, requests] = await Promise.all([
+  const [boards, members] = await Promise.all([
     boardsPromise,
     admin ? membersPromise : Promise.resolve([] as Member[]),
-    admin ? requestsPromise : Promise.resolve([] as PaymentRequest[]),
   ]);
   const today = new Date().toISOString().slice(0, 10);
 
@@ -66,85 +55,6 @@ async function PaymentsBody({
 
       {admin ? (
         <div className="stack">
-          <section className="panel">
-            <h2>Record member contribution</h2>
-            {members.length === 0 || requests.length === 0 ? (
-              <p className="muted" style={{ margin: 0 }}>
-                {members.length === 0
-                  ? "Add a member on Home first."
-                  : "Create a payment request first, then record contributions."}
-              </p>
-            ) : (
-              <form action={recordMemberContribution} className="form-grid">
-                <FormBusyMarker />
-                <input type="hidden" name="return_to" value="/payments" />
-                <label className="field">
-                  Payment title
-                  <select name="payment_request_id" required defaultValue="">
-                    <option value="" disabled>
-                      Select payment
-                    </option>
-                    {requests.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.title} · min {formatMoney(r.amount)} · due{" "}
-                        {formatDate(r.deadline)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field">
-                  Member
-                  <select name="member_id" required defaultValue="">
-                    <option value="" disabled>
-                      Select member
-                    </option>
-                    {members.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="form-grid two">
-                  <label className="field">
-                    Amount (₦)
-                    <input
-                      name="amount"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      required
-                      placeholder="0.00"
-                    />
-                  </label>
-                  <label className="field">
-                    Status
-                    <select name="status" defaultValue="pledge">
-                      <option value="pledge">Pledge</option>
-                      <option value="paid">Paid</option>
-                    </select>
-                  </label>
-                </div>
-                <label className="field">
-                  Payment date (optional)
-                  <input name="payment_date" type="date" defaultValue={today} />
-                </label>
-                <label className="field">
-                  Notes (optional)
-                  <textarea
-                    name="notes"
-                    rows={2}
-                    placeholder="Bank transfer ref, cash collector, etc."
-                  />
-                </label>
-                <PendingSubmitButton
-                  idleLabel="Save contribution"
-                  pendingLabel="Saving…"
-                />
-              </form>
-            )}
-          </section>
-
           <section className="panel">
             <h2>New payment</h2>
             {members.length === 0 ? (
@@ -256,7 +166,6 @@ export default async function PaymentsPage({
   const viewerPromise = requireAccess();
   const boardsPromise = listContributionBoards(true);
   const membersPromise = listMemberOptions();
-  const requestsPromise = listOpenPaymentRequests();
   const params = await searchParams;
   const viewer = await viewerPromise;
   const admin = isAdmin(viewer);
@@ -273,7 +182,8 @@ export default async function PaymentsPage({
         <div>
           <h1>Contributions</h1>
           <p>
-            One-off contribution requests (separate from monthly dues).
+            One-off contribution requests (separate from monthly dues). Use
+            Pledge / Mark paid on each board to record members.
           </p>
         </div>
       </div>
@@ -282,7 +192,7 @@ export default async function PaymentsPage({
         ok={ok}
         error={error}
         messages={{
-          "1": "Payment request created. Record each member's contribution next.",
+          "1": "Payment request created. Use Pledge or Mark paid on the board to record members.",
           recorded: "Member marked as contributed.",
           contributed: "Member marked as contributed.",
           pledged: "Member marked as contributed (pledge).",
@@ -303,7 +213,6 @@ export default async function PaymentsPage({
           admin={admin}
           boardsPromise={boardsPromise}
           membersPromise={membersPromise}
-          requestsPromise={requestsPromise}
         />
       </Suspense>
     </AppShell>

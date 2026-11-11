@@ -57,67 +57,82 @@ export default async function ExpensesPage({
 
   return (
     <AppShell viewer={viewer} active="expenses">
-      <div className="page-head expenses-head">
-        <div>
-          <h1>Expenses</h1>
-          <p>
-            Bank balance rises with paid contributions and dues, and falls when
-            expenses are certified by two admins. Member, meeting, and
-            miscellaneous expenses can draw from a contribution, the bank, or
-            both.
-          </p>
+      <div className="expenses-top">
+        <div className="page-head expenses-head">
+          <div>
+            <h1>Expenses</h1>
+            <p>
+              Inflows from contributions and dues; outflows after two-admin
+              certification. Fund from a contribution, the bank, or both.
+            </p>
+          </div>
+          <aside className="bank-corner" aria-label="Bank account details">
+            <p className="bank-corner-label">Bank account</p>
+            <p className="bank-corner-name">{bank.account_name || "—"}</p>
+            <p className="bank-corner-meta">
+              {bank.bank_name || "—"}
+              {bank.account_number ? ` · ${bank.account_number}` : ""}
+            </p>
+            {bank.bank_code ? (
+              <p className="bank-corner-meta">Code {bank.bank_code}</p>
+            ) : null}
+          </aside>
         </div>
-        <aside className="bank-corner" aria-label="Bank account details">
-          <p className="bank-corner-label">Bank account</p>
-          <p className="bank-corner-name">{bank.account_name || "—"}</p>
-          <p className="bank-corner-meta">
-            {bank.bank_name || "—"}
-            {bank.account_number ? ` · ${bank.account_number}` : ""}
-          </p>
-          {bank.bank_code ? (
-            <p className="bank-corner-meta">Code {bank.bank_code}</p>
-          ) : null}
-        </aside>
+
+        <Flash
+          ok={ok}
+          error={error}
+          messages={{
+            bank: "Bank account details saved.",
+            recorded: "Expense recorded. Needs two admin certifications.",
+            cert_progress:
+              "Certification recorded. One more admin still needed.",
+            certified: "Expense certified and deducted from the bank balance.",
+            removed: "Uncertified expense removed.",
+          }}
+        />
+
+        <section className="panel expenses-balance-panel">
+          <div className="expenses-balance-grid">
+            <div>
+              <strong
+                className={
+                  Number(ledger.balance) < 0 ? "money-out" : "money-balance"
+                }
+              >
+                {formatMoney(ledger.balance)}
+              </strong>
+              <span>Bank balance</span>
+            </div>
+            <div>
+              <strong className="money-in">
+                {formatMoney(ledger.contributions_in)}
+              </strong>
+              <span>Contributions in</span>
+            </div>
+            <div>
+              <strong className="money-in">
+                {formatMoney(ledger.dues_in)}
+              </strong>
+              <span>Dues in</span>
+            </div>
+            <div>
+              <strong className="money-out">
+                {formatMoney(ledger.expenses_out)}
+              </strong>
+              <span>Certified out</span>
+            </div>
+            <div>
+              <strong className="money-out">
+                {formatMoney(ledger.pending_expenses)}
+              </strong>
+              <span>Awaiting certification</span>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <Flash
-        ok={ok}
-        error={error}
-        messages={{
-          bank: "Bank account details saved.",
-          recorded: "Expense recorded. Needs two admin certifications.",
-          cert_progress: "Certification recorded. One more admin still needed.",
-          certified: "Expense certified and deducted from the bank balance.",
-          removed: "Uncertified expense removed.",
-        }}
-      />
-
-      <section className="panel expenses-balance-panel">
-        <div className="stat-line expenses-balance-line">
-          <div>
-            <strong>{formatMoney(ledger.balance)}</strong>
-            <span>Bank balance</span>
-          </div>
-          <div>
-            <strong>{formatMoney(ledger.contributions_in)}</strong>
-            <span>Contributions in</span>
-          </div>
-          <div>
-            <strong>{formatMoney(ledger.dues_in)}</strong>
-            <span>Dues in</span>
-          </div>
-          <div>
-            <strong>{formatMoney(ledger.expenses_out)}</strong>
-            <span>Certified out</span>
-          </div>
-          <div>
-            <strong>{formatMoney(ledger.pending_expenses)}</strong>
-            <span>Awaiting certification</span>
-          </div>
-        </div>
-      </section>
-
-      <div className={admin ? "split split-2" : "stack"}>
+      <div className={admin ? "split split-2 expenses-split" : "stack"}>
         <div className="stack">
           <section className="panel">
             <div className="panel-heading-row">

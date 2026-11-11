@@ -49,9 +49,6 @@ async function HomeRoster({
       <section className="panel">
         <div className="panel-heading-row">
           <h2>EXCO</h2>
-          <p className="panel-heading-meta">
-            Admin rights sit with President and Treasurer only
-          </p>
         </div>
         <div className="exco-grid">
           {excoSeats.map((seat) => (

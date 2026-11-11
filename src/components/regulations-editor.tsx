@@ -62,52 +62,59 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
   return (
     <section className="panel">
       <h2>Edit regulations</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
+      <p className="muted" style={{ margin: "0 0 0.85rem" }}>
         Choose a rule to revise or delete, add a new rule, or update the page
         title, intro, and signatories.
       </p>
       <form action={saveRegulationsAction} className="form-grid">
-        <input type="hidden" name="section_count" value={submitSections.length} />
-        <input type="hidden" name="signatory_count" value={signatories.length} />
-
-        {/* Always post title/intro/signatories so partial edits don't wipe them. */}
-        <input type="hidden" name="title" value={title} />
-        <input type="hidden" name="intro" value={intro} />
-        {signatories.map((row, index) => (
-          <div key={`hidden-signatory-${index}`}>
-            <input
-              type="hidden"
-              name={`signatory_role_${index}`}
-              value={row.role}
-            />
-            <input
-              type="hidden"
-              name={`signatory_name_${index}`}
-              value={row.name}
-            />
-          </div>
-        ))}
-
-        {/* Always post every section (edited + untouched) so saves stay complete. */}
-        {submitSections.map((section, index) => (
-          <div key={`hidden-section-${section.id || index}`}>
-            <input
-              type="hidden"
-              name={`section_id_${index}`}
-              value={section.id}
-            />
-            <input
-              type="hidden"
-              name={`section_title_${index}`}
-              value={section.title}
-            />
-            <input
-              type="hidden"
-              name={`section_items_${index}`}
-              value={section.items.join("\n")}
-            />
-          </div>
-        ))}
+        {/* Keep payload fields out of the visible grid so they don't add empty rows. */}
+        <div hidden>
+          <input
+            type="hidden"
+            name="section_count"
+            value={submitSections.length}
+          />
+          <input
+            type="hidden"
+            name="signatory_count"
+            value={signatories.length}
+          />
+          <input type="hidden" name="title" value={title} />
+          <input type="hidden" name="intro" value={intro} />
+          {signatories.map((row, index) => (
+            <span key={`hidden-signatory-${index}`}>
+              <input
+                type="hidden"
+                name={`signatory_role_${index}`}
+                value={row.role}
+              />
+              <input
+                type="hidden"
+                name={`signatory_name_${index}`}
+                value={row.name}
+              />
+            </span>
+          ))}
+          {submitSections.map((section, index) => (
+            <span key={`hidden-section-${section.id || index}`}>
+              <input
+                type="hidden"
+                name={`section_id_${index}`}
+                value={section.id}
+              />
+              <input
+                type="hidden"
+                name={`section_title_${index}`}
+                value={section.title}
+              />
+              <input
+                type="hidden"
+                name={`section_items_${index}`}
+                value={section.items.join("\n")}
+              />
+            </span>
+          ))}
+        </div>
 
         <label className="field">
           What do you want to change?

@@ -276,6 +276,14 @@ export async function deleteDuesYear(formData: FormData): Promise<void> {
   const schedule = await getDuesScheduleById(id);
   if (!schedule) failDues("Dues year not found.");
 
+  const payments = await listDuesPaymentsForSchedule(id);
+  if (payments.length > 0) {
+    failDues(
+      `Cannot remove ${schedule.year} dues while ${payments.length} payment(s) are recorded. Clear those payments first.`,
+      schedule.year,
+    );
+  }
+
   await deleteDuesSchedule(id);
   revalidateDues();
 

@@ -230,21 +230,35 @@ export default async function DuesPage({
             {board ? (
               <section className="panel">
                 <h2>Remove dues year</h2>
-                <p className="muted" style={{ marginTop: 0 }}>
-                  Permanently delete {board.schedule.year} dues and every payment
-                  recorded for that year. Use this only for a mistaken year.
-                </p>
-                <ConfirmActionForm
-                  action={deleteDuesYear}
-                  message={`Permanently delete ${board.schedule.year} dues and all of its payment records? This cannot be undone.`}
-                >
-                  <input type="hidden" name="id" value={board.schedule.id} />
-                  <PendingSubmitButton
-                    className="btn-ghost"
-                    idleLabel={`Remove ${board.schedule.year} dues`}
-                    pendingLabel="Removing…"
-                  />
-                </ConfirmActionForm>
+                {board.payments.length > 0 ? (
+                  <p className="muted" style={{ margin: 0 }}>
+                    {board.schedule.year} has {board.payments.length} payment
+                    {board.payments.length === 1 ? "" : "s"} recorded. Clear
+                    those payments before this year can be removed.
+                  </p>
+                ) : (
+                  <>
+                    <p className="muted" style={{ marginTop: 0 }}>
+                      Permanently delete {board.schedule.year} dues. Only empty
+                      years with no payments can be removed.
+                    </p>
+                    <ConfirmActionForm
+                      action={deleteDuesYear}
+                      message={`Permanently delete ${board.schedule.year} dues? This cannot be undone.`}
+                    >
+                      <input
+                        type="hidden"
+                        name="id"
+                        value={board.schedule.id}
+                      />
+                      <PendingSubmitButton
+                        className="btn-ghost"
+                        idleLabel={`Remove ${board.schedule.year} dues`}
+                        pendingLabel="Removing…"
+                      />
+                    </ConfirmActionForm>
+                  </>
+                )}
               </section>
             ) : null}
 

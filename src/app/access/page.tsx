@@ -81,11 +81,10 @@ export default async function AccessPage({
         ok={ok}
         error={error}
         messages={{
-          approved:
-            "Request approved and linked to an existing member.",
+          approved: "Access approved for the existing member.",
           member_created: createdName
-            ? `New member “${createdName}” created on the roster and login approved.`
-            : "New member created on the roster and login approved.",
+            ? `New member “${createdName}” created successfully.`
+            : "New member created successfully.",
           rejected: "Request rejected.",
           login_deleted: "Login removed. The member stays on the roster.",
           reset_sent: "Password reset link ready to share.",

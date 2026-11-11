@@ -217,8 +217,9 @@ export async function approveAccessRequest(
     }
   }
 
+  let result: Awaited<ReturnType<typeof provisionApprovedUser>>;
   try {
-    const result = await provisionApprovedUser(
+    result = await provisionApprovedUser(
       request,
       mode === "link"
         ? { mode: "link", memberId }
@@ -230,26 +231,26 @@ export async function approveAccessRequest(
       decided_at: new Date().toISOString(),
       member_id: result.member.id,
     });
-
-    revalidatePath("/access");
-    revalidatePath("/");
-    revalidatePath("/members");
-    const q = new URLSearchParams();
-    if (mode === "create") {
-      q.set("ok", "member_created");
-      q.set("name", result.member.name);
-    } else {
-      q.set("ok", "approved");
-    }
-    if (result.passwordResetLink) {
-      q.set("link", result.passwordResetLink);
-    }
-    redirect(`/access?${q.toString()}`);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Could not approve this request.";
     redirect("/access?error=" + encodeURIComponent(message));
   }
+
+  revalidatePath("/access");
+  revalidatePath("/");
+  revalidatePath("/members");
+  const q = new URLSearchParams();
+  if (mode === "create") {
+    q.set("ok", "member_created");
+    q.set("name", result.member.name);
+  } else {
+    q.set("ok", "approved");
+  }
+  if (result.passwordResetLink) {
+    q.set("link", result.passwordResetLink);
+  }
+  redirect(`/access?${q.toString()}`);
 }
 
 export async function rejectAccessRequest(formData: FormData): Promise<void> {
@@ -341,16 +342,18 @@ export async function sendMemberPasswordReset(
   if (!auth) {
     redirect("/access?error=" + encodeURIComponent("Auth is unavailable."));
   }
+  let link: string;
   try {
-    const link = await auth.generatePasswordResetLink(email);
-    revalidatePath("/access");
-    redirect("/access?ok=reset_sent&link=" + encodeURIComponent(link));
+    link = await auth.generatePasswordResetLink(email);
   } catch {
     redirect(
       "/access?error=" +
         encodeURIComponent("Could not create a password reset link."),
     );
   }
+
+  revalidatePath("/access");
+  redirect("/access?ok=reset_sent&link=" + encodeURIComponent(link));
 }
 
 export async function setUserRoleAction(formData: FormData): Promise<void> {

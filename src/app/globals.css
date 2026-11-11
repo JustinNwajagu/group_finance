@@ -247,7 +247,6 @@ a.viewer-name.is-active {
   padding: 1.25rem;
   box-shadow: var(--shadow);
   min-width: 0;
-  overflow: hidden;
 }
 
 .panel + .panel {
@@ -294,8 +293,6 @@ table.data td {
   padding: 0.75rem 0.55rem;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
-  max-width: 18rem;
-  overflow-wrap: anywhere;
 }
 
 table.data th {

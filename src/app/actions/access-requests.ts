@@ -200,8 +200,21 @@ export async function approveAccessRequest(
   if (mode !== "link" && mode !== "create") {
     redirect(
       "/access?error=" +
-        encodeURIComponent("Choose link to a member or create a new member."),
+        encodeURIComponent(
+          "Choose link to an existing member or create a new member before approving.",
+        ),
     );
+  }
+
+  if (mode === "link") {
+    if (!Number.isFinite(memberId) || memberId <= 0) {
+      redirect(
+        "/access?error=" +
+          encodeURIComponent(
+            "Select an existing member to link this login to.",
+          ),
+      );
+    }
   }
 
   try {

@@ -1,12 +1,12 @@
 import { connection } from "next/server";
 import { signOut } from "@/app/actions/auth";
 import {
-  approveAccessRequest,
   deleteLoginAction,
   rejectAccessRequest,
   sendMemberPasswordReset,
 } from "@/app/actions/access-requests";
 import { assignExcoOfficeAction } from "@/app/actions/exco";
+import { ApproveAccessForm } from "@/components/approve-access-form";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { requireAdmin, adminEmail } from "@/lib/auth";
@@ -170,59 +170,11 @@ export default async function AccessPage({
                     </div>
                   </div>
 
-                  <form action={approveAccessRequest} className="form-grid">
-                    <input type="hidden" name="id" value={r.id} />
-                    <label className="field">
-                      Link login to
-                      <select name="link_mode" required defaultValue="">
-                        <option value="" disabled>
-                          Choose…
-                        </option>
-                        <option
-                          value="link"
-                          disabled={unlinkable.length === 0 || atLoginCap}
-                        >
-                          Existing member
-                          {unlinkable.length === 0
-                            ? " (none available)"
-                            : atLoginCap
-                              ? " (login limit reached)"
-                              : ""}
-                        </option>
-                        <option value="create">Create new member</option>
-                      </select>
-                    </label>
-                    <label className="field">
-                      Existing member
-                      <select
-                        name="member_id"
-                        defaultValue=""
-                        disabled={unlinkable.length === 0}
-                      >
-                        <option value="" disabled>
-                          Select member without a login
-                        </option>
-                        {unlinkable.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                            {m.email ? ` · ${m.email}` : ""}
-                            {m.phone ? ` · ${m.phone}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "0.5rem",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button type="submit" className="btn-primary">
-                        Approve &amp; create login
-                      </button>
-                    </div>
-                  </form>
+                  <ApproveAccessForm
+                    requestId={r.id}
+                    unlinkable={unlinkable}
+                    atLoginCap={atLoginCap}
+                  />
 
                   <form action={rejectAccessRequest}>
                     <input type="hidden" name="id" value={r.id} />

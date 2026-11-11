@@ -182,10 +182,24 @@ export default async function MemberDetailPage({
                           <td
                             key={DUES_MONTH_LABELS[i]}
                             className={
-                              paid ? "dues-month dues-paid" : "dues-month"
+                              paid
+                                ? "dues-month dues-paid dues-month-tip"
+                                : "dues-month dues-month-tip"
+                            }
+                            data-tip={
+                              paid
+                                ? `${DUES_MONTH_LABELS[i]} · Paid`
+                                : `${DUES_MONTH_LABELS[i]} · Unpaid`
                             }
                           >
-                            {paid ? "●" : "·"}
+                            <span className="dues-month-mark" aria-hidden="true">
+                              {paid ? "●" : "·"}
+                            </span>
+                            <span className="sr-only">
+                              {paid
+                                ? `${DUES_MONTH_LABELS[i]} paid`
+                                : `${DUES_MONTH_LABELS[i]} unpaid`}
+                            </span>
                           </td>
                         ))}
                         <td className="num">{year.months_count}/12</td>

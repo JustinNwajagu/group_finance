@@ -645,6 +645,29 @@ export async function deletePaymentRow(id: number): Promise<void> {
   invalidateStoreCache();
 }
 
+/** Delete a contribution request and all of its member payment rows. */
+export async function deletePaymentRequestRow(id: number): Promise<void> {
+  if (!Number.isFinite(id) || id <= 0) return;
+  if (isFirestore()) {
+    const db = adminDb()!;
+    const payments = await db
+      .collection("payments")
+      .where("payment_request_id", "==", id)
+      .get();
+    const batch = db.batch();
+    for (const doc of payments.docs) batch.delete(doc.ref);
+    batch.delete(db.collection("payment_requests").doc(String(id)));
+    await batch.commit();
+    invalidateStoreCache();
+    return;
+  }
+  const db = await loadLocal();
+  db.payments = db.payments.filter((p) => p.payment_request_id !== id);
+  db.payment_requests = db.payment_requests.filter((r) => r.id !== id);
+  await saveLocal(db);
+  invalidateStoreCache();
+}
+
 function normalizeDuesSchedule(
   raw: Record<string, unknown>,
 ): DuesScheduleRow | null {
@@ -923,6 +946,29 @@ export async function deleteDuesPayment(id: number): Promise<void> {
   }
   const db = await loadLocal();
   db.dues_payments = db.dues_payments.filter((p) => p.id !== id);
+  await saveLocal(db);
+  invalidateStoreCache();
+}
+
+/** Delete a dues year schedule and all payments recorded against it. */
+export async function deleteDuesSchedule(id: number): Promise<void> {
+  if (!Number.isFinite(id) || id <= 0) return;
+  if (isFirestore()) {
+    const db = adminDb()!;
+    const payments = await db
+      .collection("dues_payments")
+      .where("dues_schedule_id", "==", id)
+      .get();
+    const batch = db.batch();
+    for (const doc of payments.docs) batch.delete(doc.ref);
+    batch.delete(db.collection("dues_schedules").doc(String(id)));
+    await batch.commit();
+    invalidateStoreCache();
+    return;
+  }
+  const db = await loadLocal();
+  db.dues_payments = db.dues_payments.filter((p) => p.dues_schedule_id !== id);
+  db.dues_schedules = db.dues_schedules.filter((s) => s.id !== id);
   await saveLocal(db);
   invalidateStoreCache();
 }

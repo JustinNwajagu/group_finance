@@ -8,11 +8,13 @@ import { getContributionRemaining } from "@/lib/expenses-data";
 import {
   createPaymentRequestRow,
   createPaymentRow,
+  deletePaymentRequestRow,
   deletePaymentRow,
   findPaymentForMemberRequest,
   getPaymentById,
   getPaymentRequestById,
   getMemberById,
+  listAllExpenses,
   updatePaymentRequestRow,
   updatePaymentRow,
 } from "@/lib/store";
@@ -111,6 +113,33 @@ export async function reopenPaymentRequest(formData: FormData): Promise<void> {
   await updatePaymentRequestRow(id, { concluded_at: null });
   revalidateDashboards();
   redirect("/payments?ok=reopened");
+}
+
+export async function deletePaymentRequest(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  const returnTo = String(formData.get("return_to") ?? "/payments");
+  if (!Number.isFinite(id) || id <= 0) failPayments("Invalid payment.");
+
+  const request = await getPaymentRequestById(id);
+  if (!request) failPayments("Payment request not found.");
+
+  const linked = (await listAllExpenses()).some(
+    (e) => e.payment_request_id === id,
+  );
+  if (linked) {
+    failReturn(
+      returnTo,
+      "This contribution funds one or more expenses. Remove or reassign those expenses first.",
+    );
+  }
+
+  await deletePaymentRequestRow(id);
+  revalidateDashboards();
+  okReturn(
+    returnTo.startsWith("/archive") ? "/payments" : returnTo,
+    "deleted",
+  );
 }
 
 export async function recordMemberContribution(

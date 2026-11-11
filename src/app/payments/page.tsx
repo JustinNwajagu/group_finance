@@ -204,6 +204,7 @@ export default async function PaymentsPage({
           concluded_transferred:
             "Payment archived and remaining balance transferred to the bank.",
           reopened: "Payment reopened on Payments.",
+          deleted: "Contribution removed.",
           bulk_contributions: bulkTitle
             ? `Imported ${bulkCount ?? ""} contribution row(s) for “${bulkTitle}”.`
             : "Contribution spreadsheet imported.",

@@ -16,6 +16,7 @@ import {
   createDuesPayment,
   createDuesSchedule,
   deleteDuesPayment,
+  deleteDuesSchedule,
   getDuesPaymentById,
   getDuesScheduleById,
   getDuesScheduleByYear,
@@ -265,4 +266,23 @@ export async function removeDuesPayment(formData: FormData): Promise<void> {
   await deleteDuesPayment(id);
   revalidateDues(`/members/${payment.member_id}`);
   okDues("cleared", schedule?.year ?? new Date().getFullYear());
+}
+
+export async function deleteDuesYear(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id) || id <= 0) failDues("Invalid dues year.");
+
+  const schedule = await getDuesScheduleById(id);
+  if (!schedule) failDues("Dues year not found.");
+
+  await deleteDuesSchedule(id);
+  revalidateDues();
+
+  const remaining = await listAllDuesSchedules();
+  const nextYear = remaining[0]?.year;
+  if (nextYear) {
+    redirect(`/dues?year=${nextYear}&ok=year_deleted`);
+  }
+  redirect("/dues?ok=year_deleted");
 }

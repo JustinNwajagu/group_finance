@@ -116,7 +116,8 @@ export function isAdmin(viewer: ViewerContext): boolean {
 }
 
 /** Post-login landing for every role. */
-export function homePathForRole(_role: AppRole): string {
+export function homePathForRole(role: AppRole): string {
+  void role;
   return "/";
 }
 

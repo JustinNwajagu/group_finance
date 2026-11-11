@@ -3,11 +3,13 @@ import { connection } from "next/server";
 import { bulkImportDues } from "@/app/actions/bulk-import";
 import {
   createDuesYear,
+  deleteDuesYear,
   recordDuesPayment,
   removeDuesPayment,
 } from "@/app/actions/dues";
 import { FormBusyMarker } from "@/components/action-form";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmActionForm } from "@/components/confirm-action-form";
 import { Flash } from "@/components/flash";
 import {
   FormPendingStatus,
@@ -102,6 +104,7 @@ export default async function DuesPage({
           year: "Dues year opened.",
           recorded: "Dues payment recorded.",
           cleared: "Dues payment removed.",
+          year_deleted: "Dues year removed.",
           bulk_dues: bulkTitle
             ? `Imported ${bulkCount ?? ""} dues row(s) for “${bulkTitle}”${
                 bulkYear ? ` (${bulkYear})` : ""
@@ -163,15 +166,24 @@ export default async function DuesPage({
                         <td
                           key={DUES_MONTH_LABELS[i]}
                           className={
-                            paid ? "dues-month dues-paid" : "dues-month"
-                          }
-                          title={
                             paid
-                              ? `${DUES_MONTH_LABELS[i]} paid`
-                              : `${DUES_MONTH_LABELS[i]} unpaid`
+                              ? "dues-month dues-paid dues-month-tip"
+                              : "dues-month dues-month-tip"
+                          }
+                          data-tip={
+                            paid
+                              ? `${DUES_MONTH_LABELS[i]} · Paid`
+                              : `${DUES_MONTH_LABELS[i]} · Unpaid`
                           }
                         >
-                          {paid ? "●" : "·"}
+                          <span className="dues-month-mark" aria-hidden="true">
+                            {paid ? "●" : "·"}
+                          </span>
+                          <span className="sr-only">
+                            {paid
+                              ? `${DUES_MONTH_LABELS[i]} paid`
+                              : `${DUES_MONTH_LABELS[i]} unpaid`}
+                          </span>
                         </td>
                       ))}
                       <td className="num">
@@ -214,6 +226,27 @@ export default async function DuesPage({
                 />
               )}
             </section>
+
+            {board ? (
+              <section className="panel">
+                <h2>Remove dues year</h2>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  Permanently delete {board.schedule.year} dues and every payment
+                  recorded for that year. Use this only for a mistaken year.
+                </p>
+                <ConfirmActionForm
+                  action={deleteDuesYear}
+                  message={`Permanently delete ${board.schedule.year} dues and all of its payment records? This cannot be undone.`}
+                >
+                  <input type="hidden" name="id" value={board.schedule.id} />
+                  <PendingSubmitButton
+                    className="btn-ghost"
+                    idleLabel={`Remove ${board.schedule.year} dues`}
+                    pendingLabel="Removing…"
+                  />
+                </ConfirmActionForm>
+              </section>
+            ) : null}
 
             <section className="panel">
               <h2>Open dues year</h2>

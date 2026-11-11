@@ -3,8 +3,10 @@ import type { ReactNode } from "react";
 import {
   clearMemberContribution,
   concludePaymentRequest,
+  deletePaymentRequest,
   reopenPaymentRequest,
 } from "@/app/actions/payments";
+import { ConfirmActionForm } from "@/components/confirm-action-form";
 import { ContributeDialog } from "@/components/contribute-dialog";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -310,6 +312,20 @@ export function ContributionBoard({
               />
             </form>
           )}
+
+          <ConfirmActionForm
+            action={deletePaymentRequest}
+            message={`Permanently delete “${request.title}” and all of its contribution records? This cannot be undone.`}
+            className="inline-form"
+          >
+            <input type="hidden" name="id" value={request.id} />
+            <input type="hidden" name="return_to" value={returnTo} />
+            <PendingSubmitButton
+              className="btn-ghost"
+              idleLabel="Remove contribution"
+              pendingLabel="Removing…"
+            />
+          </ConfirmActionForm>
 
           <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
             Contributed means paid only. Pledges stay in Pledged and do not count

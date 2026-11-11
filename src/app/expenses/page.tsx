@@ -158,7 +158,12 @@ export default async function ExpensesPage({
                           </p>
                           <p className="muted">
                             {formatDate(expense.expense_date)} ·{" "}
-                            {formatExpenseKind(expense.kind)} ·{" "}
+                            {formatExpenseKind(expense.kind)}
+                          </p>
+                          <p className="expense-funding">
+                            <span className="expense-meta-label">
+                              Funded from
+                            </span>{" "}
                             {formatExpenseFunding({
                               funding_source: expense.funding_source,
                               contribution_title: expense.contribution_title,
@@ -171,7 +176,12 @@ export default async function ExpensesPage({
                           {expense.certifications.length}/2 certified
                         </span>
                       </div>
-                      <p className="expense-notes">{expense.notes}</p>
+                      {expense.notes ? (
+                        <p className="expense-notes">
+                          <span className="expense-meta-label">Notes</span>{" "}
+                          {expense.notes}
+                        </p>
+                      ) : null}
                       {expense.allocations.length > 0 ? (
                         <ul className="expense-alloc-list">
                           {expense.allocations.map((a) => (

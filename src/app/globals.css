@@ -1595,9 +1595,25 @@ form[aria-busy="true"] button:not([type="submit"]) {
   font-weight: 650;
 }
 
+.expense-funding {
+  margin: 0.35rem 0 0;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
 .expense-notes {
   margin: 0.55rem 0 0;
   white-space: pre-wrap;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.expense-meta-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
 }
 
 .expense-alloc-list,

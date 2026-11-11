@@ -132,8 +132,8 @@ export default async function ExpensesPage({
         </section>
       </div>
 
-      <div className={admin ? "split split-2 expenses-split" : "stack"}>
-        <div className="stack">
+      <div className={admin ? "expenses-layout" : "stack"}>
+        <div className="expenses-main stack">
           <section className="panel">
             <div className="panel-heading-row">
               <h2>Awaiting certification</h2>
@@ -312,7 +312,7 @@ export default async function ExpensesPage({
         </div>
 
         {admin ? (
-          <div className="stack">
+          <aside className="expenses-aside stack">
             <section className="panel">
               <h2>Record expense</h2>
               <RecordExpenseForm
@@ -373,7 +373,7 @@ export default async function ExpensesPage({
                 </div>
               </form>
             </section>
-          </div>
+          </aside>
         ) : null}
       </div>
     </AppShell>

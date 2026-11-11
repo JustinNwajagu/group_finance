@@ -1226,21 +1226,69 @@ form[aria-busy="true"] button:not([type="submit"]) {
   color: var(--sea-deep);
 }
 
-.expenses-split {
+/* Dedicated expenses two-column layout — avoids shared .split overlap. */
+.main:has(.expenses-layout),
+.main:has(.expenses-top) {
+  width: min(1280px, calc(100% - 2rem));
+}
+
+.expenses-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  gap: 1.25rem;
   align-items: start;
+  width: 100%;
 }
 
-.expenses-split > * {
+.expenses-main,
+.expenses-aside {
   min-width: 0;
+  width: 100%;
 }
 
-@media (min-width: 900px) {
-  .expenses-split.split-2 {
-    grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr);
+.expenses-aside {
+  position: sticky;
+  top: 1rem;
+}
+
+.expenses-aside .panel,
+.expenses-main .panel {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.expenses-aside .panel + .panel,
+.expenses-main .panel + .panel {
+  margin-top: 0;
+}
+
+.expenses-aside input,
+.expenses-aside select,
+.expenses-aside textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.expenses-main .table-wrap {
+  max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .expenses-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 960px) {
+  .expenses-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-aside {
+    position: static;
+  }
+
   .expenses-balance-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

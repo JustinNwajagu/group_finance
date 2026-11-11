@@ -34,27 +34,29 @@ async function PaymentsBody({
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className={admin ? "split split-2" : "stack"}>
-      <section className="panel">
-        <h2>Current contributions</h2>
-        {boards.length === 0 ? (
-          <div className="hero-empty">No open contribution requests.</div>
-        ) : (
-          <div className="contrib-boards">
-            {boards.map((board) => (
-              <ContributionBoard
-                key={board.request.id}
-                board={board}
-                isAdmin={admin}
-                returnTo="/payments"
-              />
-            ))}
-          </div>
-        )}
-      </section>
+    <div className={admin ? "dash-layout" : "stack"}>
+      <div className="dash-main">
+        <section className="panel">
+          <h2>Current contributions</h2>
+          {boards.length === 0 ? (
+            <div className="hero-empty">No open contribution requests.</div>
+          ) : (
+            <div className="contrib-boards">
+              {boards.map((board) => (
+                <ContributionBoard
+                  key={board.request.id}
+                  board={board}
+                  isAdmin={admin}
+                  returnTo="/payments"
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       {admin ? (
-        <div className="stack">
+        <aside className="dash-aside stack">
           <section className="panel">
             <h2>New payment</h2>
             {members.length === 0 ? (
@@ -152,7 +154,7 @@ async function PaymentsBody({
               </form>
             )}
           </section>
-        </div>
+        </aside>
       ) : null}
     </div>
   );

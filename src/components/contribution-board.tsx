@@ -38,26 +38,30 @@ function MemberList({
       ) : (
         <ul className="name-list">
           {members.map((m) => (
-            <li key={m.id}>
-              <Link className="row-link" href={`/members/${m.id}`}>
-                {m.name}
-              </Link>
-              {m.status ? (
-                <span
-                  className={
-                    m.status === "paid" ? "badge badge-paid" : "badge badge-pledge"
-                  }
-                  style={{ marginLeft: "0.4rem" }}
-                >
-                  {m.status === "paid" ? "Paid" : "Pledge"}
-                </span>
-              ) : null}
-              {m.amount ? (
-                <span className="muted"> · {formatMoney(m.amount)}</span>
-              ) : null}
-              {m.notes ? (
-                <span className="muted"> · {m.notes}</span>
-              ) : null}
+            <li key={m.id} className="name-list-item">
+              <div className="name-list-meta">
+                <Link className="row-link" href={`/members/${m.id}`}>
+                  {m.name}
+                </Link>
+                {m.status ? (
+                  <span
+                    className={
+                      m.status === "paid"
+                        ? "badge badge-paid"
+                        : "badge badge-pledge"
+                    }
+                    style={{ marginLeft: "0.4rem" }}
+                  >
+                    {m.status === "paid" ? "Paid" : "Pledge"}
+                  </span>
+                ) : null}
+                {m.amount ? (
+                  <span className="muted"> · {formatMoney(m.amount)}</span>
+                ) : null}
+                {m.notes ? (
+                  <span className="muted"> · {m.notes}</span>
+                ) : null}
+              </div>
               {renderExtra?.(m)}
             </li>
           ))}
@@ -84,10 +88,7 @@ function RecordActions({
 }) {
   if (member.payment_id == null) return null;
   return (
-    <span
-      className="amend-row"
-      style={{ display: "inline-flex", marginLeft: "0.5rem" }}
-    >
+    <div className="amend-row">
       {member.status === "pledge" ? (
         <ContributeDialog
           requestId={requestId}
@@ -128,7 +129,7 @@ function RecordActions({
           pendingLabel="Clearing…"
         />
       </form>
-    </span>
+    </div>
   );
 }
 
@@ -239,10 +240,7 @@ export function ContributionBoard({
           renderExtra={
             isAdmin
               ? (m) => (
-                  <span
-                    className="amend-row"
-                    style={{ display: "inline-flex", marginLeft: "0.5rem" }}
-                  >
+                  <div className="amend-row">
                     <ContributeDialog
                       requestId={request.id}
                       requestTitle={request.title}
@@ -264,7 +262,7 @@ export function ContributionBoard({
                       defaultDate={today}
                       triggerLabel="Mark paid"
                     />
-                  </span>
+                  </div>
                 )
               : undefined
           }

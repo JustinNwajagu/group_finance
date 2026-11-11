@@ -962,22 +962,28 @@ form[aria-busy="true"] button:not([type="submit"]) {
 .contrib-split {
   display: grid;
   gap: 1rem;
+  width: 100%;
+  min-width: 0;
 }
 
 @media (min-width: 720px) {
   .contrib-split:not(.contrib-split-3) {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .contrib-split-3 {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 1100px) {
   .contrib-split-3 {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.contrib-list {
+  min-width: 0;
 }
 
 .contrib-list h4 {
@@ -1083,7 +1089,19 @@ form[aria-busy="true"] button:not([type="submit"]) {
   margin: 0;
   padding: 0;
   display: grid;
+  gap: 0.55rem;
+}
+
+.name-list-item {
+  display: grid;
   gap: 0.35rem;
+  min-width: 0;
+}
+
+.name-list-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .contrib-admin {
@@ -1099,6 +1117,8 @@ form[aria-busy="true"] button:not([type="submit"]) {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.45);
   border: 1px solid rgba(20, 32, 51, 0.06);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .amend-row {
@@ -1106,6 +1126,8 @@ form[aria-busy="true"] button:not([type="submit"]) {
   flex-wrap: wrap;
   gap: 0.4rem;
   align-items: center;
+  margin-left: 0;
+  max-width: 100%;
 }
 
 .payment-groups {
@@ -1401,12 +1423,17 @@ form[aria-busy="true"] button:not([type="submit"]) {
   color: var(--sea-deep);
 }
 
-/* Dedicated expenses two-column layout — avoids shared .split overlap. */
+/*
+ * Dedicated two-column dash layout — Contributions, Archive, Expenses.
+ * Avoids shared .split overlap when the main board is wider than 1.1fr.
+ */
+.main:has(.dash-layout),
 .main:has(.expenses-layout),
 .main:has(.expenses-top) {
   width: min(1280px, calc(100% - 2rem));
 }
 
+.dash-layout,
 .expenses-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
@@ -1415,28 +1442,44 @@ form[aria-busy="true"] button:not([type="submit"]) {
   width: 100%;
 }
 
+.dash-main,
+.dash-aside,
 .expenses-main,
 .expenses-aside {
   min-width: 0;
   width: 100%;
 }
 
+.dash-aside,
 .expenses-aside {
   position: sticky;
   top: 1rem;
 }
 
+.dash-aside .panel,
+.dash-main .panel,
 .expenses-aside .panel,
 .expenses-main .panel {
   width: 100%;
   box-sizing: border-box;
 }
 
+.dash-aside .stack,
+.expenses-aside .stack {
+  min-width: 0;
+  width: 100%;
+}
+
+.dash-aside .panel + .panel,
+.dash-main .panel + .panel,
 .expenses-aside .panel + .panel,
 .expenses-main .panel + .panel {
   margin-top: 0;
 }
 
+.dash-aside input:not([type="radio"]):not([type="checkbox"]),
+.dash-aside select,
+.dash-aside textarea,
 .expenses-aside input:not([type="radio"]):not([type="checkbox"]),
 .expenses-aside select,
 .expenses-aside textarea {
@@ -1496,16 +1539,19 @@ form[aria-busy="true"] button:not([type="submit"]) {
 }
 
 @media (max-width: 1100px) {
+  .dash-layout,
   .expenses-layout {
     grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
   }
 }
 
 @media (max-width: 960px) {
+  .dash-layout,
   .expenses-layout {
     grid-template-columns: 1fr;
   }
 
+  .dash-aside,
   .expenses-aside {
     position: static;
   }

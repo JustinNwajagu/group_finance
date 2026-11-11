@@ -113,7 +113,8 @@ export default async function DuesPage({
         }}
       />
 
-      <div className={admin ? "split split-2" : "stack"}>
+      <div className={admin ? "dash-layout" : "stack"}>
+        <div className="dash-main">
         <section className="panel">
           <div className="panel-heading-row">
             <h2>
@@ -196,9 +197,10 @@ export default async function DuesPage({
             </div>
           )}
         </section>
+        </div>
 
         {admin ? (
-          <div className="stack">
+          <aside className="dash-aside stack">
             <section className="panel">
               <h2>Record dues payment</h2>
               {!board || members.length === 0 ? (
@@ -411,7 +413,7 @@ export default async function DuesPage({
                 </div>
               </section>
             ) : null}
-          </div>
+          </aside>
         ) : null}
       </div>
     </AppShell>

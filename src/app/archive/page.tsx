@@ -92,23 +92,31 @@ export default async function ArchivePage({
         }}
       />
 
-      <div className={admin && requests.length > 0 ? "split split-2" : "stack"}>
-        <section className="panel">
-          <h2>Concluded payments</h2>
-          <ArchiveBoards boards={boards} isAdmin={admin} />
-        </section>
+      <div
+        className={
+          admin && requests.length > 0 ? "dash-layout" : "stack"
+        }
+      >
+        <div className="dash-main">
+          <section className="panel">
+            <h2>Concluded payments</h2>
+            <ArchiveBoards boards={boards} isAdmin={admin} />
+          </section>
+        </div>
 
         {admin && requests.length > 0 ? (
-          <section className="panel">
-            <h2>Amend archived contribution</h2>
-            <AmendArchivedForm
-              action={recordMemberContribution}
-              requests={requests}
-              members={members}
-              existing={existing}
-              today={today}
-            />
-          </section>
+          <aside className="dash-aside">
+            <section className="panel">
+              <h2>Amend archived contribution</h2>
+              <AmendArchivedForm
+                action={recordMemberContribution}
+                requests={requests}
+                members={members}
+                existing={existing}
+                today={today}
+              />
+            </section>
+          </aside>
         ) : null}
       </div>
     </AppShell>

@@ -31,16 +31,26 @@ export type LoginFailureKind =
 export type UnlinkedMemberOption = {
   id: number;
   name: string;
+  phone: string | null;
 };
 
 /** Public roster names still without a login — for the create-account picker. */
 export async function listUnlinkedMembersForSignup(): Promise<
   UnlinkedMemberOption[]
 > {
+  const { nameSortKey } = await import("@/lib/name-titles");
   const rows = await listMembersWithoutLogin();
   return rows
-    .map((m) => ({ id: m.id, name: m.name }))
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      phone: m.phone?.trim() || null,
+    }))
+    .sort((a, b) =>
+      nameSortKey(a.name).localeCompare(nameSortKey(b.name), undefined, {
+        sensitivity: "base",
+      }),
+    );
 }
 
 export async function classifyLoginFailure(
@@ -172,10 +182,11 @@ export async function submitAccessRequest(input: {
     }
     claimedMemberId = memberId;
     name = member.name;
-    phone = (member.phone || String(input.phone ?? "").trim() || "").trim();
-    if (phone.length < 7) {
-      // Allow claim without phone when roster has none; admin still sees the name.
-      phone = member.phone || "";
+    const providedPhone = String(input.phone ?? "").trim();
+    // Prefer the phone they enter; fall back to whatever is already on the roster.
+    phone = providedPhone || member.phone || "";
+    if (providedPhone && providedPhone.length < 7) {
+      return { ok: false, error: "Enter a valid phone number." };
     }
   }
 

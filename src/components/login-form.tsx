@@ -460,15 +460,21 @@ function AccessRequestDialog({
   const [error, setError] = useState<string | null>(null);
   const [errorForOpen, setErrorForOpen] = useState(open);
   const [memberChoice, setMemberChoice] = useState("");
+  const [phone, setPhone] = useState("");
   const [roster, setRoster] = useState(unlinkedMembers);
   const [pending, startTransition] = useTransition();
   const isNewMember = memberChoice === "new";
+  const claimedSelected = Boolean(memberChoice) && !isNewMember;
+  const selectedMember = claimedSelected
+    ? roster.find((m) => String(m.id) === memberChoice)
+    : null;
 
   if (open !== errorForOpen) {
     setErrorForOpen(open);
     if (open) {
       setError(null);
       setMemberChoice("");
+      setPhone("");
       setRoster(unlinkedMembers);
     }
   }
@@ -556,7 +562,16 @@ function AccessRequestDialog({
             name="member_choice"
             required
             value={memberChoice}
-            onChange={(e) => setMemberChoice(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setMemberChoice(next);
+              if (next === "new" || !next) {
+                setPhone("");
+                return;
+              }
+              const match = roster.find((m) => String(m.id) === next);
+              setPhone(match?.phone ?? "");
+            }}
             disabled={pending}
           >
             <option value="" disabled>
@@ -571,47 +586,51 @@ function AccessRequestDialog({
           </select>
         </label>
         {isNewMember ? (
-          <>
-            <div className="form-grid two">
-              <label className="field">
-                Title
-                <select
-                  name="title"
-                  required
-                  defaultValue=""
-                  disabled={pending}
-                >
-                  <option value="" disabled>
-                    Choose…
-                  </option>
-                  {NAME_TITLES.map((title) => (
-                    <option key={title} value={title}>
-                      {title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                Full name
-                <input
-                  name="name"
-                  required
-                  autoComplete="name"
-                  disabled={pending}
-                />
-              </label>
-            </div>
+          <div className="form-grid two">
             <label className="field">
-              Phone number
+              Title
+              <select name="title" required defaultValue="" disabled={pending}>
+                <option value="" disabled>
+                  Choose…
+                </option>
+                {NAME_TITLES.map((title) => (
+                  <option key={title} value={title}>
+                    {title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              Full name
               <input
-                name="phone"
-                type="tel"
+                name="name"
                 required
-                autoComplete="tel"
+                autoComplete="name"
                 disabled={pending}
               />
             </label>
-          </>
+          </div>
+        ) : null}
+        {isNewMember || claimedSelected ? (
+          <label className="field">
+            Phone number{claimedSelected ? " (optional)" : ""}
+            <input
+              name="phone"
+              type="tel"
+              required={isNewMember}
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={
+                claimedSelected
+                  ? selectedMember?.phone
+                    ? undefined
+                    : "Add your phone number"
+                  : undefined
+              }
+              disabled={pending}
+            />
+          </label>
         ) : null}
         <label className="field">
           Email

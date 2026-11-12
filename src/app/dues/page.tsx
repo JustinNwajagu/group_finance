@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Suspense } from "react";
 import { connection } from "next/server";
 import { bulkImportDues } from "@/app/actions/bulk-import";
 import {
@@ -11,8 +10,7 @@ import {
 } from "@/app/actions/dues";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
-import { DuesYearTable } from "@/components/dues-year-table";
-import { FilterBar } from "@/components/filter-bar";
+import { DuesBoardPanel } from "@/components/dues-board-panel";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordDuesForm } from "@/components/record-dues-form";
@@ -37,7 +35,6 @@ export default async function DuesPage({
   const admin = isAdmin(viewer);
   const error = typeof params.error === "string" ? params.error : undefined;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
-  const q = typeof params.q === "string" ? params.q : "";
   const bulkCount =
     typeof params.count === "string" ? params.count : undefined;
   const bulkTitle =
@@ -64,26 +61,8 @@ export default async function DuesPage({
 
   const today = todayIsoDate();
   const monthly = board ? Number(board.schedule.monthly_amount) : 0;
-  const qLower = q.trim().toLowerCase();
-  const filteredBoard = board
-    ? {
-        ...board,
-        rows: qLower
-          ? board.rows.filter(
-              (row) =>
-                row.member.name.toLowerCase().includes(qLower) ||
-                (row.member.email ?? "").toLowerCase().includes(qLower),
-            )
-          : board.rows,
-      }
-    : null;
 
-  const yearQuery = (year: number) => {
-    const params = new URLSearchParams();
-    params.set("year", String(year));
-    if (q.trim()) params.set("q", q);
-    return `/dues?${params.toString()}`;
-  };
+  const yearQuery = (year: number) => `/dues?year=${year}`;
 
   return (
     <AppShell viewer={viewer} active="dues">
@@ -98,9 +77,6 @@ export default async function DuesPage({
           </p>
         </div>
         <div className="page-head-tools">
-          <Suspense fallback={null}>
-            <FilterBar placeholder="Filter members…" />
-          </Suspense>
           {schedules.length > 0 ? (
             <div
               className="dues-year-switch"
@@ -144,39 +120,13 @@ export default async function DuesPage({
 
       <div className={admin ? "dash-layout" : "stack"}>
         <div className="dash-main">
-          <section className="panel">
-            <div className="panel-heading-row">
-              <h2>
-                {board
-                  ? board.schedule.title || `${board.schedule.year} dues`
-                  : "Year tracker"}
-              </h2>
-              {board ? (
-                <p className="panel-heading-meta">
-                  Monthly {formatMoney(board.schedule.monthly_amount)} ·
-                  Deadline {formatDate(board.schedule.deadline)} · Collected{" "}
-                  <strong>{formatMoney(board.total_collected)}</strong>
-                </p>
-              ) : null}
-            </div>
-
-            {!filteredBoard ? (
-              <div className="hero-empty">
-                {admin
-                  ? "Open a dues year to start tracking Jan–Dec payments."
-                  : "No open dues year right now."}
-              </div>
-            ) : (
-              <DuesYearTable
-                board={filteredBoard}
-                emptyLabel={
-                  q
-                    ? "No members match that filter."
-                    : "No members on the roster yet."
-                }
-              />
-            )}
-          </section>
+          {!board && !admin ? (
+            <section className="panel">
+              <div className="hero-empty">No open dues year right now.</div>
+            </section>
+          ) : (
+            <DuesBoardPanel board={board} />
+          )}
         </div>
 
         {admin ? (

@@ -6,6 +6,7 @@ import {
   saveBankAccountDetails,
 } from "@/app/actions/expenses";
 import { AppShell } from "@/components/app-shell";
+import { CertifiedExpensesList } from "@/components/certified-expenses-list";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordExpenseForm } from "@/components/record-expense-form";
@@ -251,67 +252,7 @@ export default async function ExpensesPage({
                 {certified.length} · deducted from balance
               </p>
             </div>
-            {certified.length === 0 ? (
-              <div className="hero-empty">No certified expenses yet.</div>
-            ) : (
-              <div className="table-wrap">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Amount</th>
-                      <th>Type</th>
-                      <th>Funded from</th>
-                      <th>Paid to</th>
-                      <th>Notes</th>
-                      <th>Certified by</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {certified.map((expense) => (
-                      <tr key={expense.id}>
-                        <td>{formatDate(expense.expense_date)}</td>
-                        <td>{formatMoney(expense.amount)}</td>
-                        <td>{formatExpenseKind(expense.kind)}</td>
-                        <td className="muted">
-                          {formatExpenseFunding({
-                            funding_source: expense.funding_source,
-                            contribution_title: expense.contribution_title,
-                            contribution_amount: expense.contribution_amount,
-                            bank_amount: expense.bank_amount,
-                          })}
-                        </td>
-                        <td>
-                          {expense.allocations.length > 0 ? (
-                            <ul className="expense-inline-list">
-                              {expense.allocations.map((a) => (
-                                <li key={`${expense.id}-${a.member_id}`}>
-                                  <Link
-                                    className="row-link"
-                                    href={`/members/${a.member_id}`}
-                                  >
-                                    {a.member_name}
-                                  </Link>{" "}
-                                  · {formatMoney(a.amount)}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="muted">{expense.notes}</td>
-                        <td className="muted">
-                          {expense.certifications
-                            .map((c) => c.name || c.email)
-                            .join(", ")}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <CertifiedExpensesList expenses={certified} />
           </section>
         </div>
 

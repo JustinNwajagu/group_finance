@@ -356,8 +356,9 @@ export async function createMember(input: {
   phone?: string | null;
 }): Promise<MemberRow> {
   const created_at = nowIso();
+  const { ensureLeadingTitleDot } = await import("./name-titles");
   const rowBase = {
-    name: input.name,
+    name: ensureLeadingTitleDot(input.name.trim()),
     email: input.email,
     phone: input.phone?.trim() || null,
     auth_uid: null as string | null,

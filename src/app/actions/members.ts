@@ -82,7 +82,17 @@ export async function deleteMemberAction(formData: FormData): Promise<void> {
 
   if (member.auth_uid || member.login_email) {
     try {
-      await deleteMemberLogin(id);
+      const result = await deleteMemberLogin(id);
+      if (result.memberRemoved) {
+        revalidatePath("/");
+        revalidatePath("/payments");
+        revalidatePath("/archive");
+        revalidatePath("/dues");
+        revalidatePath("/expenses");
+        revalidatePath("/access");
+        revalidatePath("/members", "layout");
+        redirect("/?ok=member_deleted");
+      }
     } catch {
       // Continue with roster delete if login was already gone.
     }

@@ -27,12 +27,37 @@ export function isNameTitle(value: string): value is NameTitle {
   return (NAME_TITLES as readonly string[]).includes(value);
 }
 
+/** Ensure a title ends with a single trailing dot (Mr → Mr.). */
+export function formatTitleWithDot(title: string | null | undefined): string {
+  const clean = (title ?? "").trim();
+  if (!clean) return "";
+  return clean.endsWith(".") ? clean : `${clean}.`;
+}
+
 export function formatTitledName(title: string | null | undefined, name: string): string {
   const cleanName = name.trim();
-  const cleanTitle = (title ?? "").trim();
-  if (!cleanTitle) return cleanName;
-  if (!cleanName) return cleanTitle;
-  return `${cleanTitle} ${cleanName}`;
+  const dottedTitle = formatTitleWithDot(title);
+  if (!dottedTitle) return cleanName;
+  if (!cleanName) return dottedTitle;
+  return `${dottedTitle} ${cleanName}`;
+}
+
+/**
+ * For free-text roster names, ensure a leading known title ends with "."
+ * e.g. "Mr Udeoba Donald" → "Mr. Udeoba Donald".
+ */
+export function ensureLeadingTitleDot(name: string): string {
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (!clean) return clean;
+  const match = clean.match(/^([A-Za-z]+)\.?\s+(.+)$/);
+  if (!match) return clean;
+  const rawTitle = match[1];
+  const rest = match[2];
+  const known = NAME_TITLES.find(
+    (t) => t.toLowerCase() === rawTitle.toLowerCase(),
+  );
+  if (!known) return clean;
+  return `${formatTitleWithDot(known)} ${rest}`;
 }
 
 /** Split a display name into comparable personal-name tokens. */

@@ -90,7 +90,9 @@ export default async function AccessPage({
             : "New member created successfully.",
           rejected: "Request rejected.",
           login_deleted:
-            "Login unlinked from the member and removed. The member stays on the roster.",
+            "Login unlinked from the member and removed. The member stays on the roster because they have payments.",
+          login_deleted_member_removed:
+            "Login removed and the member was deleted from the roster (no payments on record).",
           reset_sent: "Password reset link ready to share.",
           exco_updated: "EXCO position updated.",
         }}
@@ -200,9 +202,10 @@ export default async function AccessPage({
         <section className="panel">
           <h2>Active logins</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Deleting a login unlinks it from that member and removes sign-in
-            access. The member stays on the roster. Admin access is granted by
-            EXCO office (President / Treasurer), not by a separate role toggle.
+            Deleting a login unlinks it and removes sign-in access. If that
+            member has no contribution or dues payments, they are also removed
+            from the roster. Admin access is granted by EXCO office (President /
+            Treasurer), not by a separate role toggle.
           </p>
           {withLogin.length === 0 ? (
             <div className="hero-empty">No member logins yet.</div>

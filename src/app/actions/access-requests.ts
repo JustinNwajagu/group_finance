@@ -369,8 +369,10 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
     );
   }
 
+  let memberRemoved = false;
   try {
-    await deleteMemberLogin(memberId);
+    const result = await deleteMemberLogin(memberId);
+    memberRemoved = result.memberRemoved;
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Could not delete login.";
@@ -379,7 +381,16 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
 
   revalidatePath("/access");
   revalidatePath("/");
-  redirect("/access?ok=login_deleted");
+  revalidatePath("/payments");
+  revalidatePath("/dues");
+  revalidatePath("/expenses");
+  revalidatePath("/archive");
+  revalidatePath("/members", "layout");
+  redirect(
+    memberRemoved
+      ? "/access?ok=login_deleted_member_removed"
+      : "/access?ok=login_deleted",
+  );
 }
 
 /** Admin-triggered password reset link for a member login. */

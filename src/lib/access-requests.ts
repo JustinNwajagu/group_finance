@@ -4,10 +4,14 @@ import path from "node:path";
 import { adminAuth, adminDb } from "./firebase-admin";
 import { isFirestore } from "./config";
 import {
+  assignExcoOffice,
   clearMemberLoginLink,
   countLinkedLogins,
   countMembers,
+  countPaymentsForMember,
   createMember,
+  deleteMemberRow,
+  getExcoBoard,
   getMemberById,
   updateMemberRow,
   type MemberRow,
@@ -363,12 +367,15 @@ export async function provisionApprovedUser(
 }
 
 /**
- * Remove Firebase login for a member but keep the roster row.
- * Always unlinks auth_uid / login_email from that member so the login is no
- * longer tied to them; Auth / access-request cleanup is best-effort and must
- * not leave the roster still linked.
+ * Remove Firebase login for a member.
+ * Always unlinks auth_uid / login_email from that member. If the member has no
+ * contribution or dues payments, they are also removed from the roster (only
+ * members with payments are retained). Auth / access-request cleanup is
+ * best-effort and must not leave the roster still linked.
  */
-export async function deleteMemberLogin(memberId: number): Promise<void> {
+export async function deleteMemberLogin(
+  memberId: number,
+): Promise<{ memberRemoved: boolean }> {
   const member = await getMemberById(memberId);
   if (!member) {
     throw new Error("Member not found.");
@@ -433,6 +440,30 @@ export async function deleteMemberLogin(memberId: number): Promise<void> {
       await deleteAccessRequest(row.id);
     }
   }
+
+  const payments = await countPaymentsForMember(memberId);
+  if (payments.total > 0) {
+    return { memberRemoved: false };
+  }
+
+  // No payments — drop them from the roster as well.
+  try {
+    const board = await getExcoBoard();
+    for (const seat of board.seats) {
+      if (seat.member_id === memberId) {
+        await assignExcoOffice({
+          office: seat.office,
+          member_id: null,
+          updated_by: "login_delete",
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[deleteMemberLogin] EXCO clear failed:", err);
+  }
+
+  await deleteMemberRow(memberId);
+  return { memberRemoved: true };
 }
 
 export { listMembersWithoutLogin, listMembersWithLogin } from "./store";

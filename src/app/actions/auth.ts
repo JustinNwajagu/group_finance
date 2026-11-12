@@ -5,8 +5,11 @@ import { redirect } from "next/navigation";
 import { adminAuth } from "@/lib/firebase-admin";
 import {
   DEV_SESSION_COOKIE,
+  IDLE_SIGNED_OUT_MESSAGE,
+  LAST_ACTIVE_COOKIE,
   SESSION_COOKIE,
   homePathForRole,
+  sessionIdleMs,
 } from "@/lib/auth";
 import { firebaseAdminConfigured, isAdminEmail } from "@/lib/config";
 import {
@@ -17,6 +20,25 @@ import { resolveAppRole } from "@/lib/user-roles";
 import type { AppRole } from "@/lib/types";
 
 const SESSION_DAYS = 14;
+
+function setLastActiveCookie(
+  jar: Awaited<ReturnType<typeof cookies>>,
+  when = Date.now(),
+) {
+  jar.set(LAST_ACTIVE_COOKIE, String(when), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
+  });
+}
+
+function clearSessionCookies(jar: Awaited<ReturnType<typeof cookies>>) {
+  jar.delete(SESSION_COOKIE);
+  jar.delete(DEV_SESSION_COOKIE);
+  jar.delete(LAST_ACTIVE_COOKIE);
+}
 
 export async function createFirebaseSession(
   idToken: string,
@@ -87,6 +109,7 @@ export async function createFirebaseSession(
       maxAge: SESSION_DAYS * 24 * 60 * 60,
     });
     jar.delete(DEV_SESSION_COOKIE);
+    setLastActiveCookie(jar);
     return { ok: true, role, redirectTo: homePathForRole(role) };
   } catch {
     return {
@@ -124,12 +147,38 @@ export async function createDevSession(formData: FormData): Promise<void> {
       maxAge: SESSION_DAYS * 24 * 60 * 60,
     },
   );
+  setLastActiveCookie(jar);
   redirect(homePathForRole(role));
 }
 
 export async function signOut(): Promise<void> {
   const jar = await cookies();
-  jar.delete(SESSION_COOKIE);
-  jar.delete(DEV_SESSION_COOKIE);
+  clearSessionCookies(jar);
   redirect("/login");
+}
+
+/** Client idle guard — clear session and send the user back to sign-in. */
+export async function signOutDueToInactivity(): Promise<void> {
+  const jar = await cookies();
+  clearSessionCookies(jar);
+  redirect(
+    "/login?error=" + encodeURIComponent(IDLE_SIGNED_OUT_MESSAGE),
+  );
+}
+
+/** Optional touch from the client when activity is detected. */
+export async function touchSessionActivity(): Promise<{ ok: true }> {
+  const jar = await cookies();
+  const hasSession = Boolean(
+    jar.get(SESSION_COOKIE)?.value || jar.get(DEV_SESSION_COOKIE)?.value,
+  );
+  if (!hasSession) return { ok: true };
+  const raw = jar.get(LAST_ACTIVE_COOKIE)?.value;
+  const last = Number(raw);
+  if (Number.isFinite(last) && Date.now() - last > sessionIdleMs()) {
+    clearSessionCookies(jar);
+    return { ok: true };
+  }
+  setLastActiveCookie(jar);
+  return { ok: true };
 }

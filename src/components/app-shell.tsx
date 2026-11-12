@@ -2,8 +2,9 @@ import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/brand-logo";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { SessionIdleGuard } from "@/components/session-idle-guard";
 import type { ViewerContext } from "@/lib/auth";
-import { homePathForRole, isAdmin } from "@/lib/auth";
+import { homePathForRole, isAdmin, sessionIdleMs } from "@/lib/auth";
 import { countPendingAccessRequests } from "@/lib/access-requests";
 import { getExcoSeatForEmail } from "@/lib/exco";
 
@@ -37,6 +38,7 @@ export async function AppShell({
 
   return (
     <div className="shell">
+      <SessionIdleGuard idleMs={sessionIdleMs()} />
       <header className="topbar">
         <Link href={homeHref} className="brand">
           <BrandLogo size={36} />

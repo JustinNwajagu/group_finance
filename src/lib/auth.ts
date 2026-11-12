@@ -10,6 +10,24 @@ import type { AppRole, AppUser } from "./types";
 
 export const SESSION_COOKIE = "__session";
 export const DEV_SESSION_COOKIE = "klef_dev_session";
+/** Client + server readable timestamp (ms) of last user activity. */
+export const LAST_ACTIVE_COOKIE = "klef_last_active";
+
+/** Default idle window before the next visit requires sign-in again. */
+export const DEFAULT_SESSION_IDLE_MINUTES = 30;
+
+export function sessionIdleMinutes(): number {
+  const raw = Number(process.env.SESSION_IDLE_MINUTES ?? DEFAULT_SESSION_IDLE_MINUTES);
+  if (!Number.isFinite(raw) || raw < 1) return DEFAULT_SESSION_IDLE_MINUTES;
+  return Math.min(24 * 60, Math.floor(raw));
+}
+
+export function sessionIdleMs(): number {
+  return sessionIdleMinutes() * 60 * 1000;
+}
+
+export const IDLE_SIGNED_OUT_MESSAGE =
+  "Signed out after inactivity. Sign in again to continue.";
 
 export type ViewerContext = {
   sub: string;

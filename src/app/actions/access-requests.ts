@@ -80,17 +80,23 @@ export async function classifyLoginFailure(
 
 export async function submitAccessRequest(input: {
   email: string;
+  title: string;
   name: string;
   phone: string;
   password: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { formatTitledName, isNameTitle } = await import("@/lib/name-titles");
   const email = input.email.trim().toLowerCase();
+  const title = input.title.trim();
   const name = input.name.trim();
   const phone = input.phone.trim();
   const password = input.password;
 
   if (!email.includes("@")) {
     return { ok: false, error: "Enter a valid email address." };
+  }
+  if (!isNameTitle(title)) {
+    return { ok: false, error: "Choose a title (Mr, Dr, Engr, Chief, or Sir)." };
   }
   if (name.length < 2) {
     return { ok: false, error: "Enter your full name." };
@@ -138,7 +144,7 @@ export async function submitAccessRequest(input: {
     await auth.createUser({
       email,
       password,
-      displayName: name,
+      displayName: formatTitledName(title, name),
       emailVerified: false,
     });
   } catch (err) {
@@ -159,7 +165,7 @@ export async function submitAccessRequest(input: {
   }
 
   try {
-    await createAccessRequest({ email, name, phone });
+    await createAccessRequest({ email, title, name, phone });
   } catch (err) {
     try {
       const user = await auth.getUserByEmail(email);
@@ -177,6 +183,13 @@ export async function submitAccessRequest(input: {
   }
 
   revalidatePath("/access");
+  revalidatePath("/");
+  revalidatePath("/payments");
+  revalidatePath("/dues");
+  revalidatePath("/expenses");
+  revalidatePath("/archive");
+  revalidatePath("/regulations");
+  revalidatePath("/profile");
   return { ok: true };
 }
 

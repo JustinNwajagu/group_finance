@@ -19,6 +19,7 @@ import {
 } from "@/app/actions/access-requests";
 import { PasswordInput } from "@/components/password-input";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
+import { NAME_TITLES } from "@/lib/name-titles";
 
 const WRONG_CREDENTIALS_MESSAGE =
   "Incorrect email or password. Check your details and try again.";
@@ -476,6 +477,7 @@ function AccessRequestDialog({
     startTransition(async () => {
       const result = await submitAccessRequest({
         email: String(data.get("email") ?? ""),
+        title: String(data.get("title") ?? ""),
         name: String(data.get("name") ?? ""),
         phone: String(data.get("phone") ?? ""),
         password: String(data.get("password") ?? ""),
@@ -530,15 +532,30 @@ function AccessRequestDialog({
             disabled={pending}
           />
         </label>
-        <label className="field">
-          Full name
-          <input
-            name="name"
-            required
-            autoComplete="name"
-            disabled={pending}
-          />
-        </label>
+        <div className="form-grid two">
+          <label className="field">
+            Title
+            <select name="title" required defaultValue="" disabled={pending}>
+              <option value="" disabled>
+                Choose…
+              </option>
+              {NAME_TITLES.map((title) => (
+                <option key={title} value={title}>
+                  {title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            Full name
+            <input
+              name="name"
+              required
+              autoComplete="name"
+              disabled={pending}
+            />
+          </label>
+        </div>
         <label className="field">
           Phone number
           <input

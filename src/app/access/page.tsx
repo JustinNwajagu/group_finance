@@ -19,6 +19,7 @@ import {
 import { isAdminEmail } from "@/lib/config";
 import { listExcoSeatViews } from "@/lib/exco";
 import { formatTimestamp } from "@/lib/format";
+import { formatTitledName } from "@/lib/name-titles";
 import { listAllMembers, listMembersWithLogin } from "@/lib/store";
 import { ensurePrimaryAdminRole, resolveAppRole } from "@/lib/user-roles";
 
@@ -167,7 +168,7 @@ export default async function AccessPage({
               {pending.map((r) => (
                 <div key={r.id} className="access-request-card">
                   <div>
-                    <strong>{r.name}</strong>
+                    <strong>{formatTitledName(r.title, r.name)}</strong>
                     <div className="muted">
                       {r.email} · {r.phone} · {formatTimestamp(r.created_at)}
                     </div>

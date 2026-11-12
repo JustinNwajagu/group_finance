@@ -4,6 +4,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type { ViewerContext } from "@/lib/auth";
 import { homePathForRole, isAdmin } from "@/lib/auth";
+import { countPendingAccessRequests } from "@/lib/access-requests";
 import { getExcoSeatForEmail } from "@/lib/exco";
 
 export async function AppShell({
@@ -25,10 +26,14 @@ export async function AppShell({
 }) {
   const admin = isAdmin(viewer);
   const homeHref = homePathForRole(viewer.access?.role ?? "member");
-  const exco = await getExcoSeatForEmail(viewer.email);
+  const [exco, pendingAccessCount] = await Promise.all([
+    getExcoSeatForEmail(viewer.email),
+    admin ? countPendingAccessRequests() : Promise.resolve(0),
+  ]);
   const roleLabel = exco
     ? exco.label
     : (viewer.access?.role ?? "guest");
+  const showAccessAlert = admin && pendingAccessCount > 0;
 
   return (
     <div className="shell">
@@ -86,9 +91,23 @@ export async function AppShell({
             <Link
               href="/access"
               prefetch
-              className={active === "access" ? "nav-link active" : "nav-link"}
+              className={
+                active === "access"
+                  ? "nav-link active nav-link-with-badge"
+                  : "nav-link nav-link-with-badge"
+              }
+              aria-label={
+                pendingAccessCount > 0
+                  ? `Access, ${pendingAccessCount} pending request${pendingAccessCount === 1 ? "" : "s"}`
+                  : "Access"
+              }
             >
               Access
+              {pendingAccessCount > 0 ? (
+                <span className="nav-count" aria-hidden="true">
+                  {pendingAccessCount > 9 ? "9+" : pendingAccessCount}
+                </span>
+              ) : null}
             </Link>
           ) : null}
         </nav>
@@ -117,6 +136,22 @@ export async function AppShell({
           </form>
         </div>
       </header>
+      {showAccessAlert ? (
+        <div className="admin-alert" role="status">
+          <p>
+            {pendingAccessCount === 1
+              ? "1 new login request is waiting for approval."
+              : `${pendingAccessCount} new login requests are waiting for approval.`}
+          </p>
+          {active === "access" ? (
+            <span className="admin-alert-meta">Review below</span>
+          ) : (
+            <Link href="/access" className="admin-alert-link">
+              Review on Access
+            </Link>
+          )}
+        </div>
+      ) : null}
       <main className="main">{children}</main>
     </div>
   );

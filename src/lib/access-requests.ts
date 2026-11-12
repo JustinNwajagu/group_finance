@@ -17,6 +17,8 @@ export type AccessRequestStatus = "pending" | "approved" | "rejected";
 export type AccessRequestRow = {
   id: number;
   email: string;
+  /** Honorific such as Mr / Dr / Engr / Chief / Sir. */
+  title: string;
   name: string;
   phone: string;
   status: AccessRequestStatus;
@@ -68,6 +70,7 @@ function normalizeRequest(raw: Record<string, unknown>): AccessRequestRow | null
   return {
     id: Number(raw.id),
     email: String(raw.email ?? "").toLowerCase(),
+    title: String(raw.title ?? "").trim(),
     name: String(raw.name ?? ""),
     phone: String(raw.phone ?? ""),
     status: (raw.status as AccessRequestStatus) ?? "pending",
@@ -99,10 +102,12 @@ async function nextId(): Promise<number> {
 
 export async function createAccessRequest(input: {
   email: string;
+  title: string;
   name: string;
   phone: string;
 }): Promise<AccessRequestRow> {
   const email = input.email.trim().toLowerCase();
+  const title = input.title.trim();
   const name = input.name.trim();
   const phone = input.phone.trim();
   const created_at = new Date().toISOString();
@@ -110,6 +115,7 @@ export async function createAccessRequest(input: {
   const row: AccessRequestRow = {
     id,
     email,
+    title,
     name,
     phone,
     status: "pending",
@@ -126,6 +132,11 @@ export async function createAccessRequest(input: {
   db.requests.push(row);
   await saveLocal(db);
   return row;
+}
+
+export async function countPendingAccessRequests(): Promise<number> {
+  const rows = await listAccessRequests("pending");
+  return rows.length;
 }
 
 export async function listAccessRequests(
@@ -254,6 +265,8 @@ export async function provisionApprovedUser(
     | { mode: "create" },
 ): Promise<{ passwordResetLink: string | null; member: MemberRow }> {
   const capacity = await loginCapacity();
+  const { formatTitledName } = await import("./name-titles");
+  const displayName = formatTitledName(request.title, request.name);
 
   let member: MemberRow | null = null;
 
@@ -273,7 +286,7 @@ export async function provisionApprovedUser(
   } else {
     // Creating a member increases roster by 1 and login by 1 — always capacity-safe.
     member = await createMember({
-      name: request.name,
+      name: displayName,
       email: request.email,
       phone: request.phone,
     });
@@ -288,6 +301,11 @@ export async function provisionApprovedUser(
     try {
       const existing = await auth.getUserByEmail(request.email);
       authUid = existing.uid;
+      try {
+        await auth.updateUser(authUid, { displayName });
+      } catch {
+        /* keep existing Auth profile if update fails */
+      }
     } catch {
       // Fallback if the requester somehow has no Auth user yet.
       const crypto = await import("node:crypto");
@@ -295,7 +313,7 @@ export async function provisionApprovedUser(
       const created = await auth.createUser({
         email: request.email,
         password: temp,
-        displayName: request.name,
+        displayName,
         emailVerified: false,
       });
       authUid = created.uid;

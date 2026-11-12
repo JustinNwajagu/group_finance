@@ -15,8 +15,12 @@ function bucket(): Map<string, CacheEntry> {
   return g.__klefFsCache;
 }
 
-/** Short TTL so dashboard hops reuse warm Firestore reads. */
-const DEFAULT_TTL_MS = 8_000;
+/**
+ * Keep collection snapshots warm across dashboard hops.
+ * Was 8s — too short under Spark/free quotas and caused Home to re-scan
+ * members+payments+dues on nearly every navigation (RESOURCE_EXHAUSTED).
+ */
+const DEFAULT_TTL_MS = 120_000;
 
 export function invalidateStoreCache(prefix?: string): void {
   const map = bucket();

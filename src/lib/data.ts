@@ -27,14 +27,13 @@ export async function requestedPaymentCount(): Promise<number> {
 
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
   const q = query?.trim().toLowerCase() ?? "";
-  const [members, requests, payments, schedules, allDuesPayments] =
-    await Promise.all([
-      listAllMembers(),
-      listAllPaymentRequestRows(),
-      listAllPaymentRows(),
-      listAllDuesSchedules(),
-      listAllDuesPayments(),
-    ]);
+  // Sequential collection loads avoid bursting Firestore under free/Spark
+  // rate limits (parallel gets were surfacing RESOURCE_EXHAUSTED on Home).
+  const members = await listAllMembers();
+  const requests = await listAllPaymentRequestRows();
+  const payments = await listAllPaymentRows();
+  const schedules = await listAllDuesSchedules();
+  const allDuesPayments = await listAllDuesPayments();
   const paymentCount = requests.length;
   const duesYearsCount = schedules.length;
   const duesByScheduleMember = new Map<string, typeof allDuesPayments>();
@@ -43,6 +42,14 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
     const list = duesByScheduleMember.get(key) ?? [];
     list.push(p);
     duesByScheduleMember.set(key, list);
+  }
+  const paidContributionCountByMember = new Map<number, number>();
+  for (const p of payments) {
+    if (p.status !== "paid") continue;
+    paidContributionCountByMember.set(
+      p.member_id,
+      (paidContributionCountByMember.get(p.member_id) ?? 0) + 1,
+    );
   }
 
   return members
@@ -66,9 +73,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
       return {
         ...m,
         payment_count: paymentCount,
-        contribution_count: payments.filter(
-          (p) => p.member_id === m.id && p.status === "paid",
-        ).length,
+        contribution_count: paidContributionCountByMember.get(m.id) ?? 0,
         dues_count: duesCount,
         dues_years_count: duesYearsCount,
       };

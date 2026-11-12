@@ -7,6 +7,7 @@ import { adminDb } from "./firebase-admin";
 import { isFirestore } from "./config";
 import { normalizePaymentTitle } from "./format";
 import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
+import { withFirestoreRetry } from "./firestore-retry";
 import { compareMembersByName } from "./member-sort";
 import {
   defaultRegulationsDoc,
@@ -517,7 +518,9 @@ function normalizeMember(raw: Record<string, unknown>): MemberRow | null {
 export const listAllMembers = cache(async (): Promise<MemberRow[]> => {
   return cachedLoad("members", async () => {
     if (isFirestore()) {
-      const snap = await adminDb()!.collection("members").get();
+      const snap = await withFirestoreRetry("members.get", () =>
+        adminDb()!.collection("members").get(),
+      );
       return snap.docs
         .map((d) => normalizeMember(d.data() as Record<string, unknown>))
         .filter((d): d is MemberRow => d != null)
@@ -613,7 +616,9 @@ export const listAllPaymentRequestRows = cache(
   async (): Promise<PaymentRequestRow[]> => {
     return cachedLoad("payment_requests", async () => {
       if (isFirestore()) {
-        const snap = await adminDb()!.collection("payment_requests").get();
+        const snap = await withFirestoreRetry("payment_requests.get", () =>
+          adminDb()!.collection("payment_requests").get(),
+        );
         return snap.docs
           .map((d) =>
             normalizePaymentRequest(d.data() as Record<string, unknown>),
@@ -678,7 +683,9 @@ export async function updatePaymentRequestRow(
 export const listAllPaymentRows = cache(async (): Promise<PaymentRow[]> => {
   return cachedLoad("payments", async () => {
     if (isFirestore()) {
-      const snap = await adminDb()!.collection("payments").get();
+      const snap = await withFirestoreRetry("payments.get", () =>
+        adminDb()!.collection("payments").get(),
+      );
       return snap.docs
         .map((d) => normalizePayment(d.data() as Record<string, unknown>))
         .filter((d): d is PaymentRow => d != null);
@@ -995,7 +1002,9 @@ export async function createDuesSchedule(input: {
 export const listAllDuesSchedules = cache(async (): Promise<DuesScheduleRow[]> => {
   return cachedLoad("dues_schedules", async () => {
     if (isFirestore()) {
-      const snap = await adminDb()!.collection("dues_schedules").get();
+      const snap = await withFirestoreRetry("dues_schedules.get", () =>
+        adminDb()!.collection("dues_schedules").get(),
+      );
       return snap.docs
         .map((d) => normalizeDuesSchedule(d.data() as Record<string, unknown>))
         .filter((d): d is DuesScheduleRow => d != null)
@@ -1062,7 +1071,9 @@ export async function updateDuesScheduleRow(
 export const listAllDuesPayments = cache(async (): Promise<DuesPaymentRow[]> => {
   return cachedLoad("dues_payments", async () => {
     if (isFirestore()) {
-      const snap = await adminDb()!.collection("dues_payments").get();
+      const snap = await withFirestoreRetry("dues_payments.get", () =>
+        adminDb()!.collection("dues_payments").get(),
+      );
       return snap.docs
         .map((d) => normalizeDuesPayment(d.data() as Record<string, unknown>))
         .filter((d): d is DuesPaymentRow => d != null);
@@ -1554,7 +1565,9 @@ export async function saveRegulations(input: {
 export const listAllExpenses = cache(async (): Promise<ExpenseRow[]> => {
   return cachedLoad("expenses", async () => {
     if (isFirestore()) {
-      const snap = await adminDb()!.collection("expenses").get();
+      const snap = await withFirestoreRetry("expenses.get", () =>
+        adminDb()!.collection("expenses").get(),
+      );
       return snap.docs
         .map((d) => normalizeExpense(d.data() as Record<string, unknown>))
         .filter((d): d is ExpenseRow => d != null)

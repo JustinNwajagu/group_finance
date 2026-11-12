@@ -288,7 +288,7 @@ export function LoginForm({
           setRequestOpen(false);
           setError(null);
           setRequestNotice(
-            "Request sent. An admin must approve it before you can sign in.",
+            "Request sent. An admin has been notified and must approve it before you can sign in.",
           );
         }}
       />

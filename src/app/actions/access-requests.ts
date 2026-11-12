@@ -164,8 +164,10 @@ export async function submitAccessRequest(input: {
     return { ok: false, error: "Could not create the account. Try again." };
   }
 
+  let requestId = 0;
   try {
-    await createAccessRequest({ email, title, name, phone });
+    const created = await createAccessRequest({ email, title, name, phone });
+    requestId = created.id;
   } catch (err) {
     try {
       const user = await auth.getUserByEmail(email);
@@ -180,6 +182,20 @@ export async function submitAccessRequest(input: {
           ? err.message
           : "Could not save your access request.",
     };
+  }
+
+  try {
+    const { notifyAdminsOfAccessRequest } = await import("@/lib/admin-notify");
+    await notifyAdminsOfAccessRequest({
+      kind: "access_request",
+      requestId,
+      email,
+      title,
+      name,
+      phone,
+    });
+  } catch {
+    // Request is saved; admin still sees the Access badge/banner if email fails.
   }
 
   revalidatePath("/access");

@@ -65,22 +65,24 @@ export function Flash({
       // Reload clears previous flash so the user can try again cleanly.
       stripFlashParams(url);
       window.history.replaceState({}, "", pathWithQuery(url));
+      setContent(null);
       return;
     }
 
+    // A successful action replaces any prior error; a new error replaces ok.
     if (error) {
       setContent({ kind: "error", text: error });
     } else if (ok && messages[ok]) {
       setContent({ kind: "ok", text: messages[ok] });
+    } else if (ok || error === "") {
+      setContent(null);
     }
 
     if (hasFlash) {
       stripFlashParams(url);
       window.history.replaceState({}, "", pathWithQuery(url));
     }
-    // Mount-only: flash comes from the request URL for this page load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ok, error, messages]);
 
   if (!content) return null;
 

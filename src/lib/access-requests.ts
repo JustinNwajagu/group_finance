@@ -4,6 +4,7 @@ import path from "node:path";
 import { adminAuth, adminDb } from "./firebase-admin";
 import { isFirestore } from "./config";
 import {
+  clearMemberLoginLink,
   countLinkedLogins,
   countMembers,
   createMember,
@@ -363,7 +364,9 @@ export async function provisionApprovedUser(
 
 /**
  * Remove Firebase login for a member but keep the roster row.
- * Clears auth_uid / login_email so a new login can be linked later.
+ * Always unlinks auth_uid / login_email from that member so the login is no
+ * longer tied to them; Auth / access-request cleanup is best-effort and must
+ * not leave the roster still linked.
  */
 export async function deleteMemberLogin(memberId: number): Promise<void> {
   const member = await getMemberById(memberId);
@@ -374,42 +377,60 @@ export async function deleteMemberLogin(memberId: number): Promise<void> {
     throw new Error("This member has no login to delete.");
   }
 
+  const loginEmail = (member.login_email || "").trim().toLowerCase();
+  const emails = new Set<string>();
+  if (loginEmail) emails.add(loginEmail);
+
   const auth = adminAuth();
   if (auth) {
-    try {
-      if (member.auth_uid) {
-        await auth.deleteUser(member.auth_uid);
-      } else if (member.login_email) {
-        const user = await auth.getUserByEmail(member.login_email);
-        await auth.deleteUser(user.uid);
+    // Collect the Auth email (may differ if login_email was stale) then delete.
+    if (member.auth_uid) {
+      try {
+        const user = await auth.getUser(member.auth_uid);
+        const authEmail = (user.email || "").trim().toLowerCase();
+        if (authEmail) emails.add(authEmail);
+      } catch {
+        /* user may already be gone */
       }
-    } catch (err) {
-      const code = (err as { code?: string }).code;
-      // Already gone in Auth — still clear the roster link.
-      if (code !== "auth/user-not-found") {
-        throw err instanceof Error ? err : new Error("Could not delete login.");
+      try {
+        await auth.deleteUser(member.auth_uid);
+      } catch (err) {
+        const code = (err as { code?: string }).code;
+        if (code !== "auth/user-not-found") {
+          console.error("[deleteMemberLogin] Auth uid delete failed:", err);
+        }
+      }
+    }
+
+    for (const email of [...emails]) {
+      try {
+        const user = await auth.getUserByEmail(email);
+        await auth.deleteUser(user.uid);
+      } catch (err) {
+        const code = (err as { code?: string }).code;
+        if (code !== "auth/user-not-found") {
+          console.error("[deleteMemberLogin] Auth email delete failed:", err);
+        }
       }
     }
   }
 
-  await updateMemberRow(memberId, {
-    auth_uid: null,
-    login_email: null,
-  });
+  // Always unlink from the previously linked member, even if Auth cleanup failed.
+  await clearMemberLoginLink(memberId);
 
-  // Remove the approved access record so they cannot sign in again
-  // until a new request is approved.
-  if (member.login_email) {
-    const { deleteUserRole } = await import("./user-roles");
-    await deleteUserRole(member.login_email);
-    const rows = await listAccessRequests();
-    const match = rows.find(
-      (r) =>
-        r.email === member.login_email!.toLowerCase() &&
-        r.status === "approved",
-    );
-    if (match) {
-      await deleteAccessRequest(match.id);
+  // Drop role + approved access so this login cannot sign in again until re-approved.
+  const { deleteUserRole } = await import("./user-roles");
+  for (const email of emails) {
+    await deleteUserRole(email);
+  }
+
+  const rows = await listAccessRequests();
+  for (const row of rows) {
+    const emailMatch =
+      row.email && emails.has(row.email.trim().toLowerCase());
+    const memberMatch = row.member_id === memberId;
+    if (row.status === "approved" && (emailMatch || memberMatch)) {
+      await deleteAccessRequest(row.id);
     }
   }
 }

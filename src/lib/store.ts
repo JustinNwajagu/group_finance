@@ -410,6 +410,23 @@ export async function updateMemberRow(
   invalidateStoreCache();
 }
 
+/** Remove login linkage fields from a roster member (Auth account may be deleted separately). */
+export async function clearMemberLoginLink(id: number): Promise<void> {
+  if (!Number.isFinite(id) || id <= 0) return;
+  if (isFirestore()) {
+    await adminDb()!
+      .collection("members")
+      .doc(String(id))
+      .update({
+        auth_uid: FieldValue.delete(),
+        login_email: FieldValue.delete(),
+      });
+    invalidateStoreCache();
+    return;
+  }
+  await updateMemberRow(id, { auth_uid: null, login_email: null });
+}
+
 export async function deleteMemberRow(id: number): Promise<void> {
   if (!Number.isFinite(id) || id <= 0) return;
   if (isFirestore()) {
@@ -423,14 +440,18 @@ export async function deleteMemberRow(id: number): Promise<void> {
   invalidateStoreCache();
 }
 
+function memberHasLinkedLogin(m: MemberRow): boolean {
+  return Boolean(m.auth_uid) || Boolean((m.login_email || "").trim());
+}
+
 /** Roster members that do not yet have a linked login. */
 export async function listMembersWithoutLogin(): Promise<MemberRow[]> {
-  return (await listAllMembers()).filter((m) => !m.auth_uid);
+  return (await listAllMembers()).filter((m) => !memberHasLinkedLogin(m));
 }
 
 /** Roster members that currently have a linked login. */
 export async function listMembersWithLogin(): Promise<MemberRow[]> {
-  return (await listAllMembers()).filter((m) => Boolean(m.auth_uid));
+  return (await listAllMembers()).filter((m) => memberHasLinkedLogin(m));
 }
 
 /** Find a roster member linked to a login / contact email. */
@@ -454,7 +475,7 @@ export async function countMembers(): Promise<number> {
 }
 
 export async function countLinkedLogins(): Promise<number> {
-  return (await listAllMembers()).filter((m) => Boolean(m.auth_uid)).length;
+  return (await listAllMembers()).filter((m) => memberHasLinkedLogin(m)).length;
 }
 
 function coerceCreatedAt(raw: Record<string, unknown>): string {

@@ -1,5 +1,6 @@
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
+import { listUnlinkedMembersForSignup } from "@/app/actions/access-requests";
 import { LoginForm } from "@/components/login-form";
 import { BrandLogo } from "@/components/brand-logo";
 import { Flash } from "@/components/flash";
@@ -22,6 +23,7 @@ export default async function LoginPage({
   const params = await searchParams;
   const error = typeof params.error === "string" ? params.error : undefined;
   const config = firebaseClientConfig();
+  const unlinkedMembers = await listUnlinkedMembersForSignup();
 
   return (
     <div className="gate">
@@ -30,7 +32,11 @@ export default async function LoginPage({
         <p className="gate-brand">KLEF 13</p>
         <h1>Sign in</h1>
         <Flash ok={undefined} error={error} messages={{}} />
-        <LoginForm firebaseConfig={config} adminEmail={adminEmail()} />
+        <LoginForm
+          firebaseConfig={config}
+          adminEmail={adminEmail()}
+          unlinkedMembers={unlinkedMembers}
+        />
       </div>
     </div>
   );

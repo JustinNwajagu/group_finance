@@ -13,7 +13,6 @@ import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAdmin, adminEmail } from "@/lib/auth";
 import {
   listAccessRequests,
-  listMembersWithoutLogin,
   loginCapacity,
 } from "@/lib/access-requests";
 import { isAdminEmail } from "@/lib/config";
@@ -39,10 +38,9 @@ export default async function AccessPage({
   const createdName =
     typeof params.name === "string" ? params.name.trim() : "";
   await ensurePrimaryAdminRole();
-  const [pending, unlinkable, withLogin, capacity, allMembers, excoSeats] =
+  const [pending, withLogin, capacity, allMembers, excoSeats] =
     await Promise.all([
       listAccessRequests("pending"),
-      listMembersWithoutLogin(),
       listMembersWithLogin(),
       loginCapacity(),
       listAllMembers(),
@@ -70,12 +68,11 @@ export default async function AccessPage({
         <div>
           <h1>Access</h1>
           <p>
-            Roster members do not get login automatically. Approve requests by
-            linking to an existing member or creating a new one. Linking only
-            succeeds when at least one personal name matches the selected
-            member. Logins cannot exceed the member count (
-            {capacity.logins}/{capacity.members} used). Admin rights follow EXCO
-            offices (President and Treasurer only).
+            Requesters pick their roster name (or New member) when creating an
+            account. Confirm each request is legitimate, then approve — claimed
+            names are linked, new names are added to the roster. Logins cannot
+            exceed the member count ({capacity.logins}/{capacity.members} used).
+            Admin rights follow EXCO offices (President and Treasurer only).
           </p>
         </div>
       </div>
@@ -170,31 +167,58 @@ export default async function AccessPage({
             <div className="hero-empty">No pending access requests.</div>
           ) : (
             <div className="stack" style={{ gap: "1rem" }}>
-              {pending.map((r) => (
-                <div key={r.id} className="access-request-card">
-                  <div>
-                    <strong>{formatTitledName(r.title, r.name)}</strong>
-                    <div className="muted">
-                      {r.email} · {r.phone} · {formatTimestamp(r.created_at)}
+              {pending.map((r) => {
+                const claimed =
+                  r.claimed_member_id != null
+                    ? allMembers.find((m) => m.id === r.claimed_member_id)
+                    : null;
+                const displayName =
+                  r.claimed_member_id != null
+                    ? claimed?.name || r.name
+                    : formatTitledName(r.title, r.name);
+                const kind = r.claimed_member_id != null ? "claim" : "new";
+                return (
+                  <div key={r.id} className="access-request-card">
+                    <div className="access-request-meta">
+                      <div className="access-request-title-row">
+                        <strong>{displayName}</strong>
+                        <span
+                          className={
+                            kind === "new"
+                              ? "badge badge-member"
+                              : "badge badge-exco"
+                          }
+                        >
+                          {kind === "new" ? "New member" : "Roster claim"}
+                        </span>
+                      </div>
+                      <div className="muted">
+                        {r.email}
+                        {r.phone ? ` · ${r.phone}` : ""}
+                        {" · "}
+                        {formatTimestamp(r.created_at)}
+                      </div>
+                    </div>
+
+                    <div className="access-request-actions">
+                      <ApproveAccessForm
+                        requestId={r.id}
+                        kind={kind}
+                        claimedMemberName={claimed?.name || r.name}
+                        atLoginCap={atLoginCap}
+                      />
+                      <form action={rejectAccessRequest}>
+                        <input type="hidden" name="id" value={r.id} />
+                        <PendingSubmitButton
+                          className="btn-ghost"
+                          idleLabel="Reject"
+                          pendingLabel="Rejecting…"
+                        />
+                      </form>
                     </div>
                   </div>
-
-                  <ApproveAccessForm
-                    requestId={r.id}
-                    unlinkable={unlinkable}
-                    atLoginCap={atLoginCap}
-                  />
-
-                  <form action={rejectAccessRequest}>
-                    <input type="hidden" name="id" value={r.id} />
-                    <PendingSubmitButton
-                      className="btn-ghost"
-                      idleLabel="Reject"
-                      pendingLabel="Rejecting…"
-                    />
-                  </form>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

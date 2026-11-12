@@ -1,108 +1,51 @@
 "use client";
 
-import { useState } from "react";
 import { approveAccessRequest } from "@/app/actions/access-requests";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
-import type { Member } from "@/lib/types";
 
 export function ApproveAccessForm({
   requestId,
-  unlinkable,
+  kind,
+  claimedMemberName,
   atLoginCap,
 }: {
   requestId: number;
-  unlinkable: Member[];
+  kind: "claim" | "new";
+  claimedMemberName?: string | null;
   atLoginCap: boolean;
 }) {
-  const [mode, setMode] = useState("");
-  const [memberId, setMemberId] = useState("");
-  const linkDisabled = unlinkable.length === 0 || atLoginCap;
-  const needsMember = mode === "link";
+  const blocked = atLoginCap && kind === "claim";
 
   return (
-    <form
-      action={approveAccessRequest}
-      className="form-grid"
-      onSubmit={(event) => {
-        if (mode !== "link" && mode !== "create") {
-          event.preventDefault();
-          window.alert("Choose link to an existing member or create a new member.");
-          return;
-        }
-        if (mode === "link" && !memberId) {
-          event.preventDefault();
-          window.alert("Select an existing member to link this login to.");
-        }
-      }}
-    >
+    <form action={approveAccessRequest} className="access-approve-row">
       <input type="hidden" name="id" value={requestId} />
-      <label className="field">
-        Link login to
-        <select
-          name="link_mode"
-          required
-          value={mode}
-          onChange={(e) => {
-            const next = e.target.value;
-            setMode(next);
-            if (next !== "link") setMemberId("");
-          }}
-        >
-          <option value="" disabled>
-            Choose…
-          </option>
-          <option value="link" disabled={linkDisabled}>
-            Existing member
-            {unlinkable.length === 0
-              ? " (none available)"
-              : atLoginCap
-                ? " (login limit reached)"
-                : ""}
-          </option>
-          <option value="create">Create new member</option>
-        </select>
-      </label>
-      <label className="field">
-        Existing member
-        <select
-          name="member_id"
-          value={memberId}
-          required={needsMember}
-          disabled={!needsMember || unlinkable.length === 0}
-          onChange={(e) => setMemberId(e.target.value)}
-        >
-          <option value="" disabled>
-            {needsMember
-              ? "Select member without a login"
-              : "Only needed when linking an existing member"}
-          </option>
-          {unlinkable.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-              {m.email ? ` · ${m.email}` : ""}
-              {m.phone ? ` · ${m.phone}` : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      {mode === "create" ? (
-        <p className="muted" style={{ margin: 0 }}>
-          Approving will add this person to the roster as a new member and
-          create their login.
+      <p className="muted" style={{ margin: 0 }}>
+        {kind === "claim" ? (
+          <>
+            Claims roster member{" "}
+            <strong>{claimedMemberName || "Unknown"}</strong>. Confirm they are
+            legitimate, then approve to link this login.
+          </>
+        ) : (
+          <>
+            Asked to join as a <strong>new member</strong>. Confirm they are
+            legitimate, then approve to add them to the roster and create their
+            login.
+          </>
+        )}
+      </p>
+      {blocked ? (
+        <p className="form-error" role="alert" style={{ margin: 0 }}>
+          Login limit reached — free a login or add roster capacity first.
         </p>
       ) : null}
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-        <PendingSubmitButton
-          idleLabel={
-            mode === "create"
-              ? "Approve & create member"
-              : mode === "link"
-                ? "Approve & link login"
-                : "Approve"
-          }
-          pendingLabel="Approving…"
-        />
-      </div>
+      <PendingSubmitButton
+        idleLabel={
+          kind === "new" ? "Approve & create member" : "Approve & link login"
+        }
+        pendingLabel="Approving…"
+        disabled={blocked}
+      />
     </form>
   );
 }

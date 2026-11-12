@@ -16,7 +16,10 @@ import {
   provisionApprovedUser,
   updateAccessRequest,
 } from "@/lib/access-requests";
-import { getMemberById } from "@/lib/store";
+import {
+  getMemberById,
+  listMembersWithoutLogin,
+} from "@/lib/store";
 import { setUserRole } from "@/lib/user-roles";
 
 export type LoginFailureKind =
@@ -24,6 +27,21 @@ export type LoginFailureKind =
   | "no_account"
   | "pending"
   | "other";
+
+export type UnlinkedMemberOption = {
+  id: number;
+  name: string;
+};
+
+/** Public roster names still without a login — for the create-account picker. */
+export async function listUnlinkedMembersForSignup(): Promise<
+  UnlinkedMemberOption[]
+> {
+  const rows = await listMembersWithoutLogin();
+  return rows
+    .map((m) => ({ id: m.id, name: m.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
 
 export async function classifyLoginFailure(
   email: string,
@@ -80,38 +98,85 @@ export async function classifyLoginFailure(
 
 export async function submitAccessRequest(input: {
   email: string;
-  title: string;
-  name: string;
-  phone: string;
   password: string;
-}): Promise<
-  | { ok: true; emailed: boolean }
-  | { ok: false; error: string }
-> {
+  /** "new" or a roster member id as string */
+  memberChoice: string;
+  title?: string;
+  name?: string;
+  phone?: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const { formatTitledName, isNameTitle } = await import("@/lib/name-titles");
   const email = input.email.trim().toLowerCase();
-  const title = input.title.trim();
-  const name = input.name.trim();
-  const phone = input.phone.trim();
   const password = input.password;
+  const choice = String(input.memberChoice ?? "").trim();
 
   if (!email.includes("@")) {
     return { ok: false, error: "Enter a valid email address." };
-  }
-  if (!isNameTitle(title)) {
-    return { ok: false, error: "Choose a title (Mr, Dr, Engr, Chief, or Sir)." };
-  }
-  if (name.length < 2) {
-    return { ok: false, error: "Enter your full name." };
-  }
-  if (phone.length < 7) {
-    return { ok: false, error: "Enter a valid phone number." };
   }
   if (password.length < 8) {
     return {
       ok: false,
       error: "Choose a password with at least 8 characters.",
     };
+  }
+  if (!choice) {
+    return {
+      ok: false,
+      error: "Select your name from the roster, or choose New member.",
+    };
+  }
+
+  let title = "";
+  let name = "";
+  let phone = "";
+  let claimedMemberId: number | null = null;
+
+  if (choice === "new") {
+    title = String(input.title ?? "").trim();
+    name = String(input.name ?? "").trim();
+    phone = String(input.phone ?? "").trim();
+    if (!isNameTitle(title)) {
+      return {
+        ok: false,
+        error: "Choose a title (Mr, Dr, Engr, Chief, or Sir).",
+      };
+    }
+    if (name.length < 2) {
+      return { ok: false, error: "Enter your full name." };
+    }
+    if (phone.length < 7) {
+      return { ok: false, error: "Enter a valid phone number." };
+    }
+  } else {
+    const memberId = Number(choice);
+    if (!Number.isFinite(memberId) || memberId <= 0) {
+      return { ok: false, error: "Select a valid roster member." };
+    }
+    const member = await getMemberById(memberId);
+    if (!member || member.auth_uid || member.login_email) {
+      return {
+        ok: false,
+        error:
+          "That roster name is no longer available. Pick another name or New member.",
+      };
+    }
+    const pendingClaim = (await listAccessRequests("pending")).some(
+      (r) => r.claimed_member_id === memberId,
+    );
+    if (pendingClaim) {
+      return {
+        ok: false,
+        error:
+          "Someone already requested that roster name. Pick another name or New member.",
+      };
+    }
+    claimedMemberId = memberId;
+    name = member.name;
+    phone = (member.phone || String(input.phone ?? "").trim() || "").trim();
+    if (phone.length < 7) {
+      // Allow claim without phone when roster has none; admin still sees the name.
+      phone = member.phone || "";
+    }
   }
 
   if (await emailHasAuthAccount(email)) {
@@ -136,8 +201,11 @@ export async function submitAccessRequest(input: {
     };
   }
 
+  const displayName =
+    claimedMemberId != null ? name : formatTitledName(title, name);
+
   // Create Auth credentials now (password is never stored in Firestore).
-  // App session still blocked until an admin approves + links a member.
+  // App session still blocked until an admin approves.
   const { adminAuth } = await import("@/lib/firebase-admin");
   const auth = adminAuth();
   if (!auth) {
@@ -147,7 +215,7 @@ export async function submitAccessRequest(input: {
     await auth.createUser({
       email,
       password,
-      displayName: formatTitledName(title, name),
+      displayName,
       emailVerified: false,
     });
   } catch (err) {
@@ -169,7 +237,13 @@ export async function submitAccessRequest(input: {
 
   let requestId = 0;
   try {
-    const created = await createAccessRequest({ email, title, name, phone });
+    const created = await createAccessRequest({
+      email,
+      title,
+      name,
+      phone,
+      claimed_member_id: claimedMemberId,
+    });
     requestId = created.id;
   } catch (err) {
     try {
@@ -187,7 +261,6 @@ export async function submitAccessRequest(input: {
     };
   }
 
-  let emailed = false;
   try {
     const { notifyAdminsOfAccessRequest } = await import("@/lib/admin-notify");
     const notify = await notifyAdminsOfAccessRequest({
@@ -198,12 +271,10 @@ export async function submitAccessRequest(input: {
       name,
       phone,
     });
-    emailed = notify.emailed;
     if (!notify.emailed && notify.error) {
       console.error("[access-request] admin email not sent:", notify.error);
     }
   } catch (err) {
-    // Request is saved; admin still sees the Access badge/banner if email fails.
     console.error("[access-request] admin notify failed:", err);
   }
 
@@ -215,7 +286,7 @@ export async function submitAccessRequest(input: {
   revalidatePath("/archive");
   revalidatePath("/regulations");
   revalidatePath("/profile");
-  return { ok: true, emailed };
+  return { ok: true };
 }
 
 export async function approveAccessRequest(
@@ -223,8 +294,6 @@ export async function approveAccessRequest(
 ): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
-  const mode = String(formData.get("link_mode") ?? "").trim();
-  const memberId = Number(formData.get("member_id"));
 
   if (!Number.isFinite(id)) {
     redirect("/access?error=" + encodeURIComponent("Invalid request."));
@@ -235,42 +304,25 @@ export async function approveAccessRequest(
     redirect("/access?error=" + encodeURIComponent("Request is not pending."));
   }
 
-  if (mode !== "link" && mode !== "create") {
-    redirect(
-      "/access?error=" +
-        encodeURIComponent(
-          "Choose link to an existing member or create a new member before approving.",
-        ),
-    );
-  }
+  const claimedId = request.claimed_member_id;
+  const mode = claimedId != null ? "link" : "create";
+  const memberId = claimedId ?? 0;
 
   if (mode === "link") {
-    if (!Number.isFinite(memberId) || memberId <= 0) {
-      redirect(
-        "/access?error=" +
-          encodeURIComponent(
-            "Select an existing member to link this login to.",
-          ),
-      );
-    }
-
     const member = await getMemberById(memberId);
     if (!member) {
       redirect(
         "/access?error=" +
-          encodeURIComponent("Selected member was not found."),
+          encodeURIComponent(
+            "The claimed roster member was not found. Reject this request or ask them to request again.",
+          ),
       );
     }
-
-    const { formatTitledName, namesShareAToken } = await import(
-      "@/lib/name-titles"
-    );
-    const requestName = formatTitledName(request.title, request.name);
-    if (!namesShareAToken(requestName, member.name)) {
+    if (member.auth_uid || member.login_email) {
       redirect(
         "/access?error=" +
           encodeURIComponent(
-            `Cannot link: none of the names in the request “${requestName}” match the selected member “${member.name}”. Pick the matching roster member, or create a new member instead.`,
+            "That roster member already has a login. Reject this request.",
           ),
       );
     }

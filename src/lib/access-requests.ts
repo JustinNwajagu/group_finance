@@ -22,11 +22,17 @@ export type AccessRequestStatus = "pending" | "approved" | "rejected";
 export type AccessRequestRow = {
   id: number;
   email: string;
-  /** Honorific such as Mr / Dr / Engr / Chief / Sir. */
+  /** Honorific such as Mr / Dr / Engr / Chief / Sir (new-member requests). */
   title: string;
   name: string;
   phone: string;
   status: AccessRequestStatus;
+  /**
+   * Roster member the requester claims to be (chosen at sign-up).
+   * Null means they asked to be added as a new member.
+   */
+  claimed_member_id: number | null;
+  /** Roster member linked after approval. */
   member_id: number | null;
   created_at: string;
   decided_at: string | null;
@@ -79,6 +85,10 @@ function normalizeRequest(raw: Record<string, unknown>): AccessRequestRow | null
     name: String(raw.name ?? ""),
     phone: String(raw.phone ?? ""),
     status: (raw.status as AccessRequestStatus) ?? "pending",
+    claimed_member_id:
+      raw.claimed_member_id == null || raw.claimed_member_id === ""
+        ? null
+        : Number(raw.claimed_member_id),
     member_id:
       raw.member_id == null || raw.member_id === ""
         ? null
@@ -110,11 +120,18 @@ export async function createAccessRequest(input: {
   title: string;
   name: string;
   phone: string;
+  claimed_member_id?: number | null;
 }): Promise<AccessRequestRow> {
   const email = input.email.trim().toLowerCase();
   const title = input.title.trim();
   const name = input.name.trim();
   const phone = input.phone.trim();
+  const claimed =
+    input.claimed_member_id != null &&
+    Number.isFinite(input.claimed_member_id) &&
+    input.claimed_member_id > 0
+      ? Number(input.claimed_member_id)
+      : null;
   const created_at = new Date().toISOString();
   const id = await nextId();
   const row: AccessRequestRow = {
@@ -124,6 +141,7 @@ export async function createAccessRequest(input: {
     name,
     phone,
     status: "pending",
+    claimed_member_id: claimed,
     member_id: null,
     created_at,
     decided_at: null,
@@ -280,14 +298,18 @@ export async function provisionApprovedUser(
     if (!member) {
       throw new Error("Selected member was not found.");
     }
-    if (member.auth_uid) {
+    if (member.auth_uid || member.login_email) {
       throw new Error("That member already has a login linked.");
     }
-    const { namesShareAToken } = await import("./name-titles");
-    if (!namesShareAToken(displayName, member.name)) {
-      throw new Error(
-        `Cannot link: none of the names in the request “${displayName}” match the selected member “${member.name}”. Pick the matching roster member, or create a new member instead.`,
-      );
+    // Claimed-at-signup links are trusted; free-form admin links still need a
+    // shared personal name so the wrong roster row is not attached by mistake.
+    if (request.claimed_member_id !== choice.memberId) {
+      const { namesShareAToken } = await import("./name-titles");
+      if (!namesShareAToken(displayName, member.name)) {
+        throw new Error(
+          `Cannot link: none of the names in the request “${displayName}” match the selected member “${member.name}”.`,
+        );
+      }
     }
     if (capacity.remaining < 1) {
       throw new Error(

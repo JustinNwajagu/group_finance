@@ -228,13 +228,14 @@ export async function notifyAdminsOfAccessRequest(
   }
 
   const link = accessUrl();
-  const subject = `KLEF 13: new login request from ${displayName}`;
+  const subject = `KLEF 13: new login request from ${displayName || payload.name}`;
+  const shownName = displayName || payload.name;
   const text = [
     "A new account / login request needs approval.",
     "",
-    `Name: ${displayName}`,
+    `Name: ${shownName}`,
     `Email: ${payload.email}`,
-    `Phone: ${payload.phone}`,
+    `Phone: ${payload.phone || "—"}`,
     `Request id: ${payload.requestId}`,
     "",
     `Open Access to approve or reject: ${link}`,
@@ -242,9 +243,9 @@ export async function notifyAdminsOfAccessRequest(
   const html = `
     <p>A new account / login request needs approval.</p>
     <ul>
-      <li><strong>Name:</strong> ${escapeHtml(displayName)}</li>
+      <li><strong>Name:</strong> ${escapeHtml(shownName)}</li>
       <li><strong>Email:</strong> ${escapeHtml(payload.email)}</li>
-      <li><strong>Phone:</strong> ${escapeHtml(payload.phone)}</li>
+      <li><strong>Phone:</strong> ${escapeHtml(payload.phone || "—")}</li>
       <li><strong>Request id:</strong> ${payload.requestId}</li>
     </ul>
     <p><a href="${escapeHtml(link)}">Open Access</a> to approve or reject this request.</p>

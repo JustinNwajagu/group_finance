@@ -15,7 +15,9 @@ import {
 import { createDevSession, createFirebaseSession } from "@/app/actions/auth";
 import {
   classifyLoginFailure,
+  listUnlinkedMembersForSignup,
   submitAccessRequest,
+  type UnlinkedMemberOption,
 } from "@/app/actions/access-requests";
 import { PasswordInput } from "@/components/password-input";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
@@ -70,9 +72,11 @@ async function sendPasswordResetWithFallback(
 export function LoginForm({
   firebaseConfig,
   adminEmail,
+  unlinkedMembers,
 }: {
   firebaseConfig: PublicFirebaseConfig | null;
   adminEmail: string;
+  unlinkedMembers: UnlinkedMemberOption[];
 }) {
   const [error, setError] = useState<string | null>(null);
   const [signingIn, setSigningIn] = useState(false);
@@ -283,14 +287,13 @@ export function LoginForm({
       <AccessRequestDialog
         open={requestOpen}
         defaultEmail={requestEmail}
+        unlinkedMembers={unlinkedMembers}
         onClose={() => setRequestOpen(false)}
-        onSubmitted={(emailed) => {
+        onSubmitted={() => {
           setRequestOpen(false);
           setError(null);
           setRequestNotice(
-            emailed
-              ? "Request sent. The primary admin has been emailed and must approve it before you can sign in."
-              : "Request sent and is waiting on Access. If an admin email was not configured, tell an admin to open Access and approve you.",
+            "Request sent. You will gain access after an admin grants it.",
           );
         }}
       />
@@ -442,23 +445,32 @@ function ForgotPasswordDialog({
 function AccessRequestDialog({
   open,
   defaultEmail,
+  unlinkedMembers,
   onClose,
   onSubmitted,
 }: {
   open: boolean;
   defaultEmail: string;
+  unlinkedMembers: UnlinkedMemberOption[];
   onClose: () => void;
-  onSubmitted: (emailed: boolean) => void;
+  onSubmitted: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [error, setError] = useState<string | null>(null);
   const [errorForOpen, setErrorForOpen] = useState(open);
+  const [memberChoice, setMemberChoice] = useState("");
+  const [roster, setRoster] = useState(unlinkedMembers);
   const [pending, startTransition] = useTransition();
+  const isNewMember = memberChoice === "new";
 
   if (open !== errorForOpen) {
     setErrorForOpen(open);
-    if (open) setError(null);
+    if (open) {
+      setError(null);
+      setMemberChoice("");
+      setRoster(unlinkedMembers);
+    }
   }
 
   useEffect(() => {
@@ -466,36 +478,52 @@ function AccessRequestDialog({
     if (!el) return;
     if (open) {
       if (!el.open) el.showModal();
-    } else if (el.open) {
-      el.close();
+      let cancelled = false;
+      void listUnlinkedMembersForSignup()
+        .then((fresh) => {
+          if (!cancelled) setRoster(fresh);
+        })
+        .catch(() => {
+          /* keep server-provided list */
+        });
+      return () => {
+        cancelled = true;
+      };
     }
+    if (el.open) el.close();
+    return undefined;
   }, [open]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (!memberChoice) {
+      setError("Select your name from the roster, or choose New member.");
+      return;
+    }
     const form = event.currentTarget;
     const data = new FormData(form);
     startTransition(async () => {
       const result = await submitAccessRequest({
         email: String(data.get("email") ?? ""),
+        password: String(data.get("password") ?? ""),
+        memberChoice,
         title: String(data.get("title") ?? ""),
         name: String(data.get("name") ?? ""),
         phone: String(data.get("phone") ?? ""),
-        password: String(data.get("password") ?? ""),
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      onSubmitted(Boolean(result.emailed));
+      onSubmitted();
     });
   }
 
   return (
     <dialog
       ref={dialogRef}
-      className="contrib-dialog"
+      className="contrib-dialog contrib-dialog-wide"
       aria-labelledby={titleId}
       onClose={onClose}
       onCancel={(e) => {
@@ -513,14 +541,77 @@ function AccessRequestDialog({
             Close
           </button>
         </div>
-        <p className="muted" style={{ margin: 0 }}>
-          Choose your password now. An admin must still approve and link you to
-          a member before you can sign in.
+        <p className="muted signup-choice-hint">
+          Find your name on the roster if you are already a member. If not,
+          choose New member. An admin must grant access before you can sign in.
         </p>
         {error ? (
           <p className="form-error" role="alert">
             {error}
           </p>
+        ) : null}
+        <label className="field">
+          Your name on the roster
+          <select
+            name="member_choice"
+            required
+            value={memberChoice}
+            onChange={(e) => setMemberChoice(e.target.value)}
+            disabled={pending}
+          >
+            <option value="" disabled>
+              Choose…
+            </option>
+            <option value="new">New member — not on the roster yet</option>
+            {roster.map((m) => (
+              <option key={m.id} value={String(m.id)}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {isNewMember ? (
+          <>
+            <div className="form-grid two">
+              <label className="field">
+                Title
+                <select
+                  name="title"
+                  required
+                  defaultValue=""
+                  disabled={pending}
+                >
+                  <option value="" disabled>
+                    Choose…
+                  </option>
+                  {NAME_TITLES.map((title) => (
+                    <option key={title} value={title}>
+                      {title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Full name
+                <input
+                  name="name"
+                  required
+                  autoComplete="name"
+                  disabled={pending}
+                />
+              </label>
+            </div>
+            <label className="field">
+              Phone number
+              <input
+                name="phone"
+                type="tel"
+                required
+                autoComplete="tel"
+                disabled={pending}
+              />
+            </label>
+          </>
         ) : null}
         <label className="field">
           Email
@@ -531,40 +622,6 @@ function AccessRequestDialog({
             defaultValue={defaultEmail}
             key={defaultEmail}
             autoComplete="email"
-            disabled={pending}
-          />
-        </label>
-        <div className="form-grid two">
-          <label className="field">
-            Title
-            <select name="title" required defaultValue="" disabled={pending}>
-              <option value="" disabled>
-                Choose…
-              </option>
-              {NAME_TITLES.map((title) => (
-                <option key={title} value={title}>
-                  {title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            Full name
-            <input
-              name="name"
-              required
-              autoComplete="name"
-              disabled={pending}
-            />
-          </label>
-        </div>
-        <label className="field">
-          Phone number
-          <input
-            name="phone"
-            type="tel"
-            required
-            autoComplete="tel"
             disabled={pending}
           />
         </label>
@@ -585,7 +642,7 @@ function AccessRequestDialog({
           <button
             type="submit"
             className="btn-primary"
-            disabled={pending}
+            disabled={pending || !memberChoice}
             aria-busy={pending}
           >
             {pending ? (

@@ -133,7 +133,6 @@ export default async function DuesPage({
           recorded: "Dues payment recorded.",
           cleared: "Dues payment removed.",
           year_deleted: "Dues year removed.",
-          dues_reopened: "Dues year reopened.",
           dues_concluded: "Dues year archived.",
           bulk_dues: bulkTitle
             ? `Imported ${bulkCount ?? ""} dues row(s) for “${bulkTitle}”${
@@ -319,7 +318,8 @@ export default async function DuesPage({
                 <p className="muted" style={{ margin: 0 }}>
                   Creates a Jan–Dec tracker for that year. One schedule per year;
                   monthly amount is fixed for everyone. A past deadline opens
-                  the year already archived.
+                  the year already archived. Years that are already open or in
+                  Archive cannot be opened again.
                 </p>
                 <PendingSubmitButton
                   idleLabel="Open year"

@@ -14,12 +14,8 @@ import {
   type BulkValidationIssue,
 } from "@/lib/bulk-upload";
 import {
-  monthsCoveredForMember,
-  remainingMonths,
-} from "@/lib/dues-data";
-import {
-  monthsFromAmount as monthsFromDueAmount,
-  takeNextUnpaidMonths,
+  allocateAmountAcrossYearRange,
+  monthCreditsFromPayments,
 } from "@/lib/dues-months";
 import { isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
 import {
@@ -29,10 +25,12 @@ import {
   createPaymentRow,
   findPaymentForMemberRequest,
   getDuesScheduleByYear,
+  listAllDuesSchedules,
   listAllMembers,
   listDuesPaymentsForSchedule,
   updateDuesScheduleRow,
   updatePaymentRow,
+  type DuesScheduleRow,
 } from "@/lib/store";
 
 function fail(path: string, msg: string): never {
@@ -259,17 +257,24 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
       deadline,
       concluded_at: archived ? `${deadline}T12:00:00.000Z` : null,
     });
-  } else if (Math.abs(Number(schedule.monthly_amount) - monthly) > 0.009) {
-    fail(
-      "/dues",
-      `Dues for ${year} already exist at ${schedule.monthly_amount} per month. Use that amount, or a different year.`,
-    );
+  } else {
+    // Already open or archived — never open again; use that year's monthly split.
+    if (Math.abs(Number(schedule.monthly_amount) - monthly) > 0.009) {
+      // Keep going with the existing year's rate; form monthly is only for new years.
+    }
   }
 
+  const anchorMonthly = Number(schedule.monthly_amount);
   const members = await listAllMembers();
-  const existingPayments = await listDuesPaymentsForSchedule(schedule.id);
+  const allSchedules = await listAllDuesSchedules();
+  const schedulesByYear = new Map<number, DuesScheduleRow>(
+    allSchedules.map((s) => [s.year, s]),
+  );
+  schedulesByYear.set(schedule.year, schedule);
+
   const issues: BulkValidationIssue[] = [];
   const prepared: Array<{
+    scheduleId: number;
     memberId: number;
     amount: number;
     covered_months: number[];
@@ -277,14 +282,37 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
     notes: string | null;
   }> = [];
 
-  // Apply rows sequentially so multiple rows for the same member stack months.
-  const paidByMember = new Map<number, boolean[]>();
-  for (const p of existingPayments) {
-    const list = existingPayments.filter((x) => x.member_id === p.member_id);
-    paidByMember.set(p.member_id, monthsCoveredForMember(list));
+  // Credits per member/year so rows in this file stack correctly.
+  const creditsByMemberYear = new Map<string, number[]>();
+  async function creditsFor(memberId: number, yearKey: number, scheduleId: number) {
+    const key = `${memberId}:${yearKey}`;
+    if (creditsByMemberYear.has(key)) return creditsByMemberYear.get(key)!;
+    const payments = (await listDuesPaymentsForSchedule(scheduleId)).filter(
+      (p) => p.member_id === memberId,
+    );
+    const credits = monthCreditsFromPayments(payments);
+    creditsByMemberYear.set(key, credits);
+    return credits;
   }
 
-  parsed.rows.forEach((row, idx) => {
+  async function ensureYear(targetYear: number): Promise<DuesScheduleRow> {
+    const existing = schedulesByYear.get(targetYear) ?? (await getDuesScheduleByYear(targetYear));
+    if (existing) {
+      schedulesByYear.set(targetYear, existing);
+      return existing;
+    }
+    const created = await createDuesSchedule({
+      year: targetYear,
+      monthly_amount: anchorMonthly,
+      title: `${targetYear} Dues`,
+      deadline: `${targetYear}-12-31`,
+    });
+    schedulesByYear.set(targetYear, created);
+    return created;
+  }
+
+  for (let idx = 0; idx < parsed.rows.length; idx += 1) {
+    const row = parsed.rows[idx];
     const rowNum = idx + 2;
     const memberName = row.member ?? "";
     const amount = parseMoneyCell(row.amount ?? "");
@@ -293,7 +321,7 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
 
     if (!memberName) {
       issues.push({ row: rowNum, message: "Member is required." });
-      return;
+      continue;
     }
     const member = matchMember(members, memberName);
     if (!member) {
@@ -301,67 +329,95 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
         row: rowNum,
         message: `Unknown member "${memberName}".`,
       });
-      return;
+      continue;
     }
     if (amount == null || amount <= 0) {
       issues.push({ row: rowNum, message: "Amount must be a positive number." });
-      return;
-    }
-    const months = monthsFromDueAmount(amount, monthly);
-    if (months == null) {
-      issues.push({
-        row: rowNum,
-        message: `Amount must be a whole multiple of the monthly due (${monthly.toFixed(2)}).`,
-      });
-      return;
+      continue;
     }
     if ((row.payment_date ?? "").trim() && !paymentDate) {
       issues.push({
         row: rowNum,
         message: "Payment date must be a valid date (YYYY-MM-DD).",
       });
-      return;
+      continue;
     }
     if (paymentDate && !isPaymentDateAllowed(paymentDate)) {
       issues.push({
         row: rowNum,
         message: "Payment date cannot be in the future.",
       });
-      return;
+      continue;
     }
 
-    const paid =
-      paidByMember.get(member.id) ??
-      Array.from({ length: 12 }, () => false);
-    const remaining = remainingMonths(paid);
-    if (months > remaining) {
+    // Grow a prospective range until the amount (incl. partial month) fits,
+    // using each affected year's own monthly rate — not a single-year split.
+    let endYear = year;
+    let allocations = null as ReturnType<typeof allocateAmountAcrossYearRange>;
+    for (let guard = 0; guard < 20 && !allocations; guard += 1) {
+      const creditsByYear = new Map<number, number[]>();
+      const monthlyByYear = new Map<number, number>();
+      for (let y = year; y <= endYear; y += 1) {
+        const scheduleForYear = await ensureYear(y);
+        monthlyByYear.set(y, Number(scheduleForYear.monthly_amount));
+        creditsByYear.set(
+          y,
+          [...(await creditsFor(member.id, y, scheduleForYear.id))],
+        );
+      }
+      allocations = allocateAmountAcrossYearRange(
+        creditsByYear,
+        monthlyByYear,
+        year,
+        endYear,
+        amount,
+      );
+      if (!allocations) endYear += 1;
+    }
+
+    if (!allocations) {
       issues.push({
         row: rowNum,
-        message: `${member.name} only has ${remaining} unpaid month(s) left in ${year}.`,
+        message: `Could not place ${member.name}'s payment across dues years starting ${year}.`,
       });
-      return;
-    }
-    const covered = takeNextUnpaidMonths(paid, months);
-    if (covered.length !== months) {
-      issues.push({
-        row: rowNum,
-        message: `${member.name} cannot cover ${months} more month(s).`,
-      });
-      return;
+      continue;
     }
 
-    // Reserve months for later rows in this file.
-    for (const m of covered) paid[m - 1] = true;
-    paidByMember.set(member.id, paid);
+    for (const allocation of allocations) {
+      const scheduleForYear = schedulesByYear.get(allocation.year);
+      if (!scheduleForYear) {
+        issues.push({
+          row: rowNum,
+          message: `Dues year ${allocation.year} is missing.`,
+        });
+        continue;
+      }
+      // Reserve credits for later rows in this file.
+      const key = `${member.id}:${allocation.year}`;
+      const credits =
+        creditsByMemberYear.get(key) ??
+        Array.from({ length: 12 }, () => 0);
+      const share =
+        allocation.amount / Math.max(1, allocation.covered_months.length);
+      for (const m of allocation.covered_months) {
+        credits[m - 1] = Number(((credits[m - 1] ?? 0) + share).toFixed(2));
+      }
+      creditsByMemberYear.set(key, credits);
 
-    prepared.push({
-      memberId: member.id,
-      amount,
-      covered_months: covered,
-      payment_date: paymentDate || todayIsoDate(),
-      notes,
-    });
-  });
+      prepared.push({
+        scheduleId: scheduleForYear.id,
+        memberId: member.id,
+        amount: allocation.amount,
+        covered_months: allocation.covered_months,
+        payment_date: paymentDate || todayIsoDate(),
+        notes: allocation.partial
+          ? notes
+            ? `${notes} (partial month)`
+            : "Partial month payment"
+          : notes,
+      });
+    }
+  }
 
   if (prepared.length === 0 && issues.length === 0) {
     fail("/dues", "No data rows found in the spreadsheet.");
@@ -370,7 +426,7 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
 
   for (const row of prepared) {
     await createDuesPayment({
-      dues_schedule_id: schedule.id,
+      dues_schedule_id: row.scheduleId,
       member_id: row.memberId,
       amount: row.amount,
       covered_months: row.covered_months,
@@ -393,9 +449,10 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
   revalidatePath("/archive");
   revalidatePath("/members");
   const dest = archived || schedule.concluded_at ? "/archive" : "/dues";
+  const memberRows = new Set(prepared.map((p) => p.memberId)).size;
   ok(dest, "bulk_dues", {
     year: String(year),
-    count: String(prepared.length),
+    count: String(memberRows),
     title: parsed.title,
   });
 }

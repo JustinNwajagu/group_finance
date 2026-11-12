@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { reopenDuesYear, removeDuesPayment } from "@/app/actions/dues";
+import { removeDuesPayment } from "@/app/actions/dues";
 import { DuesYearTable } from "@/components/dues-year-table";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatCoveredMonths } from "@/lib/dues-months";
@@ -66,16 +66,10 @@ export function ArchiveDuesBoards({
               <div id={panelId} className="archive-item-body stack">
                 <DuesYearTable board={board} />
                 {isAdmin ? (
-                  <div className="contrib-admin">
-                    <form action={reopenDuesYear} className="inline-form">
-                      <input type="hidden" name="id" value={schedule.id} />
-                      <PendingSubmitButton
-                        className="btn-ghost"
-                        idleLabel="Clear concluded date"
-                        pendingLabel="Reopening…"
-                      />
-                    </form>
-                  </div>
+                  <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
+                    This dues year stays in Archive. Amend payments below — it
+                    cannot be opened again.
+                  </p>
                 ) : null}
                 {isAdmin && board.payments.length > 0 ? (
                   <div className="table-wrap">

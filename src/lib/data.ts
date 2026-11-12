@@ -59,6 +59,7 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
         const key = `${schedule.id}:${m.id}`;
         const monthsPaid = monthsCoveredForMember(
           duesByScheduleMember.get(key) ?? [],
+          schedule.monthly_amount,
         ).filter(Boolean).length;
         duesCount += duesYearFraction(monthsPaid);
       }

@@ -32,7 +32,35 @@ export function monthsFromAmount(
   return months;
 }
 
-/** Next unpaid month numbers in Jan–Dec order, up to `count`. */
+/** Money already attributed to each calendar month (length 12). */
+export function monthCreditsFromPayments(
+  payments: Array<{ amount: string | number; covered_months: number[] }>,
+): number[] {
+  const credits = Array.from({ length: 12 }, () => 0);
+  for (const p of payments) {
+    const months = p.covered_months.filter((m) => m >= 1 && m <= 12);
+    if (months.length === 0) continue;
+    const share = Number(p.amount) / months.length;
+    if (!Number.isFinite(share) || share <= 0) continue;
+    for (const m of months) credits[m - 1] += share;
+  }
+  return credits.map((c) => Number(c.toFixed(2)));
+}
+
+/** True when a month's credited amount meets the monthly due. */
+export function monthsFullyPaidFromCredits(
+  credits: number[],
+  monthlyAmount: number,
+): boolean[] {
+  const monthly = Number(monthlyAmount);
+  return Array.from({ length: 12 }, (_, i) => {
+    const credit = credits[i] ?? 0;
+    if (!Number.isFinite(monthly) || monthly <= 0) return credit > 0;
+    return credit + 0.009 >= monthly;
+  });
+}
+
+/** Next months that are not yet fully paid, up to `count`. */
 export function takeNextUnpaidMonths(
   paid: boolean[],
   count: number,
@@ -44,48 +72,142 @@ export function takeNextUnpaidMonths(
   return out;
 }
 
+/** First month that still needs money toward the monthly due. */
+export function nextPartialMonth(
+  credits: number[],
+  monthlyAmount: number,
+): number | null {
+  const monthly = Number(monthlyAmount);
+  if (!Number.isFinite(monthly) || monthly <= 0) return null;
+  for (let i = 0; i < 12; i += 1) {
+    const credit = credits[i] ?? 0;
+    if (credit + 0.009 < monthly) return i + 1;
+  }
+  return null;
+}
+
 export type YearMonthAllocation = {
   year: number;
   covered_months: number[];
+  /** Money applied to this year for these months. */
+  amount: number;
+  /** True when this slice only partly pays one month. */
+  partial?: boolean;
 };
 
 /**
- * Split `months` across years in [yearFrom, yearTo], filling unpaid months
- * chronologically (earlier years first, Jan→Dec within each year).
+ * Split a payment amount across years in [yearFrom, yearTo].
+ * Each year uses its own monthly due. Full months are filled first within the
+ * selected range only. Any leftover balance becomes a partial payment on the
+ * next incomplete month in the range.
+ */
+export function allocateAmountAcrossYearRange(
+  creditsByYear: Map<number, number[]>,
+  monthlyByYear: Map<number, number>,
+  yearFrom: number,
+  yearTo: number,
+  amount: number,
+): YearMonthAllocation[] | null {
+  if (
+    !Number.isFinite(yearFrom) ||
+    !Number.isFinite(yearTo) ||
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return null;
+  }
+  const start = Math.min(yearFrom, yearTo);
+  const end = Math.max(yearFrom, yearTo);
+  const emptyCredits = () => Array.from({ length: 12 }, () => 0);
+  const allocations: YearMonthAllocation[] = [];
+  let remainingMoney = Number(amount.toFixed(2));
+
+  for (let year = start; year <= end && remainingMoney > 0.009; year += 1) {
+    const monthly = Number(monthlyByYear.get(year) ?? 0);
+    if (!Number.isFinite(monthly) || monthly <= 0) return null;
+    const credits = [...(creditsByYear.get(year) ?? emptyCredits())];
+    const paid = monthsFullyPaidFromCredits(credits, monthly);
+    const unpaid = paid.filter((v) => !v).length;
+    if (unpaid <= 0) continue;
+
+    const affordable = Math.floor((remainingMoney + 0.009) / monthly);
+    if (affordable >= 1) {
+      const take = Math.min(unpaid, affordable);
+      const covered = takeNextUnpaidMonths(paid, take);
+      if (covered.length > 0) {
+        const slice = Number((covered.length * monthly).toFixed(2));
+        allocations.push({
+          year,
+          covered_months: covered,
+          amount: slice,
+        });
+        for (const m of covered) {
+          credits[m - 1] = Number(((credits[m - 1] ?? 0) + monthly).toFixed(2));
+        }
+        creditsByYear.set(year, credits);
+        remainingMoney = Number((remainingMoney - slice).toFixed(2));
+      }
+    }
+
+    if (remainingMoney > 0.009) {
+      const refreshed = monthsFullyPaidFromCredits(credits, monthly);
+      const partialMonth = nextPartialMonth(credits, monthly);
+      if (partialMonth == null || refreshed[partialMonth - 1]) continue;
+      const already = credits[partialMonth - 1] ?? 0;
+      const need = Number((monthly - already).toFixed(2));
+      if (need <= 0.009) continue;
+      const partialAmount = Number(Math.min(remainingMoney, need).toFixed(2));
+      if (partialAmount <= 0.009) continue;
+      allocations.push({
+        year,
+        covered_months: [partialMonth],
+        amount: partialAmount,
+        partial: partialAmount + 0.009 < need,
+      });
+      credits[partialMonth - 1] = Number(
+        (already + partialAmount).toFixed(2),
+      );
+      creditsByYear.set(year, credits);
+      remainingMoney = Number((remainingMoney - partialAmount).toFixed(2));
+    }
+  }
+
+  if (remainingMoney > 0.009) return null;
+  if (allocations.length === 0) return null;
+  return allocations;
+}
+
+/**
+ * Split a fixed month count across years (same monthly rate assumed).
+ * Prefer {@link allocateAmountAcrossYearRange} when rates can differ.
  */
 export function allocateMonthsAcrossYearRange(
   paidByYear: Map<number, boolean[]>,
   yearFrom: number,
   yearTo: number,
   months: number,
+  monthly = 1,
 ): YearMonthAllocation[] | null {
-  if (
-    !Number.isFinite(yearFrom) ||
-    !Number.isFinite(yearTo) ||
-    !Number.isFinite(months) ||
-    months < 1
-  ) {
-    return null;
-  }
+  if (!Number.isFinite(months) || months < 1) return null;
   const start = Math.min(yearFrom, yearTo);
   const end = Math.max(yearFrom, yearTo);
-  const empty = () => Array.from({ length: 12 }, () => false);
-  const allocations: YearMonthAllocation[] = [];
-  let remaining = months;
-
-  for (let year = start; year <= end && remaining > 0; year += 1) {
-    const paid = paidByYear.get(year) ?? empty();
-    const covered = takeNextUnpaidMonths(paid, remaining);
-    if (covered.length === 0) continue;
-    allocations.push({ year, covered_months: covered });
-    // Mark taken months so later logic could reuse the map if needed.
-    for (const m of covered) paid[m - 1] = true;
-    paidByYear.set(year, paid);
-    remaining -= covered.length;
+  const monthlyByYear = new Map<number, number>();
+  const creditsByYear = new Map<number, number[]>();
+  for (let year = start; year <= end; year += 1) {
+    monthlyByYear.set(year, monthly);
+    const paid = paidByYear.get(year) ?? Array.from({ length: 12 }, () => false);
+    creditsByYear.set(
+      year,
+      paid.map((isPaid) => (isPaid ? monthly : 0)),
+    );
   }
-
-  if (remaining > 0) return null;
-  return allocations;
+  return allocateAmountAcrossYearRange(
+    creditsByYear,
+    monthlyByYear,
+    start,
+    end,
+    months * monthly,
+  );
 }
 
 /**

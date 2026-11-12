@@ -8,7 +8,8 @@ import {
   remainingMonths,
 } from "@/lib/dues-data";
 import {
-  allocateMonthsAcrossYearRange,
+  allocateAmountAcrossYearRange,
+  monthCreditsFromPayments,
   monthsFromAmount,
   takeNextUnpaidMonths,
 } from "@/lib/dues-months";
@@ -26,6 +27,7 @@ import {
   listDuesPaymentsForMember,
   listDuesPaymentsForSchedule,
   updateDuesScheduleRow,
+  type DuesScheduleRow,
 } from "@/lib/store";
 
 function failDues(msg: string, year?: number, returnTo = "/dues"): never {
@@ -73,7 +75,12 @@ export async function createDuesYear(formData: FormData): Promise<void> {
 
   const existing = await getDuesScheduleByYear(year);
   if (existing) {
-    failDues(`Dues for ${year} already exist.`, year);
+    failDues(
+      existing.concluded_at
+        ? `Dues for ${year} are already in Archive. Amend them there — they cannot be opened again.`
+        : `Dues for ${year} are already open and cannot be opened again.`,
+      year,
+    );
   }
 
   const today = todayIsoDate();
@@ -114,41 +121,38 @@ export async function concludeDuesYear(formData: FormData): Promise<void> {
   );
 }
 
+/** Archived dues years stay in Archive — they cannot be reopened. */
 export async function reopenDuesYear(formData: FormData): Promise<void> {
   await requireAdmin();
   const id = Number(formData.get("id"));
-  if (!Number.isFinite(id) || id <= 0) failDues("Invalid dues year.");
-
-  const schedule = await getDuesScheduleById(id);
-  if (!schedule) failDues("Dues year not found.");
-
-  await updateDuesScheduleRow(id, { concluded_at: null });
-  revalidateDues();
-  redirect(`/dues?year=${schedule.year}&ok=dues_reopened`);
+  const schedule = Number.isFinite(id) ? await getDuesScheduleById(id) : null;
+  failDues(
+    schedule
+      ? `Dues for ${schedule.year} stay in Archive. Amend payments there — they cannot be opened again.`
+      : "Archived dues years cannot be opened again. Amend them in Archive.",
+    schedule?.year,
+    "/archive",
+  );
 }
 
-async function ensureScheduleForYear(
+/**
+ * Use an existing dues year as-is (including archived / different monthly).
+ * Only create a brand-new year when none exists yet.
+ */
+async function resolveScheduleForYear(
   year: number,
-  monthly: number,
+  monthlyFallback: number,
   titleHint: string,
   deadlineHint?: string,
-) {
+): Promise<DuesScheduleRow> {
   const existing = await getDuesScheduleByYear(year);
-  if (!existing) {
-    return createDuesSchedule({
-      year,
-      monthly_amount: monthly,
-      title: titleHint || `${year} Dues`,
-      deadline: deadlineHint || `${year}-12-31`,
-    });
-  }
-  if (Math.abs(Number(existing.monthly_amount) - monthly) > 0.009) {
-    failDues(
-      `Dues for ${year} use ${existing.monthly_amount}/month, which does not match this payment’s monthly due (${monthly.toFixed(2)}).`,
-      year,
-    );
-  }
-  return existing;
+  if (existing) return existing;
+  return createDuesSchedule({
+    year,
+    monthly_amount: monthlyFallback,
+    title: titleHint || `${year} Dues`,
+    deadline: deadlineHint || `${year}-12-31`,
+  });
 }
 
 export async function recordDuesPayment(formData: FormData): Promise<void> {
@@ -185,13 +189,8 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
   if (!member) failDues("Member not found.", schedule.year, returnTo);
 
   const monthly = Number(schedule.monthly_amount);
-  const months = monthsFromAmount(amount, monthly);
-  if (months == null) {
-    failDues(
-      `Amount must be a whole multiple of the monthly due (${schedule.monthly_amount}).`,
-      schedule.year,
-      returnTo,
-    );
+  if (!Number.isFinite(monthly) || monthly <= 0) {
+    failDues("This dues year has an invalid monthly amount.", schedule.year, returnTo);
   }
 
   const today = todayIsoDate();
@@ -205,26 +204,65 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
   const existingCurrent = (await listDuesPaymentsForSchedule(schedule.id)).filter(
     (p) => p.member_id === memberId,
   );
-  const paidCurrent = monthsCoveredForMember(existingCurrent);
+  const paidCurrent = monthsCoveredForMember(
+    existingCurrent,
+    schedule.monthly_amount,
+  );
   const remainingCurrent = remainingMonths(paidCurrent);
+  const wholeMonthsAtAnchor = monthsFromAmount(amount, monthly);
+  const yearlyTotal = monthly * 12;
+  const exceedsYear =
+    amount > yearlyTotal + 0.009 ||
+    (wholeMonthsAtAnchor != null && wholeMonthsAtAnchor > remainingCurrent);
 
   const hasRange = Boolean(yearFromRaw || yearToRaw);
-  const needsRange = months > remainingCurrent || months > 12;
-
-  if (needsRange && !hasRange) {
+  if (exceedsYear && !hasRange) {
     failDues(
-      months > 12
-        ? "This payment covers more than 12 months. Select a year range to split the breakdown."
+      amount > yearlyTotal + 0.009
+        ? `This payment is higher than the ${schedule.year} yearly total (${schedule.monthly_amount} × 12). Select a year range to split the excess across retrospective or prospective months.`
         : `${member.name} only has ${remainingCurrent} unpaid month${remainingCurrent === 1 ? "" : "s"} left in ${schedule.year}. Select a year range to apply the rest to other years.`,
       schedule.year,
       returnTo,
     );
   }
 
-  // Single-year path when everything fits the open year and no range was given.
+  // Single-year path when everything fits and no range was given.
   if (!hasRange) {
-    const covered_months = takeNextUnpaidMonths(paidCurrent, months);
-    if (covered_months.length !== months) {
+    if (wholeMonthsAtAnchor == null) {
+      // Allow a single partial month when amount is below one monthly due
+      // or otherwise not an exact multiple, as long as one incomplete month remains.
+      const credits = monthCreditsFromPayments(existingCurrent);
+      const partialMonth = takeNextUnpaidMonths(paidCurrent, 1)[0];
+      if (!partialMonth) {
+        failDues(
+          `${member.name} has no unpaid months left in ${schedule.year}.`,
+          schedule.year,
+          returnTo,
+        );
+      }
+      const already = credits[partialMonth - 1] ?? 0;
+      const need = Number((monthly - already).toFixed(2));
+      if (amount > need + 0.009) {
+        failDues(
+          `Amount must be a whole multiple of the monthly due (${schedule.monthly_amount}), or at most ${need.toFixed(2)} to finish the next partial month. For larger excess, select a year range.`,
+          schedule.year,
+          returnTo,
+        );
+      }
+      await createDuesPayment({
+        dues_schedule_id: scheduleId,
+        member_id: memberId,
+        amount,
+        covered_months: [partialMonth],
+        payment_date,
+        notes,
+      });
+      revalidateDues(`/members/${memberId}`);
+      okDues("recorded", schedule.year, returnTo);
+    }
+
+    const covered_months = takeNextUnpaidMonths(paidCurrent, wholeMonthsAtAnchor);
+    if (covered_months.length !== wholeMonthsAtAnchor) {
       failDues(
         `${member.name} only has ${remainingCurrent} unpaid month${remainingCurrent === 1 ? "" : "s"} left in ${schedule.year}.`,
         schedule.year,
@@ -258,23 +296,16 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
 
   const start = Math.min(yearFrom, yearTo);
   const end = Math.max(yearFrom, yearTo);
-  const spanYears = end - start + 1;
-  if (months > spanYears * 12) {
-    failDues(
-      `${months} months need at least ${Math.ceil(months / 12)} year(s). Widen the year range.`,
-      schedule.year,
-      returnTo,
-    );
-  }
 
-  // Ensure every year in the range has a matching schedule (create if missing).
-  const schedulesByYear = new Map<number, Awaited<ReturnType<typeof getDuesScheduleByYear>>>();
+  // Range may go retrospective or prospective, but stays inside the selected
+  // bounds — it does not spill to cover all months beyond that range.
+  const schedulesByYear = new Map<number, DuesScheduleRow>();
   for (let year = start; year <= end; year += 1) {
-    const row = await ensureScheduleForYear(
+    const row = await resolveScheduleForYear(
       year,
       monthly,
       year === schedule.year ? schedule.title : `${year} Dues`,
-      schedule.deadline,
+      year === schedule.year ? schedule.deadline : `${year}-12-31`,
     );
     schedulesByYear.set(year, row);
   }
@@ -282,26 +313,29 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
   const memberPayments = await listDuesPaymentsForMember(memberId);
   const allSchedules = await listAllDuesSchedules();
   const scheduleYearById = new Map(allSchedules.map((s) => [s.id, s.year]));
-  const paidByYear = new Map<number, boolean[]>();
+  const creditsByYear = new Map<number, number[]>();
+  const monthlyByYear = new Map<number, number>();
   for (let year = start; year <= end; year += 1) {
     const scheduleForYear = schedulesByYear.get(year)!;
+    monthlyByYear.set(year, Number(scheduleForYear.monthly_amount));
     const forYear = memberPayments.filter(
       (p) =>
         p.dues_schedule_id === scheduleForYear.id ||
         scheduleYearById.get(p.dues_schedule_id) === year,
     );
-    paidByYear.set(year, monthsCoveredForMember(forYear));
+    creditsByYear.set(year, monthCreditsFromPayments(forYear));
   }
 
-  const allocations = allocateMonthsAcrossYearRange(
-    paidByYear,
+  const allocations = allocateAmountAcrossYearRange(
+    creditsByYear,
+    monthlyByYear,
     start,
     end,
-    months,
+    amount,
   );
   if (!allocations) {
     failDues(
-      `Not enough unpaid months for ${member.name} across ${start}–${end}. Open more years or reduce the amount.`,
+      `Not enough unpaid months for ${member.name} across ${start}–${end} to place this payment (including any partial month). Widen the selected range or reduce the amount.`,
       schedule.year,
       returnTo,
     );
@@ -316,14 +350,17 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
         returnTo,
       );
     }
-    const sliceAmount = allocation.covered_months.length * monthly;
     await createDuesPayment({
       dues_schedule_id: scheduleForYear.id,
       member_id: memberId,
-      amount: sliceAmount,
+      amount: allocation.amount,
       covered_months: allocation.covered_months,
       payment_date,
-      notes,
+      notes: allocation.partial
+        ? notes
+          ? `${notes} (partial month)`
+          : "Partial month payment"
+        : notes,
     });
   }
 
@@ -376,7 +413,7 @@ export async function deleteDuesYear(formData: FormData): Promise<void> {
   revalidateDues();
 
   const remaining = await listAllDuesSchedules();
-  const nextYear = remaining[0]?.year;
+  const nextYear = remaining.filter((s) => !s.concluded_at)[0]?.year;
   if (nextYear) {
     redirect(`/dues?year=${nextYear}&ok=year_deleted`);
   }

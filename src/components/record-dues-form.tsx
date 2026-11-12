@@ -161,9 +161,10 @@ export function RecordDuesForm({
           </label>
           <p className="muted" style={{ margin: 0, gridColumn: "1 / -1" }}>
             This payment exceeds what fits in {currentYear}
-            {selected ? ` for ${selected.name}` : ""}. Choose the year range to
-            split months across (past or future). Missing years are opened
-            automatically at {formatMoney(monthly)}/month.
+            {selected ? ` for ${selected.name}` : ""}. Choose a retrospective or
+            prospective year range to place the excess. Each year keeps its own
+            monthly split; any leftover balance becomes a partial month payment.
+            Existing open or archived years are reused (not opened again).
           </p>
         </div>
       ) : null}

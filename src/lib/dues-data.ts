@@ -1,6 +1,10 @@
 import "server-only";
 import { compareMembersByName } from "./member-sort";
-import { duesYearFraction } from "./dues-months";
+import {
+  duesYearFraction,
+  monthCreditsFromPayments,
+  monthsFullyPaidFromCredits,
+} from "./dues-months";
 import {
   getDuesScheduleById,
   getDuesScheduleByYear,
@@ -24,16 +28,16 @@ function moneySum(values: Array<string | number>): string {
   return total.toFixed(2);
 }
 
+/**
+ * Months that are fully paid for a member. Pass the year's monthly due so
+ * partial month payments do not count as complete.
+ */
 export function monthsCoveredForMember(
   payments: DuesPaymentRow[],
+  monthlyAmount?: number | string,
 ): boolean[] {
-  const paid = Array.from({ length: 12 }, () => false);
-  for (const p of payments) {
-    for (const m of p.covered_months) {
-      if (m >= 1 && m <= 12) paid[m - 1] = true;
-    }
-  }
-  return paid;
+  const credits = monthCreditsFromPayments(payments);
+  return monthsFullyPaidFromCredits(credits, Number(monthlyAmount ?? 0));
 }
 
 export function remainingMonths(paid: boolean[]): number {
@@ -43,8 +47,9 @@ export function remainingMonths(paid: boolean[]): number {
 function toMemberYear(
   member: MemberRow,
   payments: DuesPaymentRow[],
+  monthlyAmount: number | string,
 ): DuesMemberYear {
-  const months_paid = monthsCoveredForMember(payments);
+  const months_paid = monthsCoveredForMember(payments, monthlyAmount);
   const months_count = months_paid.filter(Boolean).length;
   return {
     member,
@@ -93,7 +98,9 @@ export async function getDuesBoard(
   const memById = new Map(members.map((m) => [m.id, m]));
   const rows = [...members]
     .sort(compareMembersByName)
-    .map((m) => toMemberYear(m, byMember.get(m.id) ?? []));
+    .map((m) =>
+      toMemberYear(m, byMember.get(m.id) ?? [], schedule.monthly_amount),
+    );
 
   const paymentRows: DuesPaymentWithMember[] = [...payments]
     .sort((a, b) => {
@@ -147,7 +154,10 @@ export async function memberDuesSummary(memberId: number): Promise<{
         if (byDate !== 0) return byDate;
         return b.id - a.id;
       });
-    const months_paid = monthsCoveredForMember(forYear);
+    const months_paid = monthsCoveredForMember(
+      forYear,
+      schedule.monthly_amount,
+    );
     const months_count = months_paid.filter(Boolean).length;
     return {
       schedule,

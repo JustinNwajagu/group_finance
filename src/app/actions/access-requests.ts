@@ -183,8 +183,15 @@ export async function submitAccessRequest(input: {
     claimedMemberId = memberId;
     name = member.name;
     const providedPhone = String(input.phone ?? "").trim();
+    const rosterPhone = (member.phone || "").trim();
     // Prefer the phone they enter; fall back to whatever is already on the roster.
-    phone = providedPhone || member.phone || "";
+    phone = providedPhone || rosterPhone;
+    if (!rosterPhone && providedPhone.length < 7) {
+      return {
+        ok: false,
+        error: "Enter a valid phone number — none is on record for this member.",
+      };
+    }
     if (providedPhone && providedPhone.length < 7) {
       return { ok: false, error: "Enter a valid phone number." };
     }

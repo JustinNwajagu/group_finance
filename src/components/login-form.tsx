@@ -468,6 +468,8 @@ function AccessRequestDialog({
   const selectedMember = claimedSelected
     ? roster.find((m) => String(m.id) === memberChoice)
     : null;
+  const claimHasPhoneOnRecord = Boolean(selectedMember?.phone?.trim());
+  const phoneRequired = isNewMember || (claimedSelected && !claimHasPhoneOnRecord);
 
   if (open !== errorForOpen) {
     setErrorForOpen(open);
@@ -613,19 +615,18 @@ function AccessRequestDialog({
         ) : null}
         {isNewMember || claimedSelected ? (
           <label className="field">
-            Phone number{claimedSelected ? " (optional)" : ""}
+            Phone number
+            {claimedSelected && claimHasPhoneOnRecord ? " (optional)" : ""}
             <input
               name="phone"
               type="tel"
-              required={isNewMember}
+              required={phoneRequired}
               autoComplete="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder={
-                claimedSelected
-                  ? selectedMember?.phone
-                    ? undefined
-                    : "Add your phone number"
+                claimedSelected && !claimHasPhoneOnRecord
+                  ? "Add your phone number"
                   : undefined
               }
               disabled={pending}

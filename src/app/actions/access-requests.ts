@@ -38,19 +38,16 @@ export type UnlinkedMemberOption = {
 export async function listUnlinkedMembersForSignup(): Promise<
   UnlinkedMemberOption[]
 > {
-  const { nameSortKey } = await import("@/lib/name-titles");
+  const { compareMembersByName } = await import("@/lib/member-sort");
   const rows = await listMembersWithoutLogin();
+  // Same alphabetical roster order as the home dashboard (titles ignored).
   return rows
     .map((m) => ({
       id: m.id,
       name: m.name,
       phone: m.phone?.trim() || null,
     }))
-    .sort((a, b) =>
-      nameSortKey(a.name).localeCompare(nameSortKey(b.name), undefined, {
-        sensitivity: "base",
-      }),
-    );
+    .sort(compareMembersByName);
 }
 
 export async function classifyLoginFailure(

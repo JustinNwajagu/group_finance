@@ -4,10 +4,13 @@ import { notFound } from "next/navigation";
 import { deleteMemberAction } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
+import { EditMemberNameForm } from "@/components/edit-member-name-form";
 import { Flash } from "@/components/flash";
 import { PaymentGroups } from "@/components/payment-groups";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/config";
+import { splitTitledName } from "@/lib/name-titles";
 import {
   getMember,
   listPaymentsForMember,
@@ -45,6 +48,8 @@ export default async function MemberDetailPage({
   const paramsQuery = await searchParams;
   const error =
     typeof paramsQuery.error === "string" ? paramsQuery.error : undefined;
+  const ok =
+    typeof paramsQuery.ok === "string" ? paramsQuery.ok : undefined;
 
   const member = await getMember(id);
   if (!member) notFound();
@@ -59,6 +64,11 @@ export default async function MemberDetailPage({
       getExcoSeatForMember(id),
       countPaymentsForMember(id),
     ]);
+  const isPrimaryAdminMember =
+    isAdminEmail(member.login_email || "") ||
+    isAdminEmail(member.email || "");
+  const canEditName = admin && !isPrimaryAdminMember;
+  const splitName = splitTitledName(member.name);
   const canDeleteMember =
     admin &&
     paymentCounts.total === 0 &&
@@ -156,7 +166,13 @@ export default async function MemberDetailPage({
         </div>
       </div>
 
-      <Flash ok={undefined} error={error} messages={{}} />
+      <Flash
+        ok={ok}
+        error={error}
+        messages={{
+          member_updated: "Member name updated.",
+        }}
+      />
 
       <div className="stack">
         <section className="panel">
@@ -339,6 +355,29 @@ export default async function MemberDetailPage({
             </div>
           )}
         </section>
+
+        {admin ? (
+          <section className="panel">
+            <h2>Edit name</h2>
+            {canEditName ? (
+              <>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  Update this member’s title and name on the roster. Titles are
+                  stored with a trailing dot (for example Engr.).
+                </p>
+                <EditMemberNameForm
+                  memberId={member.id}
+                  title={splitName.title}
+                  name={splitName.name}
+                />
+              </>
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>
+                The primary admin member cannot be renamed here.
+              </p>
+            )}
+          </section>
+        ) : null}
 
         {admin ? (
           <section className="panel">

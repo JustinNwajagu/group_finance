@@ -1,12 +1,28 @@
 /** Honorific titles offered on create-account requests. */
 export const NAME_TITLES = ["Mr", "Dr", "Engr", "Chief", "Sir"] as const;
 
+/** Titles available when editing a roster member. */
+export const ROSTER_TITLES = [
+  "Mr",
+  "Dr",
+  "Engr",
+  "Chief",
+  "Sir",
+  "Fr",
+  "Barr",
+  "Rev",
+  "Rev Fr",
+  "Prof",
+] as const;
+
 export type NameTitle = (typeof NAME_TITLES)[number];
+export type RosterTitle = (typeof ROSTER_TITLES)[number];
 
 /** Titles / honorifics stripped before comparing personal name tokens. */
 const NAME_NOISE = new Set(
   [
     ...NAME_TITLES,
+    ...ROSTER_TITLES,
     "mrs",
     "miss",
     "ms",
@@ -22,6 +38,9 @@ const NAME_NOISE = new Set(
     "sr",
   ].map((t) => t.toLowerCase()),
 );
+
+const TITLE_SPLIT =
+  /^(mr|mrs|ms|miss|fr|dr|engr|barr|rev\s+fr|rev|prof|professor|chief|sir)\.?\s+/i;
 
 export function isNameTitle(value: string): value is NameTitle {
   return (NAME_TITLES as readonly string[]).includes(value);
@@ -49,15 +68,35 @@ export function formatTitledName(title: string | null | undefined, name: string)
 export function ensureLeadingTitleDot(name: string): string {
   const clean = name.trim().replace(/\s+/g, " ");
   if (!clean) return clean;
-  const match = clean.match(/^([A-Za-z]+)\.?\s+(.+)$/);
+  const match = clean.match(TITLE_SPLIT);
   if (!match) return clean;
-  const rawTitle = match[1];
-  const rest = match[2];
-  const known = NAME_TITLES.find(
-    (t) => t.toLowerCase() === rawTitle.toLowerCase(),
-  );
+  const rawTitle = match[1].replace(/\s+/g, " ").trim();
+  const rest = clean.slice(match[0].length).trim();
+  if (!rest) return clean;
+  const known =
+    ROSTER_TITLES.find((t) => t.toLowerCase() === rawTitle.toLowerCase()) ||
+    NAME_TITLES.find((t) => t.toLowerCase() === rawTitle.toLowerCase());
   if (!known) return clean;
   return `${formatTitleWithDot(known)} ${rest}`;
+}
+
+/** Split a roster display name into title + personal name. */
+export function splitTitledName(fullName: string): {
+  title: string;
+  name: string;
+} {
+  const clean = fullName.trim().replace(/\s+/g, " ");
+  const match = clean.match(TITLE_SPLIT);
+  if (!match) return { title: "", name: clean };
+  const rawTitle = match[1].replace(/\s+/g, " ").trim();
+  const rest = clean.slice(match[0].length).trim();
+  const known =
+    ROSTER_TITLES.find((t) => t.toLowerCase() === rawTitle.toLowerCase()) ||
+    NAME_TITLES.find((t) => t.toLowerCase() === rawTitle.toLowerCase());
+  return {
+    title: known || rawTitle.replace(/\.$/, ""),
+    name: rest || clean,
+  };
 }
 
 /**

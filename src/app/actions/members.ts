@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { deleteMemberLogin } from "@/lib/access-requests";
+import { isAdminEmail } from "@/lib/config";
+import {
+  formatTitledName,
+  ROSTER_TITLES,
+} from "@/lib/name-titles";
 import { getExcoBoard } from "@/lib/store";
 import {
   countPaymentsForMember,
@@ -11,7 +16,18 @@ import {
   deleteMemberRow,
   getMemberById,
   listAllExpenses,
+  updateMemberRow,
 } from "@/lib/store";
+
+function memberIsPrimaryAdmin(member: {
+  email: string | null;
+  login_email: string | null;
+}): boolean {
+  const emails = [member.login_email, member.email]
+    .map((v) => (v || "").trim().toLowerCase())
+    .filter(Boolean);
+  return emails.some((email) => isAdminEmail(email));
+}
 
 export async function createMemberAction(formData: FormData): Promise<void> {
   await requireAdmin();
@@ -34,6 +50,60 @@ export async function createMemberAction(formData: FormData): Promise<void> {
   revalidatePath("/archive");
   revalidatePath("/access");
   redirect("/?ok=member");
+}
+
+/** Admin-only: change a roster member’s title and/or personal name. */
+export async function updateMemberNameAction(
+  formData: FormData,
+): Promise<void> {
+  await requireAdmin();
+  const id = Number(formData.get("member_id"));
+  const title = String(formData.get("title") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!Number.isFinite(id) || id <= 0) {
+    redirect("/?error=" + encodeURIComponent("Invalid member."));
+  }
+  if (name.length < 2) {
+    redirect(
+      `/members/${id}?error=` +
+        encodeURIComponent("Enter the member’s personal name."),
+    );
+  }
+  if (
+    title &&
+    !(ROSTER_TITLES as readonly string[]).includes(title) &&
+    !/^[A-Za-z][A-Za-z .'-]{0,20}$/.test(title)
+  ) {
+    redirect(
+      `/members/${id}?error=` + encodeURIComponent("Choose a valid title."),
+    );
+  }
+
+  const member = await getMemberById(id);
+  if (!member) {
+    redirect("/?error=" + encodeURIComponent("Member not found."));
+  }
+  if (memberIsPrimaryAdmin(member)) {
+    redirect(
+      `/members/${id}?error=` +
+        encodeURIComponent(
+          "The primary admin member cannot be renamed here.",
+        ),
+    );
+  }
+
+  const nextName = formatTitledName(title, name);
+  await updateMemberRow(id, { name: nextName });
+
+  revalidatePath("/");
+  revalidatePath(`/members/${id}`);
+  revalidatePath("/payments");
+  revalidatePath("/dues");
+  revalidatePath("/archive");
+  revalidatePath("/access");
+  revalidatePath("/expenses");
+  redirect(`/members/${id}?ok=member_updated`);
 }
 
 export async function deleteMemberAction(formData: FormData): Promise<void> {

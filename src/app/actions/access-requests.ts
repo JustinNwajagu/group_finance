@@ -253,6 +253,27 @@ export async function approveAccessRequest(
           ),
       );
     }
+
+    const member = await getMemberById(memberId);
+    if (!member) {
+      redirect(
+        "/access?error=" +
+          encodeURIComponent("Selected member was not found."),
+      );
+    }
+
+    const { formatTitledName, namesShareAToken } = await import(
+      "@/lib/name-titles"
+    );
+    const requestName = formatTitledName(request.title, request.name);
+    if (!namesShareAToken(requestName, member.name)) {
+      redirect(
+        "/access?error=" +
+          encodeURIComponent(
+            `Cannot link: none of the names in the request “${requestName}” match the selected member “${member.name}”. Pick the matching roster member, or create a new member instead.`,
+          ),
+      );
+    }
   }
 
   let result: Awaited<ReturnType<typeof provisionApprovedUser>>;

@@ -278,6 +278,12 @@ export async function provisionApprovedUser(
     if (member.auth_uid) {
       throw new Error("That member already has a login linked.");
     }
+    const { namesShareAToken } = await import("./name-titles");
+    if (!namesShareAToken(displayName, member.name)) {
+      throw new Error(
+        `Cannot link: none of the names in the request “${displayName}” match the selected member “${member.name}”. Pick the matching roster member, or create a new member instead.`,
+      );
+    }
     if (capacity.remaining < 1) {
       throw new Error(
         "All members already have logins. Add a member before approving more accounts.",

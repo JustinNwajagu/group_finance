@@ -71,9 +71,11 @@ export default async function AccessPage({
           <h1>Access</h1>
           <p>
             Roster members do not get login automatically. Approve requests by
-            linking to an existing member or creating a new one. Logins cannot
-            exceed the member count ({capacity.logins}/{capacity.members} used).
-            Admin rights follow EXCO offices (President and Treasurer only).
+            linking to an existing member or creating a new one. Linking only
+            succeeds when at least one personal name matches the selected
+            member. Logins cannot exceed the member count (
+            {capacity.logins}/{capacity.members} used). Admin rights follow EXCO
+            offices (President and Treasurer only).
           </p>
         </div>
       </div>

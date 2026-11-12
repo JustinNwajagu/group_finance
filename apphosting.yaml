@@ -62,3 +62,22 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  # Access-request email alerts (Resend). Create with:
+  #   firebase apphosting:secrets:set RESEND_API_KEY
+  - variable: RESEND_API_KEY
+    secret: RESEND_API_KEY
+    availability:
+      - RUNTIME
+  - variable: RESEND_FROM_EMAIL
+    value: "KLEF 13 <onboarding@resend.dev>"
+    availability:
+      - RUNTIME
+  - variable: APP_BASE_URL
+    value: https://klefapp.web.app
+    availability:
+      - RUNTIME
+  - variable: SESSION_IDLE_MINUTES
+    value: "30"
+    availability:
+      - RUNTIME

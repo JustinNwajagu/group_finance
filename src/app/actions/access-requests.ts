@@ -84,7 +84,10 @@ export async function submitAccessRequest(input: {
   name: string;
   phone: string;
   password: string;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<
+  | { ok: true; emailed: boolean }
+  | { ok: false; error: string }
+> {
   const { formatTitledName, isNameTitle } = await import("@/lib/name-titles");
   const email = input.email.trim().toLowerCase();
   const title = input.title.trim();
@@ -184,9 +187,10 @@ export async function submitAccessRequest(input: {
     };
   }
 
+  let emailed = false;
   try {
     const { notifyAdminsOfAccessRequest } = await import("@/lib/admin-notify");
-    await notifyAdminsOfAccessRequest({
+    const notify = await notifyAdminsOfAccessRequest({
       kind: "access_request",
       requestId,
       email,
@@ -194,8 +198,13 @@ export async function submitAccessRequest(input: {
       name,
       phone,
     });
-  } catch {
+    emailed = notify.emailed;
+    if (!notify.emailed && notify.error) {
+      console.error("[access-request] admin email not sent:", notify.error);
+    }
+  } catch (err) {
     // Request is saved; admin still sees the Access badge/banner if email fails.
+    console.error("[access-request] admin notify failed:", err);
   }
 
   revalidatePath("/access");
@@ -206,7 +215,7 @@ export async function submitAccessRequest(input: {
   revalidatePath("/archive");
   revalidatePath("/regulations");
   revalidatePath("/profile");
-  return { ok: true };
+  return { ok: true, emailed };
 }
 
 export async function approveAccessRequest(

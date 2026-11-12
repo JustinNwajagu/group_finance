@@ -12,6 +12,19 @@ ADMIN_EMAIL=klef2007.2013@gmail.com
 
 Other users default to **member**. Admins can assign `admin` / `member` roles on the Access page (`user_roles` collection).
 
+### Access-request email alerts
+
+New create-account requests email `ADMIN_EMAIL` (and President/Treasurer login emails when linked). Configure one sender:
+
+```bash
+# Recommended
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_FROM_EMAIL="KLEF 13 <onboarding@resend.dev>"
+APP_BASE_URL=https://your-app.web.app
+```
+
+Or SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM` / `SMTP_PORT`). Without Resend/SMTP, requests still appear on **Access** (badge/banner), but no inbox email is sent.
+
 ## 1. Create a Firebase project
 
 1. [Firebase console](https://console.firebase.google.com/) → add project.

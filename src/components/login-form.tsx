@@ -284,11 +284,13 @@ export function LoginForm({
         open={requestOpen}
         defaultEmail={requestEmail}
         onClose={() => setRequestOpen(false)}
-        onSubmitted={() => {
+        onSubmitted={(emailed) => {
           setRequestOpen(false);
           setError(null);
           setRequestNotice(
-            "Request sent. An admin has been notified and must approve it before you can sign in.",
+            emailed
+              ? "Request sent. The primary admin has been emailed and must approve it before you can sign in."
+              : "Request sent and is waiting on Access. If an admin email was not configured, tell an admin to open Access and approve you.",
           );
         }}
       />
@@ -446,7 +448,7 @@ function AccessRequestDialog({
   open: boolean;
   defaultEmail: string;
   onClose: () => void;
-  onSubmitted: () => void;
+  onSubmitted: (emailed: boolean) => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -486,7 +488,7 @@ function AccessRequestDialog({
         setError(result.error);
         return;
       }
-      onSubmitted();
+      onSubmitted(Boolean(result.emailed));
     });
   }
 

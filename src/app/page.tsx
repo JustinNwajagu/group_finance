@@ -1,28 +1,25 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { createMember } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
-import { FilterBar } from "@/components/filter-bar";
 import { Flash } from "@/components/flash";
+import { HomeRosterList } from "@/components/home-roster";
 import { PageFallback } from "@/components/page-fallback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import { listMembers, requestedPaymentCount } from "@/lib/data";
 import { listDuesSchedules } from "@/lib/dues-data";
-import { formatDuesCount } from "@/lib/dues-months";
 import { excoByMemberIdMap, listExcoSeatViews } from "@/lib/exco";
 import type { ExcoSeatView, MemberContribution } from "@/lib/types";
 
 export const instant = false;
 
-async function HomeRoster({
+async function HomeBody({
   membersPromise,
   contributionCountPromise,
   duesYearCountPromise,
   excoPromise,
   excoByMemberPromise,
-  q,
   admin,
 }: {
   membersPromise: Promise<MemberContribution[]>;
@@ -30,7 +27,6 @@ async function HomeRoster({
   duesYearCountPromise: Promise<number>;
   excoPromise: Promise<ExcoSeatView[]>;
   excoByMemberPromise: Promise<Map<number, ExcoSeatView>>;
-  q: string;
   admin: boolean;
 }) {
   await connection();
@@ -64,79 +60,12 @@ async function HomeRoster({
         </div>
       </section>
 
-      <section className="panel">
-        <div className="panel-heading-row">
-          <h2>Roster</h2>
-          <p className="panel-heading-meta">
-            Members <strong>{members.length}</strong>
-            {" · "}
-            Contributions count <strong>{contributionCount}</strong>
-            {" · "}
-            Dues count <strong>{duesYearCount}</strong>
-          </p>
-        </div>
-        {members.length === 0 ? (
-          <div className="hero-empty">
-            {q
-              ? "No members match that filter."
-              : "No members yet. Admins can add or import the first names."}
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th className="num">#</th>
-                  <th>Member</th>
-                  <th className="num">Contributions</th>
-                  <th className="num">Dues</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m, index) => {
-                  const seat = excoByMember.get(m.id);
-                  return (
-                    <tr key={m.id}>
-                      <td className="num muted">{index + 1}</td>
-                      <td>
-                        <Link className="row-link" href={`/members/${m.id}`}>
-                          {m.name}
-                        </Link>
-                        {seat ? (
-                          <span
-                            className={
-                              seat.grants_admin
-                                ? "badge badge-admin"
-                                : "badge badge-exco"
-                            }
-                            style={{ marginLeft: "0.45rem" }}
-                          >
-                            {seat.label}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="num">
-                        {m.contribution_count}
-                        <span className="muted">/{m.payment_count}</span>
-                      </td>
-                      <td className="num">
-                        {m.dues_years_count > 0 ? (
-                          <>
-                            {formatDuesCount(m.dues_count)}
-                            <span className="muted">/{m.dues_years_count}</span>
-                          </>
-                        ) : (
-                          <span className="muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      <HomeRosterList
+        members={members}
+        contributionCount={contributionCount}
+        duesYearCount={duesYearCount}
+        excoByMemberEntries={Array.from(excoByMember.entries())}
+      />
 
       {admin ? (
         <section className="panel">
@@ -177,8 +106,8 @@ export default async function HomePage({
   await connection();
   const viewerPromise = requireAccess();
   const params = await searchParams;
-  const q = typeof params.q === "string" ? params.q : "";
-  const membersPromise = listMembers(q);
+  // Always load the full roster; filtering is client-side so clear is instant.
+  const membersPromise = listMembers();
   const contributionCountPromise = requestedPaymentCount();
   const duesYearCountPromise = listDuesSchedules().then((rows) => rows.length);
   const excoPromise = listExcoSeatViews();
@@ -199,9 +128,6 @@ export default async function HomePage({
             opened year as 1.
           </p>
         </div>
-        <Suspense fallback={null}>
-          <FilterBar placeholder="Filter members…" />
-        </Suspense>
       </div>
 
       <Flash
@@ -214,13 +140,12 @@ export default async function HomePage({
       />
 
       <Suspense fallback={<PageFallback label="Loading roster…" />}>
-        <HomeRoster
+        <HomeBody
           membersPromise={membersPromise}
           contributionCountPromise={contributionCountPromise}
           duesYearCountPromise={duesYearCountPromise}
           excoPromise={excoPromise}
           excoByMemberPromise={excoByMemberPromise}
-          q={q}
           admin={admin}
         />
       </Suspense>

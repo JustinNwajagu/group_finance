@@ -16,8 +16,8 @@ export async function withFirestoreRetry<T>(
   fn: () => Promise<T>,
   opts?: { attempts?: number; baseMs?: number },
 ): Promise<T> {
-  const attempts = opts?.attempts ?? 5;
-  const baseMs = opts?.baseMs ?? 400;
+  const attempts = opts?.attempts ?? 4;
+  const baseMs = opts?.baseMs ?? 200;
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
     try {

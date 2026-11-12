@@ -7,8 +7,7 @@ import { HomeRosterList } from "@/components/home-roster";
 import { PageFallback } from "@/components/page-fallback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
-import { listMembers, requestedPaymentCount } from "@/lib/data";
-import { listDuesSchedules } from "@/lib/dues-data";
+import { listMembers } from "@/lib/data";
 import { excoByMemberIdMap, listExcoSeatViews } from "@/lib/exco";
 import type { ExcoSeatView, MemberContribution } from "@/lib/types";
 
@@ -16,28 +15,24 @@ export const instant = false;
 
 async function HomeBody({
   membersPromise,
-  contributionCountPromise,
-  duesYearCountPromise,
   excoPromise,
   excoByMemberPromise,
   admin,
 }: {
   membersPromise: Promise<MemberContribution[]>;
-  contributionCountPromise: Promise<number>;
-  duesYearCountPromise: Promise<number>;
   excoPromise: Promise<ExcoSeatView[]>;
   excoByMemberPromise: Promise<Map<number, ExcoSeatView>>;
   admin: boolean;
 }) {
   await connection();
-  const [members, contributionCount, duesYearCount, excoSeats, excoByMember] =
-    await Promise.all([
-      membersPromise,
-      contributionCountPromise,
-      duesYearCountPromise,
-      excoPromise,
-      excoByMemberPromise,
-    ]);
+  const [members, excoSeats, excoByMember] = await Promise.all([
+    membersPromise,
+    excoPromise,
+    excoByMemberPromise,
+  ]);
+  // Counts are identical on every roster row — avoid extra Firestore round trips.
+  const contributionCount = members[0]?.payment_count ?? 0;
+  const duesYearCount = members[0]?.dues_years_count ?? 0;
 
   return (
     <div className="stack">
@@ -106,10 +101,8 @@ export default async function HomePage({
   await connection();
   const viewerPromise = requireAccess();
   const params = await searchParams;
-  // Always load the full roster; filtering is client-side so clear is instant.
+  // Full roster once; client-side filter. Counts come from the roster rows.
   const membersPromise = listMembers();
-  const contributionCountPromise = requestedPaymentCount();
-  const duesYearCountPromise = listDuesSchedules().then((rows) => rows.length);
   const excoPromise = listExcoSeatViews();
   const excoByMemberPromise = excoByMemberIdMap();
   const viewer = await viewerPromise;
@@ -142,8 +135,6 @@ export default async function HomePage({
       <Suspense fallback={<PageFallback label="Loading roster…" />}>
         <HomeBody
           membersPromise={membersPromise}
-          contributionCountPromise={contributionCountPromise}
-          duesYearCountPromise={duesYearCountPromise}
           excoPromise={excoPromise}
           excoByMemberPromise={excoByMemberPromise}
           admin={admin}

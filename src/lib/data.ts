@@ -27,13 +27,16 @@ export async function requestedPaymentCount(): Promise<number> {
 
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
   const q = query?.trim().toLowerCase() ?? "";
-  // Sequential collection loads avoid bursting Firestore under free/Spark
-  // rate limits (parallel gets were surfacing RESOURCE_EXHAUSTED on Home).
-  const members = await listAllMembers();
-  const requests = await listAllPaymentRequestRows();
-  const payments = await listAllPaymentRows();
-  const schedules = await listAllDuesSchedules();
-  const allDuesPayments = await listAllDuesPayments();
+  // Parallel core reads (with shared cache + in-flight coalescing). Skip the
+  // dues_payments scan when no dues years are open — common and saves a round trip.
+  const [members, requests, payments, schedules] = await Promise.all([
+    listAllMembers(),
+    listAllPaymentRequestRows(),
+    listAllPaymentRows(),
+    listAllDuesSchedules(),
+  ]);
+  const allDuesPayments =
+    schedules.length === 0 ? [] : await listAllDuesPayments();
   const paymentCount = requests.length;
   const duesYearsCount = schedules.length;
   const duesByScheduleMember = new Map<string, typeof allDuesPayments>();

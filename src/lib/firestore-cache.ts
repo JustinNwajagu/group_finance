@@ -8,6 +8,7 @@ type CacheEntry = {
 
 const g = globalThis as typeof globalThis & {
   __klefFsCache?: Map<string, CacheEntry>;
+  __klefFsInflight?: Map<string, Promise<unknown>>;
 };
 
 function bucket(): Map<string, CacheEntry> {
@@ -15,12 +16,16 @@ function bucket(): Map<string, CacheEntry> {
   return g.__klefFsCache;
 }
 
+function inflightBucket(): Map<string, Promise<unknown>> {
+  if (!g.__klefFsInflight) g.__klefFsInflight = new Map();
+  return g.__klefFsInflight;
+}
+
 /**
  * Keep collection snapshots warm across dashboard hops.
- * Was 8s — too short under Spark/free quotas and caused Home to re-scan
- * members+payments+dues on nearly every navigation (RESOURCE_EXHAUSTED).
+ * Long enough to reuse across navigation; short enough to pick up writes.
  */
-const DEFAULT_TTL_MS = 120_000;
+const DEFAULT_TTL_MS = 60_000;
 
 export function invalidateStoreCache(prefix?: string): void {
   const map = bucket();
@@ -46,7 +51,21 @@ export async function cachedLoad<T>(
   if (hit && now - hit.at < ttlMs) {
     return hit.value as T;
   }
-  const value = await loader();
-  map.set(key, { at: now, value });
-  return value;
+
+  // Coalesce concurrent misses for the same key (Home used to stampede).
+  const inflight = inflightBucket();
+  const pending = inflight.get(key);
+  if (pending) return pending as Promise<T>;
+
+  const promise = (async () => {
+    try {
+      const value = await loader();
+      map.set(key, { at: Date.now(), value });
+      return value;
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+  inflight.set(key, promise);
+  return promise;
 }

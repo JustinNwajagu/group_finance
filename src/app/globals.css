@@ -27,13 +27,19 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 html,
 body {
   min-height: 100%;
+  max-width: 100%;
 }
 
 body {
   margin: 0;
+  overflow-x: hidden;
   color: var(--ink);
   font-family: var(--font-body);
   background:
@@ -67,8 +73,12 @@ a {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+  min-height: 100dvh;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
 }
 
 .topbar {
@@ -80,6 +90,43 @@ a {
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(10px);
   background: rgba(243, 246, 248, 0.72);
+  min-width: 0;
+  width: 100%;
+}
+
+.primary-nav {
+  justify-self: center;
+  min-width: 0;
+}
+
+.nav-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.nav-menu-toggle:hover {
+  background: rgba(31, 122, 108, 0.08);
+}
+
+.nav-menu-label {
+  min-width: 0;
+}
+
+.nav-menu-chevron {
+  color: var(--ink-soft);
+  flex-shrink: 0;
 }
 
 .brand {
@@ -265,9 +312,12 @@ a.viewer-name.is-active {
 
 .main {
   width: min(1100px, calc(100% - 2rem));
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
   padding: 2rem 0 3.5rem;
   animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  box-sizing: border-box;
 }
 
 .page-head {
@@ -339,6 +389,9 @@ a.viewer-name.is-active {
 
 .table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  min-width: 0;
 }
 
 table.data {
@@ -1284,15 +1337,23 @@ textarea {
 
 .gate {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 2rem 1.25rem;
+  align-content: center;
+  padding: max(2rem, env(safe-area-inset-top, 0px))
+    max(1.25rem, env(safe-area-inset-right, 0px))
+    max(2rem, env(safe-area-inset-bottom, 0px))
+    max(1.25rem, env(safe-area-inset-left, 0px));
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .gate-card {
   width: min(400px, 100%);
+  max-width: 100%;
   text-align: center;
   padding: 2.5rem 1.85rem 2rem;
   border-radius: 22px;
@@ -1300,6 +1361,7 @@ textarea {
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
   animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  box-sizing: border-box;
 }
 
 .gate-brand {
@@ -1544,6 +1606,42 @@ textarea {
   top: 1rem;
 }
 
+.dash-tools-toggle {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.dash-tools-toggle:hover {
+  background: rgba(31, 122, 108, 0.08);
+}
+
+.dash-tools-toggle-label {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.dash-tools-toggle-chevron {
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+
+.dash-tools-body {
+  min-width: 0;
+  width: 100%;
+}
+
 .dash-aside .panel,
 .dash-main .panel,
 .expenses-aside .panel,
@@ -1636,12 +1734,31 @@ textarea {
 @media (max-width: 960px) {
   .dash-layout,
   .expenses-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .dash-aside,
   .expenses-aside {
     position: static;
+    order: -1;
+  }
+
+  .dash-tools-toggle {
+    display: flex;
+  }
+
+  .dash-tools:not(.is-open) .dash-tools-body {
+    display: none;
+  }
+
+  .dash-tools.is-open .dash-tools-toggle {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    background: rgba(31, 122, 108, 0.08);
+  }
+
+  .dash-tools.is-open .dash-tools-body {
+    padding-top: 0.85rem;
   }
 
   .expenses-balance-grid {
@@ -1858,18 +1975,79 @@ textarea {
   .regulations-signatories {
     grid-template-columns: 1fr;
   }
-  .topbar {
-    grid-template-columns: 1fr;
-    justify-items: start;
+
+  .gate {
+    place-items: start center;
+    align-content: start;
+    padding-top: max(1.25rem, env(safe-area-inset-top, 0px));
   }
 
-  .nav,
-  .viewer {
+  .gate-card {
+    padding: 1.75rem 1.25rem 1.5rem;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand toggle"
+      "nav nav"
+      "viewer viewer";
+    justify-items: stretch;
+    gap: 0.75rem 1rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .brand {
+    grid-area: brand;
     justify-self: start;
   }
 
+  .primary-nav {
+    display: contents;
+  }
+
+  .nav-menu-toggle {
+    display: inline-flex;
+    grid-area: toggle;
+    justify-self: end;
+    width: auto;
+    min-width: 7.5rem;
+  }
+
+  .nav {
+    grid-area: nav;
+    justify-self: stretch;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+    width: 100%;
+  }
+
+  .primary-nav:not(.is-open) .nav {
+    display: none;
+  }
+
+  .primary-nav.is-open .nav {
+    display: flex;
+  }
+
+  .nav-link {
+    border-radius: 10px;
+    padding: 0.65rem 0.85rem;
+  }
+
+  .nav-link.active::after {
+    display: none;
+  }
+
   .viewer {
+    grid-area: viewer;
+    justify-self: start;
     text-align: left;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
   }
 
   .bank-corner {
@@ -1880,5 +2058,17 @@ textarea {
 
   .expenses-head {
     align-items: stretch;
+  }
+
+  .main,
+  .main:has(.dash-layout),
+  .main:has(.expenses-layout),
+  .main:has(.expenses-top) {
+    width: calc(100% - 1.5rem);
+    padding-top: 1.25rem;
+  }
+
+  .page-head h1 {
+    font-size: clamp(1.55rem, 7vw, 2rem);
   }
 }

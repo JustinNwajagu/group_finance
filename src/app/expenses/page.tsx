@@ -7,6 +7,7 @@ import {
 } from "@/app/actions/expenses";
 import { AppShell } from "@/components/app-shell";
 import { CertifiedExpensesList } from "@/components/certified-expenses-list";
+import { DashTools } from "@/components/dash-tools";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordExpenseForm } from "@/components/record-expense-form";
@@ -257,7 +258,7 @@ export default async function ExpensesPage({
         </div>
 
         {admin ? (
-          <aside className="expenses-aside stack">
+          <DashTools title="Admin tools" asideClassName="expenses-aside">
             <section className="panel">
               <h2>Record expense</h2>
               <RecordExpenseForm
@@ -315,7 +316,7 @@ export default async function ExpensesPage({
                 </div>
               </form>
             </section>
-          </aside>
+          </DashTools>
         ) : null}
       </div>
     </AppShell>

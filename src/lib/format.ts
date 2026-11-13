@@ -65,27 +65,45 @@ export function isPaymentDateAllowed(
   return value <= today;
 }
 
+/** Fixed English month shorts — avoids Node/browser Intl mismatches (e.g. Sept vs Sep). */
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function formatDayMonthYear(d: Date): string {
+  return `${d.getUTCDate()} ${MONTH_SHORT[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return "—";
-  const raw = value.includes("T") ? value : `${value}T12:00:00`;
-  const d = new Date(raw);
+  // Date-only strings: parse as UTC calendar day to keep SSR/client identical.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, day] = value.split("-").map(Number);
+    return `${day} ${MONTH_SHORT[m - 1]} ${y}`;
+  }
+  const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
-  return new Intl.DateTimeFormat("en-NG", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(d);
+  return formatDayMonthYear(d);
 }
 
 export function formatTimestamp(value: string | null | undefined): string {
   if (!value) return "—";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value;
-  return new Intl.DateTimeFormat("en-NG", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(d);
+  const hours = d.getUTCHours();
+  const minutes = String(d.getUTCMinutes()).padStart(2, "0");
+  const hour12 = hours % 12 || 12;
+  const ampm = hours < 12 ? "AM" : "PM";
+  return `${formatDayMonthYear(d)}, ${hour12}:${minutes} ${ampm}`;
 }

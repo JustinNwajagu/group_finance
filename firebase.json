@@ -9,8 +9,8 @@
       "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
       "redirects": [
         {
-          "source": "**",
-          "destination": "https://klefapp--klefapp.europe-west4.hosted.app/:splat",
+          "regex": "^/(.*)$",
+          "destination": "https://klefapp--klefapp.europe-west4.hosted.app/:1",
           "type": 302
         }
       ]

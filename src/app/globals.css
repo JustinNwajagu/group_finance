@@ -1926,6 +1926,7 @@ textarea {
   position: sticky;
   top: 1rem;
   /* Keep tools on-screen without stretching the page scroll range */
+  max-height: calc(100vh - 2rem);
   max-height: calc(100dvh - 2rem);
   overflow-x: hidden;
   overflow-y: auto;

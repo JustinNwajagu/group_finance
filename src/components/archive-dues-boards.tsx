@@ -64,7 +64,9 @@ export function ArchiveDuesBoards({
             </button>
             {open ? (
               <div id={panelId} className="archive-item-body">
-                <DuesYearTable board={board} />
+                <div className="archive-scroll-pane">
+                  <DuesYearTable board={board} />
+                </div>
                 {isAdmin ? (
                   <p className="muted archive-item-note">
                     This dues year stays in Archive. Use Admin tools to amend

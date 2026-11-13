@@ -62,12 +62,14 @@ export function ArchiveBoards({
             </button>
             {open ? (
               <div id={panelId} className="archive-item-body">
-                <ContributionBoard
-                  board={board}
-                  isAdmin={isAdmin}
-                  returnTo="/archive"
-                  hideHeader
-                />
+                <div className="archive-scroll-pane">
+                  <ContributionBoard
+                    board={board}
+                    isAdmin={isAdmin}
+                    returnTo="/archive"
+                    hideHeader
+                  />
+                </div>
               </div>
             ) : null}
           </div>

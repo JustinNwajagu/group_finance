@@ -447,6 +447,8 @@ a.viewer-name.is-active {
   padding: 1.25rem;
   box-shadow: var(--shadow);
   min-width: 0;
+  height: fit-content;
+  max-width: 100%;
 }
 
 .panel + .panel {
@@ -1197,41 +1199,45 @@ textarea {
 }
 
 .archive-item-body {
-  /* Cap vertical growth; horizontal month scroll lives on .dues-table-wrap */
+  /* Size to the scroll pane + note — never reserve a tall empty viewport */
   padding: 0.5rem 0.65rem 0.65rem;
-  max-height: min(22rem, 50vh);
-  max-height: min(22rem, 50dvh);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
+  max-height: none;
+  height: fit-content;
   min-width: 0;
 }
 
-.archive-item-body .table-wrap,
-.archive-item-body .dues-table-wrap {
-  display: block;
+/* Single scrollport for open archive tables (vertical + horizontal months) */
+.archive-scroll-pane {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  max-height: none;
-  overflow-x: auto;
-  overflow-y: visible;
+  max-height: min(18rem, 42vh);
+  max-height: min(18rem, 42dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
 }
 
-/* Keep month columns from squashing so the wrap can scroll sideways */
-.archive-item-body .dues-table-wrap > table.dues-grid {
+.archive-scroll-pane .table-wrap,
+.archive-scroll-pane .dues-table-wrap {
+  display: block;
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  overflow: visible;
+}
+
+.archive-scroll-pane .dues-table-wrap > table.dues-grid {
   width: max-content;
   min-width: 100%;
 }
 
-.archive-item-body .contrib-board {
+.archive-scroll-pane .contrib-board {
   padding: 0.35rem 0.15rem 0.15rem;
 }
 
-.archive-item-body .contrib-split {
+.archive-scroll-pane .contrib-split {
   gap: 0.65rem;
 }
 
@@ -1936,20 +1942,19 @@ textarea {
 
 .dash-aside,
 .expenses-aside {
-  position: sticky;
-  top: 1rem;
-  /* Keep tools on-screen without stretching the page scroll range */
-  max-height: calc(100vh - 2rem);
-  max-height: calc(100dvh - 2rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  /* No sticky / viewport max-height — those reserved a near-full-screen
+     column and left blank space under shorter main boards (Archive dues). */
+  position: static;
   align-self: start;
+  height: fit-content;
+  max-height: none;
+  overflow: visible;
 }
 
 .dash-tools-toggle {
-  display: none;
+  /* Collapsed by default on every breakpoint so a tall tools column
+     cannot leave blank space under shorter main boards (e.g. Archive). */
+  display: flex;
   width: 100%;
   align-items: center;
   justify-content: space-between;
@@ -1982,6 +1987,26 @@ textarea {
 .dash-tools-body {
   min-width: 0;
   width: 100%;
+}
+
+.dash-tools:not(.is-open) .dash-tools-body {
+  display: none;
+}
+
+.dash-tools.is-open .dash-tools-toggle {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  background: rgba(31, 122, 108, 0.08);
+}
+
+.dash-tools.is-open .dash-tools-body {
+  padding-top: 0.85rem;
+  max-height: min(70vh, 32rem);
+  max-height: min(70dvh, 32rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .dash-aside .panel,
@@ -2083,28 +2108,6 @@ textarea {
   .expenses-aside {
     position: static;
     order: -1;
-  }
-
-  .dash-tools-toggle {
-    display: flex;
-  }
-
-  .dash-tools:not(.is-open) .dash-tools-body {
-    display: none;
-  }
-
-  .dash-tools.is-open .dash-tools-toggle {
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-    background: rgba(31, 122, 108, 0.08);
-  }
-
-  .dash-tools.is-open .dash-tools-body {
-    padding-top: 0.85rem;
-    max-height: min(70vh, 32rem);
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .expenses-balance-grid {

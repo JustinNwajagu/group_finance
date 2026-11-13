@@ -178,38 +178,6 @@ export function allocateAmountAcrossYearRange(
   return allocations;
 }
 
-/**
- * Split a fixed month count across years (same monthly rate assumed).
- * Prefer {@link allocateAmountAcrossYearRange} when rates can differ.
- */
-export function allocateMonthsAcrossYearRange(
-  paidByYear: Map<number, boolean[]>,
-  yearFrom: number,
-  yearTo: number,
-  months: number,
-  monthly = 1,
-): YearMonthAllocation[] | null {
-  if (!Number.isFinite(months) || months < 1) return null;
-  const start = Math.min(yearFrom, yearTo);
-  const end = Math.max(yearFrom, yearTo);
-  const monthlyByYear = new Map<number, number>();
-  const creditsByYear = new Map<number, number[]>();
-  for (let year = start; year <= end; year += 1) {
-    monthlyByYear.set(year, monthly);
-    const paid = paidByYear.get(year) ?? Array.from({ length: 12 }, () => false);
-    creditsByYear.set(
-      year,
-      paid.map((isPaid) => (isPaid ? monthly : 0)),
-    );
-  }
-  return allocateAmountAcrossYearRange(
-    creditsByYear,
-    monthlyByYear,
-    start,
-    end,
-    months * monthly,
-  );
-}
 
 /**
  * Fractional dues credit for one year: monthsPaid/12.

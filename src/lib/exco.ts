@@ -109,15 +109,6 @@ export function matchMemberIdForSlate(
   return null;
 }
 
-export function emptyExcoSeats(): ExcoSeatRow[] {
-  return DEFAULT_EXCO_SLATE.map((row) => ({
-    office: row.office,
-    member_id: null,
-    holder_name: row.holder_name,
-    updated_at: null,
-    updated_by: null,
-  }));
-}
 
 export function toExcoSeatView(
   seat: ExcoSeatRow,

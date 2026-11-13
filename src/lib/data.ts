@@ -11,7 +11,6 @@ import { duesYearFraction } from "./dues-months";
 import { compareMembersByName } from "./member-sort";
 import {
   getMemberById,
-  getPaymentRequestById,
   listAllDuesPayments,
   listAllDuesSchedules,
   listAllMembers,
@@ -122,13 +121,6 @@ export async function listOpenPaymentRequests(): Promise<PaymentRequest[]> {
     .sort((a, b) => a.deadline.localeCompare(b.deadline) || a.id - b.id);
 }
 
-export async function listConcludedPaymentRequests(): Promise<PaymentRequest[]> {
-  return (await listAllPaymentRequestRows())
-    .filter((r) => r.concluded_at)
-    .sort((a, b) =>
-      (b.concluded_at ?? "").localeCompare(a.concluded_at ?? ""),
-    );
-}
 
 export async function listAllPaymentRequests(): Promise<PaymentRequest[]> {
   return (await listAllPaymentRequestRows()).sort((a, b) => {
@@ -147,11 +139,6 @@ export async function listAllPaymentRequests(): Promise<PaymentRequest[]> {
   });
 }
 
-export async function getPaymentRequest(
-  id: number,
-): Promise<PaymentRequest | null> {
-  return getPaymentRequestById(id);
-}
 
 function buildContributionLists(
   request: PaymentRequest,
@@ -206,18 +193,6 @@ function buildContributionLists(
   };
 }
 
-export async function contributionListsForRequest(
-  requestId: number,
-): Promise<ContributionLists | null> {
-  const request = await getPaymentRequest(requestId);
-  if (!request) return null;
-
-  const [members, payments] = await Promise.all([
-    listAllMembers(),
-    listAllPaymentRows(),
-  ]);
-  return buildContributionLists(request, members, payments);
-}
 
 export async function listContributionBoards(
   onlyOpen: boolean,
@@ -260,38 +235,3 @@ export async function listPaymentsForMember(
     });
 }
 
-export async function listPayments(
-  query?: string,
-): Promise<PaymentWithMember[]> {
-  const q = query?.trim().toLowerCase() ?? "";
-  const [payments, requests, members] = await Promise.all([
-    listAllPaymentRows(),
-    listAllPaymentRequestRows(),
-    listAllMembers(),
-  ]);
-  const reqById = new Map(requests.map((r) => [r.id, r]));
-  const memById = new Map(members.map((m) => [m.id, m]));
-  return payments
-    .map((p) => {
-      const r = reqById.get(p.payment_request_id);
-      const m = memById.get(p.member_id);
-      return {
-        ...p,
-        title: r?.title ?? "Payment",
-        member_name: m?.name ?? "Member",
-      };
-    })
-    .filter((p) => {
-      if (!q) return true;
-      return (
-        p.title.toLowerCase().includes(q) ||
-        p.member_name.toLowerCase().includes(q)
-      );
-    })
-    .sort((a, b) => {
-      const da = reqById.get(a.payment_request_id)?.deadline ?? "";
-      const db = reqById.get(b.payment_request_id)?.deadline ?? "";
-      return db.localeCompare(da) || b.created_at.localeCompare(a.created_at);
-    })
-    .slice(0, 500);
-}

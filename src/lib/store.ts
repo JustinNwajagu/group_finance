@@ -347,9 +347,6 @@ function isAppRow(data: Record<string, unknown> | undefined): boolean {
   return Number.isFinite(Number(data.id));
 }
 
-export async function storeBackend(): Promise<"firestore" | "local"> {
-  return isFirestore() ? "firestore" : "local";
-}
 
 export async function createMember(input: {
   name: string;

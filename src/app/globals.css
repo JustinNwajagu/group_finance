@@ -824,9 +824,6 @@ textarea {
   width: 100%;
 }
 
-.filter.is-pending {
-  opacity: 0.7;
-}
 
 .inline-form {
   display: inline-flex;

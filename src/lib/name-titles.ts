@@ -99,16 +99,6 @@ export function splitTitledName(fullName: string): {
   };
 }
 
-/**
- * Sort key that ignores leading titles so “Mr. Udeoba” sorts under U, not M.
- */
-export function nameSortKey(value: string | null | undefined): string {
-  const tokens = nameTokens(value);
-  if (tokens.length > 0) return tokens.join(" ");
-  return String(value ?? "")
-    .trim()
-    .toLowerCase();
-}
 
 /** Split a display name into comparable personal-name tokens. */
 export function nameTokens(value: string | null | undefined): string[] {

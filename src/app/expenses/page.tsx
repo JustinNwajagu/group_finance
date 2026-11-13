@@ -264,7 +264,6 @@ export default async function ExpensesPage({
                 members={members}
                 contributions={contributions}
                 today={today}
-                bankBalance={ledger.balance}
               />
             </section>
 

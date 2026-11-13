@@ -1,10 +1,9 @@
 import "server-only";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { cache } from "react";
 import { adminDb } from "./firebase-admin";
 import { adminEmail, isAdminEmail, isFirestore } from "./config";
-import { cachedLoad, invalidateStoreCache } from "./firestore-cache";
+import { invalidateStoreCache } from "./firestore-cache";
 import type { AppRole } from "./types";
 
 export type UserRoleRow = {
@@ -49,10 +48,6 @@ async function saveLocal(db: LocalRoles): Promise<void> {
   await writeFile(rolesFile(), JSON.stringify(db, null, 2));
 }
 
-function normalizeRole(raw: unknown): "admin" | "member" {
-  return raw === "admin" ? "admin" : "member";
-}
-
 /**
  * Effective app role for a signed-in email.
  * Admin rights come from EXCO (President / Treasurer). The configured
@@ -65,56 +60,6 @@ export async function resolveAppRole(email: string): Promise<AppRole> {
   const { resolveAdminFromExco } = await import("./exco");
   if (await resolveAdminFromExco(normalized)) return "admin";
   return "member";
-}
-
-export const getUserRole = cache(async (
-  email: string,
-): Promise<UserRoleRow | null> => {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return null;
-  return cachedLoad(`user_roles:${normalized}`, async () => {
-    if (isFirestore()) {
-      const snap = await adminDb()!
-        .collection("user_roles")
-        .doc(normalized)
-        .get();
-      if (!snap.exists) return null;
-      const data = snap.data() as Record<string, unknown>;
-      return {
-        email: normalized,
-        role: normalizeRole(data.role),
-        updated_at: String(data.updated_at ?? nowIso()),
-        updated_by: (data.updated_by as string | null) ?? null,
-      };
-    }
-    const db = await loadLocal();
-    return db.roles.find((r) => r.email === normalized) ?? null;
-  });
-});
-
-export async function listUserRoles(): Promise<UserRoleRow[]> {
-  if (isFirestore()) {
-    const snap = await adminDb()!.collection("user_roles").get();
-    return snap.docs
-      .map((d) => {
-        const data = d.data() as Record<string, unknown>;
-        if (data._meta === true) return null;
-        const email = String(data.email ?? d.id)
-          .trim()
-          .toLowerCase();
-        if (!email) return null;
-        return {
-          email,
-          role: normalizeRole(data.role),
-          updated_at: String(data.updated_at ?? nowIso()),
-          updated_by: (data.updated_by as string | null) ?? null,
-        } satisfies UserRoleRow;
-      })
-      .filter((r): r is UserRoleRow => r != null)
-      .sort((a, b) => a.email.localeCompare(b.email));
-  }
-  const db = await loadLocal();
-  return [...db.roles].sort((a, b) => a.email.localeCompare(b.email));
 }
 
 export async function setUserRole(input: {

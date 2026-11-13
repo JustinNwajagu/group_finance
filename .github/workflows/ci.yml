@@ -28,6 +28,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # PageProps/LayoutProps live in .next/types — generate them before tsc.
+      - name: Typegen
+        run: npx next typegen
+
       - name: Typecheck
         run: npx tsc --noEmit
 

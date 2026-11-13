@@ -35,8 +35,6 @@ export function RecordExpenseForm({
   members: Member[];
   contributions: ContributionFundingOption[];
   today: string;
-  /** @deprecated kept optional for call-site compatibility */
-  bankBalance?: string;
 }) {
   const [kind, setKind] = useState<ExpenseKind>("miscellaneous");
   const [funding, setFunding] = useState<ExpenseFundingSource>("contribution");

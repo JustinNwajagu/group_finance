@@ -60,9 +60,6 @@ function toMemberYear(
   };
 }
 
-export async function listDuesSchedules(): Promise<DuesScheduleRow[]> {
-  return listAllDuesSchedules();
-}
 
 export async function listOpenDuesSchedules(): Promise<DuesScheduleRow[]> {
   const all = await listAllDuesSchedules();
@@ -129,11 +126,6 @@ export async function getDuesBoard(
   };
 }
 
-export async function getDuesBoardForYear(
-  year: number,
-): Promise<DuesYearBoard | null> {
-  return getDuesBoard(year, true);
-}
 
 export async function memberDuesSummary(memberId: number): Promise<{
   years_count: number;

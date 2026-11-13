@@ -1282,11 +1282,85 @@ textarea {
 
 .contrib-list {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  /* Keep overflow visible so sticky section heads work while scrolling the page */
+  overflow: visible;
 }
 
-.contrib-list h4 {
-  margin: 0 0 0.45rem;
-  font-size: 0.95rem;
+.contrib-list-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.contrib-list-head h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 650;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.contrib-list-count {
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.contrib-list-body {
+  padding: 0.65rem 0.85rem 0.85rem;
+  min-width: 0;
+}
+
+.contrib-list-paid {
+  border-color: rgba(31, 107, 74, 0.28);
+  background:
+    linear-gradient(180deg, rgba(31, 107, 74, 0.1) 0%, rgba(255, 255, 255, 0.78) 42%);
+}
+
+.contrib-list-paid .contrib-list-head {
+  background: rgba(232, 244, 237, 0.94);
+  border-bottom-color: rgba(31, 107, 74, 0.22);
+}
+
+.contrib-list-paid .contrib-list-head h4 {
+  color: var(--ok);
+}
+
+.contrib-list-pledge {
+  border-color: rgba(201, 137, 26, 0.32);
+  background:
+    linear-gradient(180deg, rgba(201, 137, 26, 0.12) 0%, rgba(255, 255, 255, 0.78) 42%);
+}
+
+.contrib-list-pledge .contrib-list-head {
+  background: rgba(250, 241, 224, 0.94);
+  border-bottom-color: rgba(201, 137, 26, 0.28);
+}
+
+.contrib-list-pledge .contrib-list-head h4 {
+  color: #8a5a0a;
+}
+
+.contrib-list-outstanding {
+  border-color: rgba(20, 32, 51, 0.16);
+  background:
+    linear-gradient(180deg, rgba(20, 32, 51, 0.06) 0%, rgba(255, 255, 255, 0.78) 42%);
+}
+
+.contrib-list-outstanding .contrib-list-head {
+  background: rgba(236, 241, 245, 0.96);
+  border-bottom-color: rgba(20, 32, 51, 0.12);
 }
 
 .contrib-dialog {
@@ -1462,13 +1536,20 @@ textarea {
   border-top: 1px dashed var(--line);
 }
 
-.contrib-split .contrib-list {
-  padding: 0.65rem 0.75rem;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.45);
-  border: 1px solid rgba(20, 32, 51, 0.06);
-  min-width: 0;
-  overflow: hidden;
+.contrib-split {
+  gap: 1.15rem;
+}
+
+@media (max-width: 719px) {
+  .contrib-split {
+    gap: 1.35rem;
+  }
+
+  .contrib-list-head {
+    top: 0.35rem;
+    border-radius: 10px 10px 0 0;
+    box-shadow: 0 8px 16px -12px rgba(20, 32, 51, 0.35);
+  }
 }
 
 .amend-row {

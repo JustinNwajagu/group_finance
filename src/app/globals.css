@@ -1210,9 +1210,9 @@ textarea {
 }
 
 /*
- * Definite height (not only max-height) so the open row’s layout box
- * cannot grow to the full year-grid content size. Inner wrapper holds
- * the wide month table for sideways scroll inside this pane.
+ * Definite height so layout grows only by this pane (no phantom empty
+ * page scroll). Tall enough to use on screen; remaining members/months
+ * scroll inside the dropdown. Horizontal scroll stays on the pane too.
  */
 .archive-scroll-pane {
   box-sizing: border-box;
@@ -1220,12 +1220,20 @@ textarea {
   max-width: 100%;
   min-width: 0;
   min-height: 0;
-  height: min(18rem, 42vh);
-  height: min(18rem, 42dvh);
+  /* Fit most of the viewport under chrome; page extends only by this box */
+  height: min(36rem, calc(100vh - 11rem));
+  height: min(36rem, calc(100dvh - 11rem));
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   contain: layout paint;
+}
+
+@media (max-width: 960px) {
+  .archive-scroll-pane {
+    height: min(28rem, calc(100vh - 9.5rem));
+    height: min(28rem, calc(100dvh - 9.5rem));
+  }
 }
 
 .archive-scroll-pane-inner {

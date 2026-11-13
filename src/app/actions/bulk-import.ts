@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
 import {
   matchMember,
   parseDateCell,
@@ -57,7 +58,7 @@ function formatIssues(issues: BulkValidationIssue[]): string {
 export async function bulkImportContributions(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const file = formData.get("file");
   const amountRaw = String(formData.get("amount") ?? "").trim();
@@ -197,6 +198,11 @@ export async function bulkImportContributions(
     }
   }
 
+  await recordAudit(viewer, {
+    action: "import.contributions",
+    summary: `Imported ${prepared.length} contribution row(s) for “${parsed.title}”`,
+    entityType: "payment_request",
+  });
   revalidatePath("/");
   revalidatePath("/payments");
   revalidatePath("/archive");
@@ -209,7 +215,7 @@ export async function bulkImportContributions(
 }
 
 export async function bulkImportDues(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const file = formData.get("file");
   const monthlyRaw = String(formData.get("monthly_amount") ?? "").trim();
@@ -444,12 +450,18 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
     await updateDuesScheduleRow(schedule.id, { deadline });
   }
 
+  const memberRows = new Set(prepared.map((p) => p.memberId)).size;
+  await recordAudit(viewer, {
+    action: "import.dues",
+    summary: `Imported dues for ${memberRows} member(s) (${year}) from “${parsed.title}”`,
+    entityType: "dues_schedule",
+    entityId: schedule.id,
+  });
   revalidatePath("/");
   revalidatePath("/dues");
   revalidatePath("/archive");
   revalidatePath("/members");
   const dest = archived || schedule.concluded_at ? "/archive" : "/dues";
-  const memberRows = new Set(prepared.map((p) => p.memberId)).size;
   ok(dest, "bulk_dues", {
     year: String(year),
     count: String(memberRows),

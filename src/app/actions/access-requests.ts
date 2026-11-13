@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
 import { isAdminEmail } from "@/lib/config";
 import {
   createAccessRequest,
@@ -292,6 +293,21 @@ export async function submitAccessRequest(input: {
     console.error("[access-request] admin notify failed:", err);
   }
 
+  await recordAudit(
+    {
+      email,
+      name: name || email,
+      sub: `access-request:${email}`,
+      viewAs: "member",
+    },
+    {
+      action: "access.request.submit",
+      summary: `Submitted access request for ${name || email}`,
+      entityType: "access_request",
+      entityId: requestId,
+    },
+  );
+
   revalidatePath("/access");
   revalidatePath("/");
   revalidatePath("/payments");
@@ -306,7 +322,7 @@ export async function submitAccessRequest(input: {
 export async function approveAccessRequest(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
 
   if (!Number.isFinite(id)) {
@@ -362,6 +378,12 @@ export async function approveAccessRequest(
     redirect("/access?error=" + encodeURIComponent(message));
   }
 
+  await recordAudit(viewer, {
+    action: "access.request.approve",
+    summary: `Approved login for ${request.email} → ${result.member.name}`,
+    entityType: "access_request",
+    entityId: id,
+  });
   revalidatePath("/access");
   revalidatePath("/");
   revalidatePath("/members");
@@ -379,7 +401,7 @@ export async function approveAccessRequest(
 }
 
 export async function rejectAccessRequest(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id)) return;
   const request = await getAccessRequestById(id);
@@ -400,6 +422,12 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
 
   // Do not keep rejection history.
   await deleteAccessRequest(id);
+  await recordAudit(viewer, {
+    action: "access.request.reject",
+    summary: `Rejected access request from ${request?.email ?? id}`,
+    entityType: "access_request",
+    entityId: id,
+  });
 
   revalidatePath("/access");
   redirect("/access?ok=rejected");
@@ -408,7 +436,7 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
 
 
 export async function deleteLoginAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const memberId = Number(formData.get("member_id"));
   if (!Number.isFinite(memberId) || memberId <= 0) {
     redirect("/access?error=" + encodeURIComponent("Invalid member."));
@@ -436,6 +464,14 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
     redirect("/access?error=" + encodeURIComponent(message));
   }
 
+  await recordAudit(viewer, {
+    action: "access.login.delete",
+    summary: memberRemoved
+      ? `Removed login and member ${member.name}`
+      : `Removed login for ${member.name} (${loginEmail || "no email"})`,
+    entityType: "member",
+    entityId: memberId,
+  });
   revalidatePath("/access");
   revalidatePath("/");
   revalidatePath("/payments");
@@ -454,7 +490,7 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
 export async function changeMemberLoginEmail(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const memberId = Number(formData.get("member_id"));
   const newEmail = String(formData.get("email") ?? "")
     .trim()
@@ -580,6 +616,13 @@ export async function changeMemberLoginEmail(
   );
   const result = await sendMemberPasswordResetEmail(newEmail);
 
+  await recordAudit(viewer, {
+    action: "access.login.email_change",
+    summary: `Changed login email for ${member.name}: ${oldEmail} → ${newEmail}`,
+    entityType: "member",
+    entityId: memberId,
+  });
+
   revalidatePath("/access");
   revalidatePath("/members", "layout");
   revalidatePath("/profile");
@@ -621,7 +664,7 @@ export async function changeMemberLoginEmail(
 export async function sendMemberPasswordReset(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const memberId = Number(formData.get("member_id"));
   const member = await getMemberById(memberId);
   const email = (member?.login_email || member?.email || "").trim().toLowerCase();
@@ -635,6 +678,13 @@ export async function sendMemberPasswordReset(
     "@/lib/password-reset-server"
   );
   const result = await sendMemberPasswordResetEmail(email);
+
+  await recordAudit(viewer, {
+    action: "access.login.password_reset",
+    summary: `Sent password reset to ${member?.name ?? email} (${email})`,
+    entityType: "member",
+    entityId: memberId,
+  });
 
   revalidatePath("/access");
 

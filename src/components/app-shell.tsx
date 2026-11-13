@@ -32,6 +32,7 @@ export async function AppShell({
     | "archive"
     | "regulations"
     | "access"
+    | "changelog"
     | "profile";
   children: React.ReactNode;
 }) {
@@ -68,6 +69,11 @@ export async function AppShell({
       label: "Access",
       active: active === "access",
       badge: pendingAccessCount,
+    });
+    navItems.push({
+      href: "/changelog",
+      label: "Changelog",
+      active: active === "changelog",
     });
   }
 

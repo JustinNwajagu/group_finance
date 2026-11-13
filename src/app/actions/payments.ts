@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
 import { listMemberOptions } from "@/lib/data";
 import { getContributionRemaining } from "@/lib/expenses-data";
-import { isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
+import {
+  formatMoney,
+  isPaymentDateAllowed,
+  todayIsoDate,
+} from "@/lib/format";
 import {
   createPaymentRequestRow,
   createPaymentRow,
@@ -45,7 +50,7 @@ function revalidateDashboards(...extra: string[]) {
 }
 
 export async function createPaymentRequest(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const title = String(formData.get("title") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "").trim();
@@ -63,13 +68,19 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
     failPayments("Add a member first, then create a payment.");
   }
 
-  await createPaymentRequestRow({ title, amount, deadline });
+  const row = await createPaymentRequestRow({ title, amount, deadline });
+  await recordAudit(viewer, {
+    action: "contribution.open",
+    summary: `Opened contribution “${row.title}” (${formatMoney(row.amount)})`,
+    entityType: "payment_request",
+    entityId: row.id,
+  });
   revalidateDashboards();
   redirect("/payments?ok=1");
 }
 
 export async function concludePaymentRequest(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const concludedDate = String(formData.get("concluded_date") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/archive");
@@ -100,6 +111,12 @@ export async function concludePaymentRequest(formData: FormData): Promise<void> 
   }
 
   await updatePaymentRequestRow(id, patch);
+  await recordAudit(viewer, {
+    action: "contribution.conclude",
+    summary: `Archived contribution “${request.title}”${transferToBank ? " (remainder to bank)" : ""}`,
+    entityType: "payment_request",
+    entityId: id,
+  });
   revalidateDashboards();
   okReturn(
     returnTo.startsWith("/archive") ? returnTo : "/archive",
@@ -108,17 +125,24 @@ export async function concludePaymentRequest(formData: FormData): Promise<void> 
 }
 
 export async function reopenPaymentRequest(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || id <= 0) failPayments("Invalid payment.");
+  const request = await getPaymentRequestById(id);
 
   await updatePaymentRequestRow(id, { concluded_at: null });
+  await recordAudit(viewer, {
+    action: "contribution.reopen",
+    summary: `Reopened contribution “${request?.title ?? id}”`,
+    entityType: "payment_request",
+    entityId: id,
+  });
   revalidateDashboards();
   redirect("/payments?ok=reopened");
 }
 
 export async function deletePaymentRequest(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const returnTo = String(formData.get("return_to") ?? "/payments");
   if (!Number.isFinite(id) || id <= 0) failPayments("Invalid payment.");
@@ -147,6 +171,12 @@ export async function deletePaymentRequest(formData: FormData): Promise<void> {
   }
 
   await deletePaymentRequestRow(id);
+  await recordAudit(viewer, {
+    action: "contribution.delete",
+    summary: `Deleted contribution “${request.title}”`,
+    entityType: "payment_request",
+    entityId: id,
+  });
   revalidateDashboards();
   okReturn(
     returnTo.startsWith("/archive") ? "/payments" : returnTo,
@@ -157,7 +187,7 @@ export async function deletePaymentRequest(formData: FormData): Promise<void> {
 export async function recordMemberContribution(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const requestId = Number(formData.get("payment_request_id"));
   const memberId = Number(formData.get("member_id"));
@@ -191,6 +221,12 @@ export async function recordMemberContribution(
   if (outstanding) {
     const existing = await findPaymentForMemberRequest(requestId, memberId);
     if (existing) await deletePaymentRow(existing.id);
+    await recordAudit(viewer, {
+      action: "contribution.clear",
+      summary: `Cleared “${request.title}” for ${member.name}`,
+      entityType: "payment_request",
+      entityId: requestId,
+    });
     revalidateDashboards(`/members/${memberId}`);
     okReturn(returnTo, "cleared");
   }
@@ -239,12 +275,18 @@ export async function recordMemberContribution(
     });
   }
 
+  await recordAudit(viewer, {
+    action: "contribution.record",
+    summary: `Recorded ${status} ${formatMoney(amount)} on “${request.title}” for ${member.name}`,
+    entityType: "payment_request",
+    entityId: requestId,
+  });
   revalidateDashboards(`/members/${memberId}`);
   okReturn(returnTo, "contributed");
 }
 
 export async function saveBoardContribution(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const requestId = Number(formData.get("payment_request_id"));
   const memberId = Number(formData.get("member_id"));
   const paymentIdRaw = String(formData.get("payment_id") ?? "").trim();
@@ -324,12 +366,18 @@ export async function saveBoardContribution(formData: FormData): Promise<void> {
     }
   }
 
+  await recordAudit(viewer, {
+    action: "contribution.record",
+    summary: `Saved ${status} ${formatMoney(amount)} on “${request.title}” for ${member.name}`,
+    entityType: "payment_request",
+    entityId: requestId,
+  });
   revalidateDashboards(`/members/${memberId}`);
   okReturn(returnTo, "contributed");
 }
 
 export async function markPaymentPaid(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const returnTo = String(formData.get("return_to") ?? `/members`);
 
@@ -345,6 +393,12 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
     status: "paid",
     payment_date: payment.payment_date || today,
   });
+  await recordAudit(viewer, {
+    action: "contribution.mark_paid",
+    summary: `Marked contribution payment #${id} as paid`,
+    entityType: "payment",
+    entityId: id,
+  });
 
   revalidateDashboards(`/members/${payment.member_id}`);
   okReturn(returnTo, "status");
@@ -353,7 +407,7 @@ export async function markPaymentPaid(formData: FormData): Promise<void> {
 export async function clearMemberContribution(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const returnTo = String(formData.get("return_to") ?? "/payments");
 
@@ -365,6 +419,12 @@ export async function clearMemberContribution(
   if (!payment) failReturn(returnTo, "Payment not found.");
 
   await deletePaymentRow(id);
+  await recordAudit(viewer, {
+    action: "contribution.clear",
+    summary: `Cleared contribution payment #${id}`,
+    entityType: "payment",
+    entityId: id,
+  });
   revalidateDashboards(`/members/${payment.member_id}`);
   okReturn(returnTo, "cleared");
 }

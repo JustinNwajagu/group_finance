@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
 import { deleteMemberLogin } from "@/lib/access-requests";
 import { isAdminEmail } from "@/lib/config";
 import {
@@ -30,7 +31,7 @@ function memberIsPrimaryAdmin(member: {
 }
 
 export async function createMemberAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
@@ -39,10 +40,16 @@ export async function createMemberAction(formData: FormData): Promise<void> {
     redirect("/?error=" + encodeURIComponent("Name is required."));
   }
 
-  await createMember({
+  const member = await createMember({
     name,
     email: email || null,
     phone: phone || null,
+  });
+  await recordAudit(viewer, {
+    action: "member.create",
+    summary: `Added member ${member.name}`,
+    entityType: "member",
+    entityId: member.id,
   });
 
   revalidatePath("/");
@@ -56,7 +63,7 @@ export async function createMemberAction(formData: FormData): Promise<void> {
 export async function updateMemberNameAction(
   formData: FormData,
 ): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("member_id"));
   const title = String(formData.get("title") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
@@ -95,6 +102,12 @@ export async function updateMemberNameAction(
 
   const nextName = formatTitledName(title, name);
   await updateMemberRow(id, { name: nextName });
+  await recordAudit(viewer, {
+    action: "member.update",
+    summary: `Renamed member to ${nextName}`,
+    entityType: "member",
+    entityId: id,
+  });
 
   revalidatePath("/");
   revalidatePath(`/members/${id}`);
@@ -107,7 +120,7 @@ export async function updateMemberNameAction(
 }
 
 export async function deleteMemberAction(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("member_id"));
   if (!Number.isFinite(id) || id <= 0) {
     redirect("/?error=" + encodeURIComponent("Invalid member."));
@@ -154,6 +167,12 @@ export async function deleteMemberAction(formData: FormData): Promise<void> {
     try {
       const result = await deleteMemberLogin(id);
       if (result.memberRemoved) {
+        await recordAudit(viewer, {
+          action: "member.delete",
+          summary: `Removed member ${member.name} (with login)`,
+          entityType: "member",
+          entityId: id,
+        });
         revalidatePath("/");
         revalidatePath("/payments");
         revalidatePath("/archive");
@@ -169,6 +188,12 @@ export async function deleteMemberAction(formData: FormData): Promise<void> {
   }
 
   await deleteMemberRow(id);
+  await recordAudit(viewer, {
+    action: "member.delete",
+    summary: `Removed member ${member.name}`,
+    entityType: "member",
+    entityId: id,
+  });
 
   revalidatePath("/");
   revalidatePath("/payments");

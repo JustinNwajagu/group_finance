@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
 import {
   monthsCoveredForMember,
   remainingMonths,
@@ -13,7 +14,7 @@ import {
   monthsFromAmount,
   takeNextUnpaidMonths,
 } from "@/lib/dues-months";
-import { isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
+import { formatMoney, isPaymentDateAllowed, todayIsoDate } from "@/lib/format";
 import {
   createDuesPayment,
   createDuesSchedule,
@@ -56,7 +57,7 @@ function revalidateDues(...extra: string[]) {
 }
 
 export async function createDuesYear(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const year = Number(formData.get("year"));
   const amountRaw = String(formData.get("monthly_amount") ?? "").trim();
@@ -85,12 +86,20 @@ export async function createDuesYear(formData: FormData): Promise<void> {
 
   const today = todayIsoDate();
   const archived = deadline < today;
-  await createDuesSchedule({
+  const created = await createDuesSchedule({
     year,
     monthly_amount: monthly,
     title: `${year} Dues`,
     deadline,
     concluded_at: archived ? `${deadline}T12:00:00.000Z` : null,
+  });
+  await recordAudit(viewer, {
+    action: "dues.year.open",
+    summary: archived
+      ? `Opened ${year} dues into Archive (${formatMoney(monthly)}/mo)`
+      : `Opened ${year} dues (${formatMoney(monthly)}/mo)`,
+    entityType: "dues_schedule",
+    entityId: created.id,
   });
   revalidateDues();
   if (archived) {
@@ -100,7 +109,7 @@ export async function createDuesYear(formData: FormData): Promise<void> {
 }
 
 export async function concludeDuesYear(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const concludedDate = String(formData.get("concluded_date") ?? "").trim();
   const returnTo = String(formData.get("return_to") ?? "/archive");
@@ -114,6 +123,12 @@ export async function concludeDuesYear(formData: FormData): Promise<void> {
     : new Date().toISOString();
 
   await updateDuesScheduleRow(id, { concluded_at: when });
+  await recordAudit(viewer, {
+    action: "dues.year.conclude",
+    summary: `Archived ${schedule.year} dues`,
+    entityType: "dues_schedule",
+    entityId: id,
+  });
   revalidateDues();
   const dest = returnTo.startsWith("/archive") ? returnTo : "/archive";
   redirect(
@@ -144,7 +159,7 @@ async function resolveScheduleForYear(
 }
 
 export async function recordDuesPayment(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
 
   const scheduleId = Number(formData.get("dues_schedule_id"));
   const memberId = Number(formData.get("member_id"));
@@ -245,6 +260,12 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
         payment_date,
         notes,
       });
+      await recordAudit(viewer, {
+        action: "dues.payment.record",
+        summary: `Recorded ${formatMoney(amount)} dues for ${member.name} (${schedule.year})`,
+        entityType: "dues_schedule",
+        entityId: scheduleId,
+      });
       revalidateDues(`/members/${memberId}`);
       okDues("recorded", schedule.year, returnTo);
     }
@@ -264,6 +285,12 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
       covered_months,
       payment_date,
       notes,
+    });
+    await recordAudit(viewer, {
+      action: "dues.payment.record",
+      summary: `Recorded ${formatMoney(amount)} dues for ${member.name} (${schedule.year})`,
+      entityType: "dues_schedule",
+      entityId: scheduleId,
     });
     revalidateDues(`/members/${memberId}`);
     okDues("recorded", schedule.year, returnTo);
@@ -354,12 +381,18 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     });
   }
 
+  await recordAudit(viewer, {
+    action: "dues.payment.record",
+    summary: `Recorded ${formatMoney(amount)} dues for ${member.name} across ${start}–${end}`,
+    entityType: "dues_schedule",
+    entityId: scheduleId,
+  });
   revalidateDues(`/members/${memberId}`);
   okDues("recorded", schedule.year, returnTo);
 }
 
 export async function removeDuesPayment(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   const returnToRaw = String(formData.get("return_to") ?? "").trim();
   const returnTo =
@@ -375,6 +408,14 @@ export async function removeDuesPayment(formData: FormData): Promise<void> {
 
   const schedule = await getDuesScheduleById(payment.dues_schedule_id);
   await deleteDuesPayment(id);
+  await recordAudit(viewer, {
+    action: "dues.payment.remove",
+    summary: schedule
+      ? `Removed dues payment #${id} (${schedule.year})`
+      : `Removed dues payment #${id}`,
+    entityType: "dues_payment",
+    entityId: id,
+  });
   revalidateDues(`/members/${payment.member_id}`);
   okDues(
     "cleared",
@@ -384,7 +425,7 @@ export async function removeDuesPayment(formData: FormData): Promise<void> {
 }
 
 export async function deleteDuesYear(formData: FormData): Promise<void> {
-  await requireAdmin();
+  const viewer = await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id) || id <= 0) failDues("Invalid dues year.");
 
@@ -400,6 +441,12 @@ export async function deleteDuesYear(formData: FormData): Promise<void> {
   }
 
   await deleteDuesSchedule(id);
+  await recordAudit(viewer, {
+    action: "dues.year.delete",
+    summary: `Deleted ${schedule.year} dues year`,
+    entityType: "dues_schedule",
+    entityId: id,
+  });
   revalidateDues();
 
   const remaining = await listAllDuesSchedules();

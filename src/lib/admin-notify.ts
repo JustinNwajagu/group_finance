@@ -107,6 +107,32 @@ export async function listAdminNotifyEmails(): Promise<string[]> {
   return [...emails];
 }
 
+/**
+ * Send a transactional email via Resend, then SMTP.
+ * Used by admin alerts and password-reset mail.
+ */
+export async function sendTransactionalEmail(input: {
+  to: string[];
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<{ channel: "resend" | "smtp" | "none"; error?: string }> {
+  try {
+    if (await sendWithResend(input)) return { channel: "resend" };
+    if (await sendWithSmtp(input)) return { channel: "smtp" };
+    return {
+      channel: "none",
+      error:
+        "No email provider configured. Set RESEND_API_KEY (recommended) or SMTP_HOST/SMTP_USER/SMTP_PASS.",
+    };
+  } catch (err) {
+    return {
+      channel: "none",
+      error: err instanceof Error ? err.message : "Could not send email.",
+    };
+  }
+}
+
 async function sendWithResend(input: {
   to: string[];
   subject: string;
@@ -254,29 +280,37 @@ export async function notifyAdminsOfAccessRequest(
   let channel: AdminNotifyResult["channel"] = "none";
   let error: string | undefined;
 
-  try {
-    if (await sendWithResend({ to: recipients, subject, text, html })) {
-      channel = "resend";
-    } else if (await sendWithSmtp({ to: recipients, subject, text, html })) {
-      channel = "smtp";
-    } else if (
-      await queueFirestoreMail({
-        to: recipients,
-        subject,
-        text,
-        html,
-        payload,
-      })
-    ) {
-      // Queued for the Trigger Email extension — not a direct send.
-      channel = "firestore_mail";
-    } else {
+  const direct = await sendTransactionalEmail({
+    to: recipients,
+    subject,
+    text,
+    html,
+  });
+  if (direct.channel !== "none") {
+    channel = direct.channel;
+  } else {
+    try {
+      if (
+        await queueFirestoreMail({
+          to: recipients,
+          subject,
+          text,
+          html,
+          payload,
+        })
+      ) {
+        // Queued for the Trigger Email extension — not a direct send.
+        channel = "firestore_mail";
+      } else {
+        error = direct.error;
+      }
+    } catch (err) {
       error =
-        "No email provider configured. Set RESEND_API_KEY (recommended) or SMTP_HOST/SMTP_USER/SMTP_PASS.";
+        err instanceof Error
+          ? err.message
+          : direct.error || "Could not send admin email.";
+      channel = "none";
     }
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Could not send admin email.";
-    channel = "none";
   }
 
   try {

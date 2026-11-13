@@ -448,7 +448,7 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
   );
 }
 
-/** Admin-triggered password reset link for a member login. */
+/** Admin-triggered password reset email for a member login. */
 export async function sendMemberPasswordReset(
   formData: FormData,
 ): Promise<void> {
@@ -462,22 +462,38 @@ export async function sendMemberPasswordReset(
     );
   }
 
-  const { adminAuth } = await import("@/lib/firebase-admin");
-  const auth = adminAuth();
-  if (!auth) {
-    redirect("/access?error=" + encodeURIComponent("Auth is unavailable."));
-  }
-  let link: string;
-  try {
-    link = await auth.generatePasswordResetLink(email);
-  } catch {
+  const { sendMemberPasswordResetEmail } = await import(
+    "@/lib/password-reset-server"
+  );
+  const result = await sendMemberPasswordResetEmail(email);
+
+  revalidatePath("/access");
+
+  if (result.emailed) {
     redirect(
-      "/access?error=" +
-        encodeURIComponent("Could not create a password reset link."),
+      "/access?ok=reset_emailed&email=" + encodeURIComponent(email),
     );
   }
 
-  revalidatePath("/access");
-  redirect("/access?ok=reset_sent&link=" + encodeURIComponent(link));
+  if (result.link) {
+    const params = new URLSearchParams({
+      ok: "reset_sent",
+      link: result.link,
+    });
+    if (result.error) {
+      params.set(
+        "error",
+        `Could not email the reset link (${result.error}). Share the link below.`,
+      );
+    }
+    redirect(`/access?${params.toString()}`);
+  }
+
+  redirect(
+    "/access?error=" +
+      encodeURIComponent(
+        result.error || "Could not send a password reset email.",
+      ),
+  );
 }
 

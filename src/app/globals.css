@@ -1142,9 +1142,10 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
-  overflow: clip;
+  overflow: hidden;
   height: fit-content;
   max-width: 100%;
+  min-width: 0;
 }
 
 .archive-item-toggle {
@@ -1196,22 +1197,34 @@ textarea {
 }
 
 .archive-item-body {
-  /* Cap the open panel so the page does not grow by a full year grid */
+  /* Cap vertical growth; horizontal month scroll lives on .dues-table-wrap */
   padding: 0.5rem 0.65rem 0.65rem;
   max-height: min(22rem, 50vh);
   max-height: min(22rem, 50dvh);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  min-width: 0;
 }
 
 .archive-item-body .table-wrap,
 .archive-item-body .dues-table-wrap {
-  /* Let the panel body own vertical scroll; keep horizontal scroll for month grid */
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   max-height: none;
   overflow-x: auto;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Keep month columns from squashing so the wrap can scroll sideways */
+.archive-item-body .dues-table-wrap > table.dues-grid {
+  width: max-content;
+  min-width: 100%;
 }
 
 .archive-item-body .contrib-board {

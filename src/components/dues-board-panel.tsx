@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DuesYearTable } from "@/components/dues-year-table";
+import { MemberFilter } from "@/components/member-filter";
 import { duesYearTitle, normalizeDuesYearTitle } from "@/lib/dues-title";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { DuesYearBoard } from "@/lib/types";
@@ -47,19 +48,7 @@ export function DuesBoardPanel({
         ) : null}
       </div>
 
-      {board ? (
-        <label className="filter">
-          <span className="sr-only">Filter members</span>
-          <input
-            type="search"
-            value={q}
-            placeholder="Filter members…"
-            className="filter-input"
-            autoComplete="off"
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </label>
-      ) : null}
+      {board ? <MemberFilter value={q} onChange={setQ} /> : null}
 
       {!filtered ? (
         <div className="hero-empty">

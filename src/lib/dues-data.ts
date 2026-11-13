@@ -2,12 +2,15 @@ import "server-only";
 import { compareMembersByName } from "./member-sort";
 import {
   duesYearFraction,
+  earliestUnpaidPoint,
+  type EarliestUnpaidPoint,
   monthCreditsFromPayments,
   monthsFullyPaidFromCredits,
 } from "./dues-months";
 import {
   getDuesScheduleById,
   getDuesScheduleByYear,
+  listAllDuesPayments,
   listAllDuesSchedules,
   listAllMembers,
   listDuesPaymentsForMember,
@@ -126,6 +129,62 @@ export async function getDuesBoard(
   };
 }
 
+
+/**
+ * Earliest unpaid dues month per member across all schedules.
+ * `null` means every existing year is fully paid for that member.
+ */
+export async function mapEarliestUnpaidDuesPoints(): Promise<
+  Map<number, EarliestUnpaidPoint | null>
+> {
+  const [schedules, members, payments] = await Promise.all([
+    listAllDuesSchedules(),
+    listAllMembers(),
+    listAllDuesPayments(),
+  ]);
+  const years = schedules.map((s) => s.year);
+  const monthlyByYear = new Map(
+    schedules.map((s) => [s.year, Number(s.monthly_amount)]),
+  );
+  const scheduleYearById = new Map(schedules.map((s) => [s.id, s.year]));
+  const paymentsByMember = new Map<number, DuesPaymentRow[]>();
+  for (const p of payments) {
+    const list = paymentsByMember.get(p.member_id) ?? [];
+    list.push(p);
+    paymentsByMember.set(p.member_id, list);
+  }
+
+  const out = new Map<number, EarliestUnpaidPoint | null>();
+  for (const member of members) {
+    const memberPayments = paymentsByMember.get(member.id) ?? [];
+    const creditsByYear = new Map<number, number[]>();
+    for (const schedule of schedules) {
+      const forYear = memberPayments.filter(
+        (p) =>
+          p.dues_schedule_id === schedule.id ||
+          scheduleYearById.get(p.dues_schedule_id) === schedule.year,
+      );
+      creditsByYear.set(schedule.year, monthCreditsFromPayments(forYear));
+    }
+    out.set(
+      member.id,
+      years.length === 0
+        ? null
+        : earliestUnpaidPoint(years, creditsByYear, monthlyByYear),
+    );
+  }
+  return out;
+}
+
+/** @deprecated Prefer mapEarliestUnpaidDuesPoints. */
+export async function mapEarliestUnpaidDuesYears(): Promise<
+  Map<number, number | null>
+> {
+  const points = await mapEarliestUnpaidDuesPoints();
+  return new Map(
+    [...points.entries()].map(([id, point]) => [id, point?.year ?? null]),
+  );
+}
 
 export async function memberDuesSummary(memberId: number): Promise<{
   years_count: number;

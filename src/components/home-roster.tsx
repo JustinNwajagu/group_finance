@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { MemberFilter } from "@/components/member-filter";
 import { formatDuesCount } from "@/lib/dues-months";
 import type { ExcoSeatView, MemberContribution } from "@/lib/types";
 
@@ -46,17 +47,7 @@ export function HomeRosterList({
         </p>
       </div>
 
-      <label className="filter">
-        <span className="sr-only">Filter members</span>
-        <input
-          type="search"
-          value={q}
-          placeholder="Filter members…"
-          className="filter-input"
-          autoComplete="off"
-          onChange={(e) => setQ(e.target.value)}
-        />
-      </label>
+      <MemberFilter value={q} onChange={setQ} />
 
       {filtered.length === 0 ? (
         <div className="hero-empty">

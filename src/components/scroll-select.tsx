@@ -3,6 +3,7 @@
 import {
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
@@ -12,6 +13,10 @@ export type ScrollSelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  /** Optional section heading; options keep first-seen group order. */
+  group?: string;
+  /** Extra text matched by search (defaults to label). */
+  searchText?: string;
 };
 
 type ScrollSelectProps = {
@@ -26,6 +31,9 @@ type ScrollSelectProps = {
   className?: string;
   "aria-label"?: string;
   placeholder?: string;
+  /** Show a filter field in the open menu (member pickers). */
+  searchable?: boolean;
+  searchPlaceholder?: string;
 };
 
 export function ScrollSelect({
@@ -40,40 +48,83 @@ export function ScrollSelect({
   className,
   "aria-label": ariaLabel,
   placeholder = "Select…",
+  searchable = false,
+  searchPlaceholder = "Search…",
 }: ScrollSelectProps) {
   const reactId = useId();
   const listId = `scroll-select-${reactId.replace(/:/g, "")}`;
   const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const isControlled = controlledValue !== undefined;
   const [uncontrolled, setUncontrolled] = useState(defaultValue);
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const value = isControlled ? controlledValue : uncontrolled;
 
   const selected = options.find((option) => option.value === value);
   const label = selected?.label || placeholder;
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return options;
+    return options.filter((option) => {
+      if (option.disabled && !option.value) return false;
+      const haystack = `${option.label} ${option.searchText ?? ""}`.toLowerCase();
+      return haystack.includes(needle);
+    });
+  }, [options, query]);
+
+  const grouped = useMemo(() => {
+    const sections: Array<{
+      group: string | null;
+      options: ScrollSelectOption[];
+    }> = [];
+    for (const option of filtered) {
+      const group = option.group ?? null;
+      const last = sections[sections.length - 1];
+      if (last && last.group === group) {
+        last.options.push(option);
+      } else {
+        sections.push({ group, options: [option] });
+      }
+    }
+    return sections;
+  }, [filtered]);
 
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: MouseEvent) {
       if (!rootRef.current?.contains(event.target as Node)) {
         setOpen(false);
+        setQuery("");
       }
     }
     function onKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setOpen(false);
+        setQuery("");
+      }
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    if (searchable) {
+      requestAnimationFrame(() => searchRef.current?.focus());
+    }
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, searchable]);
+
+  function closeMenu() {
+    setOpen(false);
+    setQuery("");
+  }
 
   function commit(next: string) {
     if (!isControlled) setUncontrolled(next);
     onChange?.(next);
-    setOpen(false);
+    closeMenu();
   }
 
   function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
@@ -89,7 +140,7 @@ export function ScrollSelect({
       ref={rootRef}
       className={`scroll-select${open ? " is-open" : ""}${
         className ? ` ${className}` : ""
-      }${disabled ? " is-disabled" : ""}`}
+      }${disabled ? " is-disabled" : ""}${searchable ? " is-searchable" : ""}`}
     >
       {name ? (
         <input
@@ -110,7 +161,12 @@ export function ScrollSelect({
         aria-label={ariaLabel}
         disabled={disabled}
         onClick={() => {
-          if (!disabled) setOpen((current) => !current);
+          if (disabled) return;
+          if (open) {
+            closeMenu();
+          } else {
+            setOpen(true);
+          }
         }}
         onKeyDown={onTriggerKeyDown}
       >
@@ -126,34 +182,81 @@ export function ScrollSelect({
         </span>
       </button>
       {open ? (
-        <ul
-          id={listId}
-          className="scroll-select-menu"
-          role="listbox"
-          aria-label={ariaLabel}
-        >
-          {options.map((option) => {
-            const isSelected = option.value === value;
-            return (
-              <li key={`${option.value}::${option.label}`} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  className={`scroll-select-option${
-                    isSelected ? " is-selected" : ""
-                  }`}
-                  aria-selected={isSelected}
-                  disabled={option.disabled || disabled}
-                  onClick={() => {
-                    if (!option.disabled) commit(option.value);
-                  }}
-                >
-                  {option.label}
-                </button>
+        <div className="scroll-select-panel">
+          {searchable ? (
+            <div className="scroll-select-search">
+              <input
+                ref={searchRef}
+                type="search"
+                className="scroll-select-search-input"
+                value={query}
+                placeholder={searchPlaceholder}
+                autoComplete="off"
+                enterKeyHint="search"
+                aria-label={searchPlaceholder}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    closeMenu();
+                  }
+                }}
+              />
+            </div>
+          ) : null}
+          <ul
+            id={listId}
+            className="scroll-select-menu"
+            role="listbox"
+            aria-label={ariaLabel}
+          >
+            {filtered.length === 0 ? (
+              <li className="scroll-select-empty" role="presentation">
+                No matches.
               </li>
-            );
-          })}
-        </ul>
+            ) : (
+              grouped.map((section) => (
+                <li
+                  key={section.group ?? "__default"}
+                  className="scroll-select-section"
+                  role="presentation"
+                >
+                  {section.group ? (
+                    <div className="scroll-select-group" aria-hidden="true">
+                      {section.group}
+                    </div>
+                  ) : null}
+                  <ul className="scroll-select-section-list" role="group">
+                    {section.options.map((option) => {
+                      const isSelected = option.value === value;
+                      return (
+                        <li
+                          key={`${option.value}::${option.label}`}
+                          role="presentation"
+                        >
+                          <button
+                            type="button"
+                            role="option"
+                            className={`scroll-select-option${
+                              isSelected ? " is-selected" : ""
+                            }`}
+                            aria-selected={isSelected}
+                            disabled={option.disabled || disabled}
+                            onClick={() => {
+                              if (!option.disabled) commit(option.value);
+                            }}
+                          >
+                            {option.label}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
       ) : null}
     </div>
   );

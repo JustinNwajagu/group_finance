@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { useScrollOpenIntoView } from "@/hooks/use-scroll-open-into-view";
 
 export function CollapsePanel({
   title,
@@ -16,9 +17,14 @@ export function CollapsePanel({
   const [open, setOpen] = useState(defaultOpen);
   const reactId = useId();
   const panelId = `collapse-${reactId.replace(/:/g, "")}`;
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScrollOpenIntoView(open, rootRef);
 
   return (
-    <div className={`archive-item${open ? " is-open" : ""}`}>
+    <div
+      ref={rootRef}
+      className={`archive-item${open ? " is-open" : ""}`}
+    >
       <button
         type="button"
         className="archive-item-toggle"
@@ -37,8 +43,10 @@ export function CollapsePanel({
         </span>
       </button>
       {open ? (
-        <div id={panelId} className="archive-item-body stack">
-          {children}
+        <div id={panelId} className="archive-item-body">
+          <div className="archive-scroll-pane">
+            <div className="archive-scroll-pane-inner stack">{children}</div>
+          </div>
         </div>
       ) : null}
     </div>

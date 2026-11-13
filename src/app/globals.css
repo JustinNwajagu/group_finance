@@ -1210,9 +1210,8 @@ textarea {
 }
 
 /*
- * Definite height so layout grows only by this pane (no phantom empty
- * page scroll). Tall enough to use on screen; remaining members/months
- * scroll inside the dropdown. Horizontal scroll stays on the pane too.
+ * Open accordion body: grow with content up to a usable on-screen cap,
+ * then scroll inside. Page height follows this box only (no trailing blank).
  */
 .archive-scroll-pane {
   box-sizing: border-box;
@@ -1220,17 +1219,31 @@ textarea {
   max-width: 100%;
   min-width: 0;
   min-height: 0;
-  /* Fit most of the viewport under chrome; page extends only by this box */
-  height: min(36rem, calc(100vh - 11rem));
-  height: min(36rem, calc(100dvh - 11rem));
+  height: auto;
+  max-height: min(36rem, calc(100vh - 11rem));
+  max-height: min(36rem, calc(100dvh - 11rem));
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   contain: layout paint;
 }
 
+/* Year grids / contribution boards lock layout height so they cannot
+   inflate the page; other panels grow with content up to max-height. */
+.archive-scroll-pane:has(table.dues-grid),
+.archive-scroll-pane:has(.contrib-board) {
+  height: min(36rem, calc(100vh - 11rem));
+  height: min(36rem, calc(100dvh - 11rem));
+}
+
 @media (max-width: 960px) {
   .archive-scroll-pane {
+    max-height: min(28rem, calc(100vh - 9.5rem));
+    max-height: min(28rem, calc(100dvh - 9.5rem));
+  }
+
+  .archive-scroll-pane:has(table.dues-grid),
+  .archive-scroll-pane:has(.contrib-board) {
     height: min(28rem, calc(100vh - 9.5rem));
     height: min(28rem, calc(100dvh - 9.5rem));
   }

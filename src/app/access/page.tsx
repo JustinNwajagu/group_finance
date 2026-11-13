@@ -259,19 +259,18 @@ export default async function AccessPage({
               meta={`${withLogin.length} login${withLogin.length === 1 ? "" : "s"}`}
               defaultOpen
             >
-              <div className="scroll-panel">
-                <div className="table-wrap">
-                  <table className="data">
-                    <thead>
-                      <tr>
-                        <th>Member</th>
-                        <th>Login email</th>
-                        <th>Access</th>
-                        <th>Phone</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+              <div className="table-wrap">
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th>Member</th>
+                      <th>Login email</th>
+                      <th>Access</th>
+                      <th>Phone</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                       {withLogin.map((m) => {
                         const email = (m.login_email || m.email || "").toLowerCase();
                         const role = roleByEmail.get(email) ?? "member";
@@ -357,7 +356,6 @@ export default async function AccessPage({
                       })}
                     </tbody>
                   </table>
-                </div>
               </div>
             </CollapsePanel>
           )}

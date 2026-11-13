@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ContributionBoard } from "@/components/contribution-board";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { ContributionLists } from "@/lib/types";
@@ -24,6 +24,18 @@ export function CurrentContributions({
   const [openId, setOpenId] = useState<number | null>(
     () => sorted[0]?.request.id ?? null,
   );
+  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    if (openId == null) return;
+    const node = itemRefs.current.get(openId);
+    if (!node) return;
+    node.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [openId]);
 
   if (sorted.length === 0) {
     return <div className="hero-empty">No open contribution requests.</div>;
@@ -39,6 +51,10 @@ export function CurrentContributions({
           <div
             key={request.id}
             className={`archive-item${open ? " is-open" : ""}`}
+            ref={(el) => {
+              if (el) itemRefs.current.set(request.id, el);
+              else itemRefs.current.delete(request.id);
+            }}
           >
             <button
               type="button"
@@ -71,12 +87,16 @@ export function CurrentContributions({
             </button>
             {open ? (
               <div id={panelId} className="archive-item-body">
-                <ContributionBoard
-                  board={board}
-                  isAdmin={isAdmin}
-                  returnTo="/payments"
-                  hideHeader
-                />
+                <div className="archive-scroll-pane">
+                  <div className="archive-scroll-pane-inner">
+                    <ContributionBoard
+                      board={board}
+                      isAdmin={isAdmin}
+                      returnTo="/payments"
+                      hideHeader
+                    />
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>

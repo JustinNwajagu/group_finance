@@ -1080,8 +1080,89 @@ textarea {
   min-width: min(100%, 18rem);
 }
 
+.filter-bar {
+  margin-bottom: 0.85rem;
+  min-width: min(100%, 18rem);
+}
+
+.filter-bar .filter {
+  margin: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.filter-field {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
 .filter-input {
   width: 100%;
+}
+
+/* Desktop uses the native search clear control. */
+.filter-clear {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  /* Keep the filter pinned while scrolling / while the list reflows under search. */
+  .filter-bar {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    margin-left: -0.15rem;
+    margin-right: -0.15rem;
+    padding: 0.35rem 0.15rem 0.65rem;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .filter-bar.is-filtering {
+    box-shadow: 0 8px 16px -12px rgba(20, 32, 51, 0.35);
+  }
+
+  .filter-input {
+    /* Avoid iOS focus-zoom jumping the layout while typing. */
+    font-size: 16px;
+    padding-right: 2.5rem;
+  }
+
+  .filter-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .filter-clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    right: 0.4rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.85rem;
+    height: 1.85rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: rgba(20, 32, 51, 0.08);
+    color: var(--ink-soft);
+    font: inherit;
+    font-size: 1.35rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .filter-clear:hover,
+  .filter-clear:focus-visible {
+    background: rgba(20, 32, 51, 0.14);
+    color: var(--ink);
+    outline: none;
+  }
 }
 
 

@@ -35,6 +35,8 @@ export default async function AccessPage({
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const error = typeof params.error === "string" ? params.error : undefined;
   const link = typeof params.link === "string" ? params.link : undefined;
+  const emailedTo =
+    typeof params.email === "string" ? params.email.trim().toLowerCase() : "";
   const createdName =
     typeof params.name === "string" ? params.name.trim() : "";
   await ensurePrimaryAdminRole();
@@ -90,7 +92,11 @@ export default async function AccessPage({
             "Login unlinked from the member and removed. The member stays on the roster because they have payments.",
           login_deleted_member_removed:
             "Login removed and the member was deleted from the roster (no payments on record).",
-          reset_sent: "Password reset link ready to share.",
+          reset_emailed: emailedTo
+            ? `Password reset email sent to ${emailedTo}.`
+            : "Password reset email sent.",
+          reset_sent:
+            "Password reset link ready to share (email could not be sent).",
           exco_updated: "EXCO position updated.",
         }}
       />
@@ -99,7 +105,8 @@ export default async function AccessPage({
         <section className="panel">
           <h2>Password setup / reset link</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Send this one-time link so they can set a new password:
+            Email delivery failed, so share this one-time link so they can set a
+            new password:
           </p>
           <p style={{ wordBreak: "break-all" }}>
             <a href={link}>{link}</a>

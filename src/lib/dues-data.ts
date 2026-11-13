@@ -71,7 +71,14 @@ export async function listOpenDuesSchedules(): Promise<DuesScheduleRow[]> {
 
 export async function listConcludedDuesSchedules(): Promise<DuesScheduleRow[]> {
   const all = await listAllDuesSchedules();
-  return all.filter((s) => Boolean(s.concluded_at));
+  return all
+    .filter((s) => Boolean(s.concluded_at))
+    .sort(
+      (a, b) =>
+        (b.concluded_at ?? "").localeCompare(a.concluded_at ?? "") ||
+        b.year - a.year ||
+        b.id - a.id,
+    );
 }
 
 export async function getDuesBoard(

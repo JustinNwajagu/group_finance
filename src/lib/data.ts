@@ -135,6 +135,14 @@ export async function listAllPaymentRequests(): Promise<PaymentRequest[]> {
     const ao = a.concluded_at ? 1 : 0;
     const bo = b.concluded_at ? 1 : 0;
     if (ao !== bo) return ao - bo;
+    // Open: soonest deadline first. Archived: newest concluded first.
+    if (a.concluded_at && b.concluded_at) {
+      return (
+        b.concluded_at.localeCompare(a.concluded_at) ||
+        b.deadline.localeCompare(a.deadline) ||
+        b.id - a.id
+      );
+    }
     return a.deadline.localeCompare(b.deadline) || b.id - a.id;
   });
 }

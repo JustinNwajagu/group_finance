@@ -54,8 +54,24 @@ export default async function ArchivePage({
       admin ? paymentsPromise : Promise.resolve([]),
       concludedDuesPromise,
     ]);
-  const boards = allBoards.filter((b) => b.request.concluded_at);
-  const requests = allRequests.filter((r) => r.concluded_at);
+  const boards = allBoards
+    .filter((b) => b.request.concluded_at)
+    .sort(
+      (a, b) =>
+        (b.request.concluded_at ?? "").localeCompare(
+          a.request.concluded_at ?? "",
+        ) ||
+        b.request.deadline.localeCompare(a.request.deadline) ||
+        b.request.id - a.request.id,
+    );
+  const requests = allRequests
+    .filter((r) => r.concluded_at)
+    .sort(
+      (a, b) =>
+        (b.concluded_at ?? "").localeCompare(a.concluded_at ?? "") ||
+        b.deadline.localeCompare(a.deadline) ||
+        b.id - a.id,
+    );
   const archivedRequestIds = new Set(requests.map((r) => r.id));
   const existing: Record<string, ExistingContribution> = {};
   for (const p of allPayments) {

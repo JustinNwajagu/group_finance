@@ -841,6 +841,123 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(31, 122, 108, 0.15);
 }
 
+/* Custom dropdowns — capped height with internal scroll */
+.scroll-select {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.scroll-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  font: inherit;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.scroll-select-trigger:hover {
+  border-color: rgba(31, 122, 108, 0.35);
+}
+
+.scroll-select.is-open .scroll-select-trigger,
+.scroll-select-trigger:focus {
+  border-color: rgba(31, 122, 108, 0.55);
+  box-shadow: 0 0 0 3px rgba(31, 122, 108, 0.15);
+}
+
+.scroll-select.is-disabled .scroll-select-trigger {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scroll-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scroll-select-value.is-placeholder {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.scroll-select-chevron {
+  flex-shrink: 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.scroll-select-menu {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.3rem);
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  max-height: min(16rem, 50vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: var(--shadow);
+}
+
+.scroll-select-option {
+  width: 100%;
+  display: block;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.scroll-select-option:hover:not(:disabled) {
+  background: rgba(31, 122, 108, 0.08);
+}
+
+.scroll-select-option.is-selected {
+  background: rgba(31, 122, 108, 0.14);
+  font-weight: 650;
+}
+
+.scroll-select-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.scroll-panel {
+  max-height: min(28rem, 65vh);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
+}
+
+.scroll-panel > .table-wrap {
+  margin: 0;
+}
+
 textarea {
   min-height: 8rem;
   resize: vertical;
@@ -1076,6 +1193,10 @@ textarea {
 
 .archive-item-body {
   padding: 0.35rem 0.55rem 0.65rem;
+  max-height: min(32rem, 70vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .contrib-board-embedded {
@@ -1847,6 +1968,10 @@ textarea {
 
   .dash-tools.is-open .dash-tools-body {
     padding-top: 0.85rem;
+    max-height: min(70vh, 32rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .expenses-balance-grid {
@@ -2117,6 +2242,11 @@ textarea {
 
   .primary-nav.is-open .nav {
     display: flex;
+    max-height: min(70vh, 28rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 0.15rem;
   }
 
   .nav-link {

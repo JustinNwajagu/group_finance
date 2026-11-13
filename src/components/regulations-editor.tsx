@@ -3,6 +3,7 @@
 import { useId, useMemo, useState } from "react";
 import { saveRegulationsAction } from "@/app/actions/regulations";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { ScrollSelect } from "@/components/scroll-select";
 import type {
   RegulationSection,
   RegulationSignatory,
@@ -119,10 +120,9 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
 
         <label className="field">
           What do you want to change?
-          <select
+          <ScrollSelect
             value={mode}
-            onChange={(e) => {
-              const next = e.target.value;
+            onChange={(next) => {
               if (next === "edit" || next === "add" || next === "details") {
                 setMode(next);
               }
@@ -134,27 +134,29 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
                 });
               }
             }}
-          >
-            <option value="edit">Edit or delete an existing rule</option>
-            <option value="add">Add a new rule</option>
-            <option value="details">Edit title, intro, or signatories</option>
-          </select>
+            options={[
+              { value: "edit", label: "Edit or delete an existing rule" },
+              { value: "add", label: "Add a new rule" },
+              {
+                value: "details",
+                label: "Edit title, intro, or signatories",
+              },
+            ]}
+          />
         </label>
 
         {mode === "edit" ? (
           <>
             <label className="field">
               Select rule
-              <select
+              <ScrollSelect
                 value={selected?.id ?? ""}
-                onChange={(e) => setSelectedId(e.target.value)}
-              >
-                {sections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.title}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedId}
+                options={sections.map((section) => ({
+                  value: section.id,
+                  label: section.title,
+                }))}
+              />
             </label>
 
             {selected && selectedIndex >= 0 ? (

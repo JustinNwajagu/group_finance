@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { RecordDuesForm } from "@/components/record-dues-form";
+import { ScrollSelect } from "@/components/scroll-select";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { DuesSchedule, Member } from "@/lib/types";
 
@@ -46,20 +47,20 @@ export function AmendArchivedDuesForm({
     <div className="stack" style={{ gap: "0.85rem" }}>
       <label className="field">
         Concluded dues year
-        <select
+        <ScrollSelect
           value={scheduleId}
-          onChange={(e) => setScheduleId(e.target.value)}
-        >
-          {schedules.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title || `${s.year} dues`} · deadline{" "}
-              {formatDate(s.deadline)}
-              {s.concluded_at
+          onChange={setScheduleId}
+          options={schedules.map((s) => ({
+            value: String(s.id),
+            label: `${s.title || `${s.year} dues`} · deadline ${formatDate(
+              s.deadline,
+            )}${
+              s.concluded_at
                 ? ` · concluded ${formatDate(s.concluded_at.slice(0, 10))}`
-                : ""}
-            </option>
-          ))}
-        </select>
+                : ""
+            }`,
+          }))}
+        />
       </label>
 
       {selected ? (

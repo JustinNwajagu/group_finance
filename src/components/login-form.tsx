@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/access-requests";
 import { DialogCloseButton } from "@/components/dialog-close-button";
 import { PasswordInput } from "@/components/password-input";
+import { ScrollSelect } from "@/components/scroll-select";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
 import { NAME_TITLES } from "@/lib/name-titles";
 
@@ -567,12 +568,13 @@ function AccessRequestDialog({
         ) : null}
         <label className="field">
           Your name on the roster
-          <select
+          <ScrollSelect
             name="member_choice"
             required
             value={memberChoice}
-            onChange={(e) => {
-              const next = e.target.value;
+            placeholder="Choose…"
+            disabled={pending}
+            onChange={(next) => {
               setMemberChoice(next);
               if (next === "new" || !next) {
                 setPhone("");
@@ -581,33 +583,37 @@ function AccessRequestDialog({
               const match = roster.find((m) => String(m.id) === next);
               setPhone(match?.phone ?? "");
             }}
-            disabled={pending}
-          >
-            <option value="" disabled>
-              Choose…
-            </option>
-            <option value="new">New member — not on the roster yet</option>
-            {roster.map((m) => (
-              <option key={m.id} value={String(m.id)}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Choose…", disabled: true },
+              {
+                value: "new",
+                label: "New member — not on the roster yet",
+              },
+              ...roster.map((m) => ({
+                value: String(m.id),
+                label: m.name,
+              })),
+            ]}
+          />
         </label>
         {isNewMember ? (
           <div className="form-grid two">
             <label className="field">
               Title
-              <select name="title" required defaultValue="" disabled={pending}>
-                <option value="" disabled>
-                  Choose…
-                </option>
-                {NAME_TITLES.map((title) => (
-                  <option key={title} value={title}>
-                    {title}
-                  </option>
-                ))}
-              </select>
+              <ScrollSelect
+                name="title"
+                required
+                defaultValue=""
+                placeholder="Choose…"
+                disabled={pending}
+                options={[
+                  { value: "", label: "Choose…", disabled: true },
+                  ...NAME_TITLES.map((title) => ({
+                    value: title,
+                    label: title,
+                  })),
+                ]}
+              />
             </label>
             <label className="field">
               Full name

@@ -2,6 +2,7 @@
 
 import { updateMemberNameAction } from "@/app/actions/members";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { ScrollSelect } from "@/components/scroll-select";
 import { ROSTER_TITLES } from "@/lib/name-titles";
 
 export function EditMemberNameForm({
@@ -18,18 +19,21 @@ export function EditMemberNameForm({
       <input type="hidden" name="member_id" value={memberId} />
       <label className="field">
         Title
-        <select name="title" defaultValue={title}>
-          <option value="">No title</option>
-          {ROSTER_TITLES.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-          {title &&
-          !(ROSTER_TITLES as readonly string[]).includes(title) ? (
-            <option value={title}>{title}</option>
-          ) : null}
-        </select>
+        <ScrollSelect
+          name="title"
+          defaultValue={title}
+          placeholder="No title"
+          options={[
+            { value: "", label: "No title" },
+            ...ROSTER_TITLES.map((option) => ({
+              value: option,
+              label: option,
+            })),
+            ...(title && !(ROSTER_TITLES as readonly string[]).includes(title)
+              ? [{ value: title, label: title }]
+              : []),
+          ]}
+        />
       </label>
       <label className="field">
         Name

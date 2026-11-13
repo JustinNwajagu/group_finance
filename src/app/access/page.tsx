@@ -9,8 +9,10 @@ import { assignExcoOfficeAction } from "@/app/actions/exco";
 import { ApproveAccessForm } from "@/components/approve-access-form";
 import { AppShell } from "@/components/app-shell";
 import { ChangeLoginEmailForm } from "@/components/change-login-email-form";
+import { CollapsePanel } from "@/components/collapse-panel";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { ScrollSelect } from "@/components/scroll-select";
 import { requireAdmin, adminEmail, isAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import {
@@ -149,25 +151,26 @@ export default async function AccessPage({
                 </div>
                 <label className="field">
                   Member
-                  <select
+                  <ScrollSelect
                     name="member_id"
+                    aria-label={`Assign ${seat.label}`}
                     defaultValue={
                       seat.member_id != null ? String(seat.member_id) : "none"
                     }
-                    aria-label={`Assign ${seat.label}`}
-                  >
-                    <option value="none">Vacant</option>
-                    {allMembers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                        {excoByMemberId.get(m.id)?.office === seat.office
-                          ? ""
-                          : excoByMemberId.has(m.id)
-                            ? ` (currently ${excoByMemberId.get(m.id)!.label})`
-                            : ""}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "none", label: "Vacant" },
+                      ...allMembers.map((m) => ({
+                        value: String(m.id),
+                        label: `${m.name}${
+                          excoByMemberId.get(m.id)?.office === seat.office
+                            ? ""
+                            : excoByMemberId.has(m.id)
+                              ? ` (currently ${excoByMemberId.get(m.id)!.label})`
+                              : ""
+                        }`,
+                      })),
+                    ]}
+                  />
                 </label>
                 <PendingSubmitButton
                   idleLabel={`Save ${seat.label}`}
@@ -251,104 +254,112 @@ export default async function AccessPage({
           {withLogin.length === 0 ? (
             <div className="hero-empty">No member logins yet.</div>
           ) : (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Login email</th>
-                    <th>Access</th>
-                    <th>Phone</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {withLogin.map((m) => {
-                    const email = (m.login_email || m.email || "").toLowerCase();
-                    const role = roleByEmail.get(email) ?? "member";
-                    const seat = excoByMemberId.get(m.id);
-                    const locked = isAdminEmail(email);
-                    return (
-                      <tr key={m.id}>
-                        <td>
-                          <div className="member-exco-cell">
-                            <span>{m.name}</span>
-                            {seat ? (
-                              <span
-                                className={
-                                  seat.grants_admin
-                                    ? "badge badge-admin"
-                                    : "badge badge-exco"
-                                }
-                              >
-                                {seat.label}
-                              </span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td>{email || "—"}</td>
-                        <td>
-                          <div className="member-exco-cell">
-                            {locked ? (
-                              <span className="badge badge-admin">
-                                primary admin
-                              </span>
-                            ) : role === "admin" ? (
-                              <span className="badge badge-admin">admin</span>
-                            ) : (
-                              <span className="badge badge-member">member</span>
-                            )}
-                          </div>
-                        </td>
-                        <td>{m.phone || "—"}</td>
-                        <td>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "0.35rem",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <form action={sendMemberPasswordReset}>
-                              <input
-                                type="hidden"
-                                name="member_id"
-                                value={m.id}
-                              />
-                              <PendingSubmitButton
-                                className="btn-ghost"
-                                idleLabel="Reset password"
-                                pendingLabel="Sending…"
-                              />
-                            </form>
-                            {!locked && email ? (
-                              <ChangeLoginEmailForm
-                                memberId={m.id}
-                                currentEmail={email}
-                              />
-                            ) : null}
-                            {!locked ? (
-                              <form action={deleteLoginAction}>
-                                <input
-                                  type="hidden"
-                                  name="member_id"
-                                  value={m.id}
-                                />
-                                <PendingSubmitButton
-                                  className="btn-ghost"
-                                  idleLabel="Delete login"
-                                  pendingLabel="Deleting…"
-                                />
-                              </form>
-                            ) : null}
-                          </div>
-                        </td>
+            <CollapsePanel
+              title="Active logins"
+              meta={`${withLogin.length} login${withLogin.length === 1 ? "" : "s"}`}
+              defaultOpen
+            >
+              <div className="scroll-panel">
+                <div className="table-wrap">
+                  <table className="data">
+                    <thead>
+                      <tr>
+                        <th>Member</th>
+                        <th>Login email</th>
+                        <th>Access</th>
+                        <th>Phone</th>
+                        <th>Action</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {withLogin.map((m) => {
+                        const email = (m.login_email || m.email || "").toLowerCase();
+                        const role = roleByEmail.get(email) ?? "member";
+                        const seat = excoByMemberId.get(m.id);
+                        const locked = isAdminEmail(email);
+                        return (
+                          <tr key={m.id}>
+                            <td>
+                              <div className="member-exco-cell">
+                                <span>{m.name}</span>
+                                {seat ? (
+                                  <span
+                                    className={
+                                      seat.grants_admin
+                                        ? "badge badge-admin"
+                                        : "badge badge-exco"
+                                    }
+                                  >
+                                    {seat.label}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td>{email || "—"}</td>
+                            <td>
+                              <div className="member-exco-cell">
+                                {locked ? (
+                                  <span className="badge badge-admin">
+                                    primary admin
+                                  </span>
+                                ) : role === "admin" ? (
+                                  <span className="badge badge-admin">admin</span>
+                                ) : (
+                                  <span className="badge badge-member">member</span>
+                                )}
+                              </div>
+                            </td>
+                            <td>{m.phone || "—"}</td>
+                            <td>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "0.35rem",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <form action={sendMemberPasswordReset}>
+                                  <input
+                                    type="hidden"
+                                    name="member_id"
+                                    value={m.id}
+                                  />
+                                  <PendingSubmitButton
+                                    className="btn-ghost"
+                                    idleLabel="Reset password"
+                                    pendingLabel="Sending…"
+                                  />
+                                </form>
+                                {!locked && email ? (
+                                  <ChangeLoginEmailForm
+                                    memberId={m.id}
+                                    currentEmail={email}
+                                  />
+                                ) : null}
+                                {!locked ? (
+                                  <form action={deleteLoginAction}>
+                                    <input
+                                      type="hidden"
+                                      name="member_id"
+                                      value={m.id}
+                                    />
+                                    <PendingSubmitButton
+                                      className="btn-ghost"
+                                      idleLabel="Delete login"
+                                      pendingLabel="Deleting…"
+                                    />
+                                  </form>
+                                ) : null}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </CollapsePanel>
           )}
         </section>
 

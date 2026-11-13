@@ -64,9 +64,8 @@ env:
       - RUNTIME
 
   # Public app origin for emails / reset continue URLs.
-  # Switch to https://shsnklef13.com once that custom domain is live.
   - variable: APP_BASE_URL
-    value: https://klefapp--klefapp.europe-west4.hosted.app
+    value: https://shsnklef13.com
     availability:
       - RUNTIME
   - variable: SESSION_IDLE_MINUTES

@@ -21,7 +21,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_USER=
 SMTP_PASS=
 SMTP_FROM="KLEF 13 <klef2007.2013@gmail.com>"
-APP_BASE_URL=https://klefapp--klefapp.europe-west4.hosted.app
+APP_BASE_URL=https://shsnklef13.com
 ```
 
 Password resets use Firebase Authentication’s built-in mailer. Without SMTP, access requests still appear on **Access** (badge/banner), but no inbox alert is sent (unless you use the optional Firebase Trigger Email extension on the `mail` collection).
@@ -68,7 +68,8 @@ firebase apphosting:secrets:set FIREBASE_PRIVATE_KEY
 `apphosting.yaml` already references those secret names. Console env values override the YAML if both are set.
 
 5. Attach a custom domain in the App Hosting backend settings when ready.
-6. Authorized domains: Authentication → Settings → Authorized domains. Add your App Hosting / custom domain. `localhost` is included by default; add `127.0.0.1` if you preview on that host. Unauthorized continue URLs used to block reset emails — the app now falls back to a plain reset email when the domain is missing.
+   - `shsnklef13.com` (apex) and `www.shsnklef13.com` are separate hostnames. Add both if you want `www` to work; Firebase will show the DNS records (often a CNAME for `www`). Redirecting `www` → apex is fine.
+6. Authorized domains: Authentication → Settings → Authorized domains. Add your App Hosting / custom domain(s), e.g. `shsnklef13.com` and `www.shsnklef13.com` if you use www. `localhost` is included by default; add `127.0.0.1` if you preview on that host. Unauthorized continue URLs used to block reset emails — the app now falls back to a plain reset email when the domain is missing.
 7. Authentication → Sign-in method → enable **Email/Password**. Password reset emails use Firebase’s built-in mailer (Templates tab to customize). Those messages often land in spam until you move to a custom SMTP / authenticated sending domain (Blaze + Authentication email templates / SMTP settings).
 
 ### Continuous delivery

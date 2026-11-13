@@ -447,7 +447,6 @@ a.viewer-name.is-active {
   padding: 1.25rem;
   box-shadow: var(--shadow);
   min-width: 0;
-  height: fit-content;
   max-width: 100%;
 }
 
@@ -1138,6 +1137,7 @@ textarea {
   display: grid;
   gap: 0.55rem;
   margin-top: 0.35rem;
+  align-content: start;
 }
 
 .archive-item {
@@ -1145,9 +1145,13 @@ textarea {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
   overflow: hidden;
-  height: fit-content;
+  /* height:auto — avoid fit-content, which can size to the full dues
+     table max-content and leave a tall empty gap above the next rows */
+  height: auto;
   max-width: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow-anchor: none;
 }
 
 .archive-item-toggle {
@@ -1199,24 +1203,35 @@ textarea {
 }
 
 .archive-item-body {
-  /* Size to the scroll pane + note — never reserve a tall empty viewport */
   padding: 0.5rem 0.65rem 0.65rem;
-  overflow: visible;
-  max-height: none;
-  height: fit-content;
+  overflow: hidden;
+  height: auto;
   min-width: 0;
+  min-height: 0;
 }
 
-/* Single scrollport for open archive tables (vertical + horizontal months) */
+/*
+ * Definite height (not only max-height) so the open row’s layout box
+ * cannot grow to the full year-grid content size. Inner wrapper holds
+ * the wide month table for sideways scroll inside this pane.
+ */
 .archive-scroll-pane {
+  box-sizing: border-box;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  max-height: min(18rem, 42vh);
-  max-height: min(18rem, 42dvh);
+  min-height: 0;
+  height: min(18rem, 42vh);
+  height: min(18rem, 42dvh);
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  contain: layout paint;
+}
+
+.archive-scroll-pane-inner {
+  width: max-content;
+  min-width: 100%;
 }
 
 .archive-scroll-pane .table-wrap,
@@ -1927,7 +1942,6 @@ textarea {
   gap: 1.25rem;
   align-items: start;
   width: 100%;
-  height: fit-content;
 }
 
 .dash-main,
@@ -1936,25 +1950,18 @@ textarea {
 .expenses-aside {
   min-width: 0;
   width: 100%;
-  height: fit-content;
   max-width: 100%;
 }
 
 .dash-aside,
 .expenses-aside {
-  /* No sticky / viewport max-height — those reserved a near-full-screen
-     column and left blank space under shorter main boards (Archive dues). */
-  position: static;
+  position: sticky;
+  top: 1rem;
   align-self: start;
-  height: fit-content;
-  max-height: none;
-  overflow: visible;
 }
 
 .dash-tools-toggle {
-  /* Collapsed by default on every breakpoint so a tall tools column
-     cannot leave blank space under shorter main boards (e.g. Archive). */
-  display: flex;
+  display: none;
   width: 100%;
   align-items: center;
   justify-content: space-between;
@@ -1987,26 +1994,6 @@ textarea {
 .dash-tools-body {
   min-width: 0;
   width: 100%;
-}
-
-.dash-tools:not(.is-open) .dash-tools-body {
-  display: none;
-}
-
-.dash-tools.is-open .dash-tools-toggle {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  background: rgba(31, 122, 108, 0.08);
-}
-
-.dash-tools.is-open .dash-tools-body {
-  padding-top: 0.85rem;
-  max-height: min(70vh, 32rem);
-  max-height: min(70dvh, 32rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
 }
 
 .dash-aside .panel,
@@ -2108,6 +2095,30 @@ textarea {
   .expenses-aside {
     position: static;
     order: -1;
+  }
+
+  .dash-tools-toggle {
+    display: flex;
+  }
+
+  .dash-tools:not(.is-open) .dash-tools-body {
+    display: none;
+  }
+
+  .dash-tools.is-open .dash-tools-toggle {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    background: rgba(31, 122, 108, 0.08);
+  }
+
+  .dash-tools.is-open .dash-tools-body {
+    padding-top: 0.85rem;
+    max-height: min(70vh, 32rem);
+    max-height: min(70dvh, 32rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .expenses-balance-grid {

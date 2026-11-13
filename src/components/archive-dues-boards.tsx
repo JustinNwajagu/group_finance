@@ -65,7 +65,9 @@ export function ArchiveDuesBoards({
             {open ? (
               <div id={panelId} className="archive-item-body">
                 <div className="archive-scroll-pane">
-                  <DuesYearTable board={board} />
+                  <div className="archive-scroll-pane-inner">
+                    <DuesYearTable board={board} />
+                  </div>
                 </div>
                 {isAdmin ? (
                   <p className="muted archive-item-note">

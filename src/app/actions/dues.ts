@@ -121,19 +121,6 @@ export async function concludeDuesYear(formData: FormData): Promise<void> {
   );
 }
 
-/** Archived dues years stay in Archive — they cannot be reopened. */
-export async function reopenDuesYear(formData: FormData): Promise<void> {
-  await requireAdmin();
-  const id = Number(formData.get("id"));
-  const schedule = Number.isFinite(id) ? await getDuesScheduleById(id) : null;
-  failDues(
-    schedule
-      ? `Dues for ${schedule.year} stay in Archive. Amend payments there — they cannot be opened again.`
-      : "Archived dues years cannot be opened again. Amend them in Archive.",
-    schedule?.year,
-    "/archive",
-  );
-}
 
 /**
  * Use an existing dues year as-is (including archived / different monthly).

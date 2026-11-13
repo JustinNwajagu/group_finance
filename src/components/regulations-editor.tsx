@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { saveRegulationsAction } from "@/app/actions/regulations";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import type {
@@ -14,6 +14,7 @@ type EditableSignatory = RegulationSignatory;
 type EditorMode = "edit" | "add" | "details";
 
 export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
+  const idPrefix = useId().replace(/:/g, "");
   const [title, setTitle] = useState(doc.title);
   const [intro, setIntro] = useState(doc.intro);
   const [sections, setSections] = useState<EditableSection[]>(
@@ -25,7 +26,7 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
   const [mode, setMode] = useState<EditorMode>("edit");
   const [selectedId, setSelectedId] = useState(doc.sections[0]?.id ?? "");
   const [draftNew, setDraftNew] = useState<EditableSection>({
-    id: `new-${Date.now()}`,
+    id: `new-${idPrefix}`,
     title: "",
     items: [""],
   });
@@ -127,7 +128,7 @@ export function RegulationsEditor({ doc }: { doc: RegulationsDoc }) {
               }
               if (next === "add") {
                 setDraftNew({
-                  id: `new-${Date.now()}`,
+                  id: `new-${idPrefix}-${sections.length}`,
                   title: "",
                   items: [""],
                 });

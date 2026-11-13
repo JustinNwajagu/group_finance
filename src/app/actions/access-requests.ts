@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin, isAdmin } from "@/lib/auth";
+import { requireAdmin } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/config";
 import {
   createAccessRequest,
@@ -12,7 +12,6 @@ import {
   findPendingOrApprovedByEmail,
   getAccessRequestById,
   listAccessRequests,
-  loginCapacity,
   provisionApprovedUser,
   updateAccessRequest,
 } from "@/lib/access-requests";
@@ -20,8 +19,6 @@ import {
   getMemberById,
   listMembersWithoutLogin,
 } from "@/lib/store";
-import { setUserRole } from "@/lib/user-roles";
-
 export type LoginFailureKind =
   | "wrong_password"
   | "no_account"
@@ -406,16 +403,7 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
   redirect("/access?ok=rejected");
 }
 
-export async function loadPendingAccessRequests() {
-  const viewer = await requireAdmin();
-  if (!isAdmin(viewer)) return [];
-  return listAccessRequests("pending");
-}
 
-export async function getLoginCapacityAction() {
-  await requireAdmin();
-  return loginCapacity();
-}
 
 export async function deleteLoginAction(formData: FormData): Promise<void> {
   await requireAdmin();
@@ -493,31 +481,3 @@ export async function sendMemberPasswordReset(
   redirect("/access?ok=reset_sent&link=" + encodeURIComponent(link));
 }
 
-export async function setUserRoleAction(formData: FormData): Promise<void> {
-  const viewer = await requireAdmin();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const roleRaw = String(formData.get("role") ?? "")
-    .trim()
-    .toLowerCase();
-  const role = roleRaw === "admin" ? "admin" : "member";
-
-  if (!email || !email.includes("@")) {
-    redirect("/access?error=" + encodeURIComponent("Invalid email."));
-  }
-
-  try {
-    await setUserRole({
-      email,
-      role,
-      updatedBy: viewer.email,
-    });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Could not update role.";
-    redirect("/access?error=" + encodeURIComponent(message));
-  }
-
-  revalidatePath("/access");
-  revalidatePath("/");
-  redirect("/access?ok=role_updated");
-}

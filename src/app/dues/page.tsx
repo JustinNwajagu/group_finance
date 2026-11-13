@@ -70,10 +70,10 @@ export default async function DuesPage({
         <div>
           <h1>Dues</h1>
           <p>
-            Monthly dues run January–December each year. Amount paid ÷ monthly
-            due = months covered. Payments that cover more than one year are
-            split across a year range you choose. Concluded years move to
-            Archive.
+            Monthly dues run September–August each year (year label = the Sept
+            start). Amount paid ÷ monthly due = months covered. Payments that
+            cover more than one year are split across a year range you choose.
+            Concluded years move to Archive.
           </p>
         </div>
         <div className="page-head-tools">
@@ -259,14 +259,15 @@ export default async function DuesPage({
                     type="date"
                     required
                     defaultValue={`${
-                      schedules.some((s) => s.year === currentYear)
+                      (schedules.some((s) => s.year === currentYear)
                         ? currentYear + 1
-                        : currentYear
-                    }-12-31`}
+                        : currentYear) + 1
+                    }-09-30`}
                   />
                 </label>
                 <p className="muted" style={{ margin: 0 }}>
-                  Creates a Jan–Dec tracker for that year. One schedule per year;
+                  Creates a Sept–Aug tracker for that year (deadline usually 30
+                  Sep of the following calendar year). One schedule per year;
                   monthly amount is fixed for everyone. A past deadline opens
                   the year already archived. Years that are already open or in
                   Archive cannot be opened again.
@@ -332,7 +333,7 @@ export default async function DuesPage({
                     type="date"
                     required
                     defaultValue={
-                      board?.schedule.deadline ?? `${selectedYear}-12-31`
+                      board?.schedule.deadline ?? `${selectedYear + 1}-09-30`
                     }
                   />
                 </label>

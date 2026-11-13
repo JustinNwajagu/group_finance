@@ -1,4 +1,9 @@
+/** Dues-year months in order: Sept → Aug (index 1 … 12). */
 export const DUES_MONTH_LABELS = [
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
   "Jan",
   "Feb",
   "Mar",
@@ -7,10 +12,6 @@ export const DUES_MONTH_LABELS = [
   "Jun",
   "Jul",
   "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
 ] as const;
 
 export type DuesMonthIndex = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -32,7 +33,7 @@ export function monthsFromAmount(
   return months;
 }
 
-/** Money already attributed to each calendar month (length 12). */
+/** Money already attributed to each dues-year month Sep→Aug (length 12). */
 export function monthCreditsFromPayments(
   payments: Array<{ amount: string | number; covered_months: number[] }>,
 ): number[] {

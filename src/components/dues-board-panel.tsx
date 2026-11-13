@@ -59,7 +59,7 @@ export function DuesBoardPanel({
 
       {!filtered ? (
         <div className="hero-empty">
-          Open a dues year to start tracking Jan–Dec payments.
+          Open a dues year to start tracking Sept–Aug payments.
         </div>
       ) : (
         <DuesYearTable

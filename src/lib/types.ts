@@ -118,7 +118,7 @@ export type ContributionLists = {
   realised_total: string;
 };
 
-/** Calendar year dues schedule (fixed monthly amount, Jan–Dec). */
+/** Dues schedule for a Sept–Aug year (fixed monthly amount; year = Sept start). */
 export type DuesSchedule = {
   id: number;
   year: number;
@@ -136,7 +136,7 @@ export type DuesPayment = {
   dues_schedule_id: number;
   member_id: number;
   amount: string;
-  /** Calendar months covered by this payment (1=Jan … 12=Dec). */
+  /** Dues-year months covered by this payment (1=Sep … 12=Aug). */
   covered_months: number[];
   payment_date: string;
   notes: string | null;
@@ -148,7 +148,7 @@ export type DuesPaymentWithMember = DuesPayment & {
   year: number;
 };
 
-/** Per-member Jan–Dec coverage for one dues year. */
+/** Per-member Sep–Aug coverage for one dues year. */
 export type DuesMemberYear = {
   member: Member;
   /** Length 12; true when that month is covered. */

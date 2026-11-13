@@ -838,7 +838,7 @@ function normalizeDuesSchedule(
   const deadlineRaw = String(raw.deadline ?? "").trim();
   const deadline = /^\d{4}-\d{2}-\d{2}$/.test(deadlineRaw)
     ? deadlineRaw
-    : `${year}-12-31`;
+    : `${year + 1}-09-30`;
   const concludedRaw = raw.concluded_at;
   const concluded_at =
     typeof concludedRaw === "string" && concludedRaw.trim()
@@ -847,7 +847,8 @@ function normalizeDuesSchedule(
   return {
     id: Number(raw.id),
     year,
-    title: titleRaw || `${year} Dues`,
+    title:
+      titleRaw || `${year} Dues (Sept ${year}–Sept ${year + 1})`,
     monthly_amount: money(
       (raw.monthly_amount as string | number | undefined) ??
         (raw.amount as string | number | undefined) ??
@@ -972,12 +973,14 @@ export async function createDuesSchedule(input: {
   const deadlineRaw = String(input.deadline ?? "").trim();
   const deadline = /^\d{4}-\d{2}-\d{2}$/.test(deadlineRaw)
     ? deadlineRaw
-    : `${input.year}-12-31`;
+    : `${input.year + 1}-09-30`;
   const rowBase = {
     year: input.year,
     title:
-      normalizePaymentTitle(input.title?.trim() || `${input.year} Dues`) ||
-      `${input.year} Dues`,
+      normalizePaymentTitle(
+        input.title?.trim() ||
+          `${input.year} Dues (Sept ${input.year}–Sept ${input.year + 1})`,
+      ) || `${input.year} Dues (Sept ${input.year}–Sept ${input.year + 1})`,
     monthly_amount: money(input.monthly_amount),
     deadline,
     concluded_at: input.concluded_at ?? null,

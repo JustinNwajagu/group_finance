@@ -56,16 +56,12 @@ function ArchiveBoardItem({
       </button>
       {open ? (
         <div id={panelId} className="archive-item-body">
-          <div className="archive-scroll-pane">
-            <div className="archive-scroll-pane-inner">
-              <ContributionBoard
-                board={board}
-                isAdmin={isAdmin}
-                returnTo="/archive"
-                hideHeader
-              />
-            </div>
-          </div>
+          <ContributionBoard
+            board={board}
+            isAdmin={isAdmin}
+            returnTo="/archive"
+            hideHeader
+          />
         </div>
       ) : null}
     </div>

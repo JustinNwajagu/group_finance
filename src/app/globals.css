@@ -1203,10 +1203,15 @@ textarea {
 
 .archive-item-body {
   padding: 0.5rem 0.65rem 0.65rem;
-  overflow: hidden;
+  overflow: visible;
   height: auto;
   min-width: 0;
   min-height: 0;
+}
+
+/* Contribution boards expand to show the full column layout; lists scroll inside */
+.archive-item-body > .contrib-board {
+  margin: 0;
 }
 
 /*
@@ -1228,10 +1233,8 @@ textarea {
   contain: layout paint;
 }
 
-/* Year grids / contribution boards lock layout height so they cannot
-   inflate the page; other panels grow with content up to max-height. */
-.archive-scroll-pane:has(table.dues-grid),
-.archive-scroll-pane:has(.contrib-board) {
+/* Year grids lock layout height so they cannot inflate the page */
+.archive-scroll-pane:has(table.dues-grid) {
   height: min(36rem, calc(100vh - 11rem));
   height: min(36rem, calc(100dvh - 11rem));
 }
@@ -1242,8 +1245,7 @@ textarea {
     max-height: min(28rem, calc(100dvh - 9.5rem));
   }
 
-  .archive-scroll-pane:has(table.dues-grid),
-  .archive-scroll-pane:has(.contrib-board) {
+  .archive-scroll-pane:has(table.dues-grid) {
     height: min(28rem, calc(100vh - 9.5rem));
     height: min(28rem, calc(100dvh - 9.5rem));
   }
@@ -1266,14 +1268,6 @@ textarea {
 .archive-scroll-pane .dues-table-wrap > table.dues-grid {
   width: max-content;
   min-width: 100%;
-}
-
-.archive-scroll-pane .contrib-board {
-  padding: 0.35rem 0.15rem 0.15rem;
-}
-
-.archive-scroll-pane .contrib-split {
-  gap: 0.65rem;
 }
 
 .archive-item-note {
@@ -1369,14 +1363,16 @@ textarea {
   border-radius: 12px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.72);
-  /* Keep overflow visible so sticky section heads work while scrolling the page */
-  overflow: visible;
+  /* Full column layout stays on screen; long member lists scroll inside */
+  max-height: min(32rem, calc(100vh - 14rem));
+  max-height: min(32rem, calc(100dvh - 14rem));
+  overflow: hidden;
 }
 
 .contrib-list-head {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 2;
+  flex-shrink: 0;
   margin: 0;
   padding: 0.7rem 0.85rem;
   border-bottom: 1px solid var(--line);
@@ -1402,6 +1398,19 @@ textarea {
 .contrib-list-body {
   padding: 0.65rem 0.85rem 0.85rem;
   min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 960px) {
+  .contrib-list {
+    max-height: min(24rem, calc(100vh - 12rem));
+    max-height: min(24rem, calc(100dvh - 12rem));
+  }
 }
 
 .contrib-list-paid {

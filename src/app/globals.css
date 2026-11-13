@@ -286,6 +286,94 @@ a.viewer-name.is-active {
   text-transform: capitalize;
 }
 
+.view-as-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.view-as-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-right: 0.15rem;
+}
+
+.view-as-form {
+  margin: 0;
+}
+
+.view-as-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.view-as-btn:hover {
+  color: var(--ink);
+  background: rgba(31, 122, 108, 0.08);
+}
+
+.view-as-btn.is-active {
+  color: var(--ink);
+  background: rgba(31, 122, 108, 0.14);
+  border-color: rgba(31, 122, 108, 0.35);
+}
+
+.view-as-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin: 0.85rem 1.25rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(201, 137, 26, 0.35);
+  border-radius: 12px;
+  background: rgba(201, 137, 26, 0.1);
+  color: var(--ink);
+}
+
+.view-as-banner p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.nav-mobile-extra {
+  display: none;
+}
+
+.change-email-form {
+  display: grid;
+  gap: 0.35rem;
+  min-width: min(14rem, 100%);
+}
+
+.change-email-field {
+  margin: 0;
+}
+
+.change-email-field input {
+  width: 100%;
+  max-width: 16rem;
+}
+
+.change-email-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .profile-dl {
   margin: 0;
   display: grid;
@@ -2040,6 +2128,23 @@ textarea {
     display: none;
   }
 
+  .nav-mobile-extra {
+    display: block;
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .nav-mobile-extra .nav-sign-out {
+    width: 100%;
+    justify-content: flex-start;
+    border-radius: 10px;
+  }
+
+  .viewer-sign-out {
+    display: none;
+  }
+
   .viewer {
     grid-area: viewer;
     justify-self: start;
@@ -2048,6 +2153,11 @@ textarea {
     flex-wrap: wrap;
     align-items: center;
     gap: 0.35rem 0.75rem;
+  }
+
+  .view-as-banner {
+    margin-left: 1rem;
+    margin-right: 1rem;
   }
 
   .bank-corner {

@@ -8,8 +8,12 @@ import {
   IDLE_SIGNED_OUT_MESSAGE,
   LAST_ACTIVE_COOKIE,
   SESSION_COOKIE,
+  VIEW_AS_COOKIE,
   homePathForRole,
+  isTrueAdmin,
+  requireAccess,
   sessionIdleMs,
+  type ViewAsMode,
 } from "@/lib/auth";
 import { firebaseAdminConfigured, isAdminEmail } from "@/lib/config";
 import {
@@ -38,6 +42,36 @@ function clearSessionCookies(jar: Awaited<ReturnType<typeof cookies>>) {
   jar.delete(SESSION_COOKIE);
   jar.delete(DEV_SESSION_COOKIE);
   jar.delete(LAST_ACTIVE_COOKIE);
+  jar.delete(VIEW_AS_COOKIE);
+}
+
+function safeReturnPath(raw: string): string {
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
+
+/** True admins preview the member UI (or restore admin UI). */
+export async function setViewAs(formData: FormData): Promise<void> {
+  const viewer = await requireAccess();
+  if (!isTrueAdmin(viewer)) redirect("/");
+
+  const requested = String(formData.get("view_as") ?? "").trim();
+  const mode: ViewAsMode = requested === "member" ? "member" : "admin";
+  const returnTo = safeReturnPath(String(formData.get("return_to") ?? "/"));
+
+  const jar = await cookies();
+  jar.set(VIEW_AS_COOKIE, mode, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
+  });
+
+  if (mode === "member" && returnTo.startsWith("/access")) {
+    redirect("/");
+  }
+  redirect(returnTo);
 }
 
 export async function createFirebaseSession(

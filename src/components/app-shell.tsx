@@ -7,8 +7,14 @@ import {
   type PrimaryNavItem,
 } from "@/components/primary-nav";
 import { SessionIdleGuard } from "@/components/session-idle-guard";
+import { ViewAsSwitch } from "@/components/view-as-switch";
 import type { ViewerContext } from "@/lib/auth";
-import { homePathForRole, isAdmin, sessionIdleMs } from "@/lib/auth";
+import {
+  homePathForRole,
+  isAdmin,
+  isTrueAdmin,
+  sessionIdleMs,
+} from "@/lib/auth";
 import { countPendingAccessRequests } from "@/lib/access-requests";
 import { getExcoSeatForEmail } from "@/lib/exco";
 
@@ -30,6 +36,7 @@ export async function AppShell({
   children: React.ReactNode;
 }) {
   const admin = isAdmin(viewer);
+  const trueAdmin = isTrueAdmin(viewer);
   const homeHref = homePathForRole(viewer.access?.role ?? "member");
   const [exco, pendingAccessCount] = await Promise.all([
     getExcoSeatForEmail(viewer.email),
@@ -64,6 +71,15 @@ export async function AppShell({
     });
   }
 
+  const signOutControl = (
+    <PendingSubmitButton
+      className="btn-ghost nav-sign-out"
+      style={{ padding: "0.2rem 0.55rem", fontSize: "0.8rem" }}
+      idleLabel="Sign out"
+      pendingLabel="Signing out…"
+    />
+  );
+
   return (
     <div className="shell">
       <SessionIdleGuard idleMs={sessionIdleMs()} />
@@ -72,7 +88,19 @@ export async function AppShell({
           <BrandLogo size={36} />
           <span className="brand-mark">KLEF 13</span>
         </Link>
-        <PrimaryNav items={navItems} />
+        <PrimaryNav
+          items={navItems}
+          mobileExtra={
+            <form action={signOut} style={{ margin: 0 }}>
+              <PendingSubmitButton
+                className="btn-ghost nav-sign-out"
+                style={{ padding: "0.65rem 0.85rem", fontSize: "0.95rem" }}
+                idleLabel="Sign out"
+                pendingLabel="Signing out…"
+              />
+            </form>
+          }
+        />
         <div className="viewer">
           <Link
             href="/profile"
@@ -86,15 +114,18 @@ export async function AppShell({
           <span className="viewer-role">
             {roleLabel}
             {exco?.grants_admin ? " · admin" : ""}
+            {viewer.viewAs === "member" && trueAdmin
+              ? " · viewing as member"
+              : ""}
             {viewer.simulated ? " · local preview" : ""}
           </span>
-          <form action={signOut} style={{ margin: 0 }}>
-            <PendingSubmitButton
-              className="btn-ghost"
-              style={{ padding: "0.2rem 0.55rem", fontSize: "0.8rem" }}
-              idleLabel="Sign out"
-              pendingLabel="Signing out…"
-            />
+          {trueAdmin ? <ViewAsSwitch viewAs={viewer.viewAs} /> : null}
+          <form
+            action={signOut}
+            className="viewer-sign-out"
+            style={{ margin: 0 }}
+          >
+            {signOutControl}
           </form>
         </div>
       </header>
@@ -112,6 +143,12 @@ export async function AppShell({
               Review on Access
             </Link>
           )}
+        </div>
+      ) : null}
+      {trueAdmin && viewer.viewAs === "member" ? (
+        <div className="view-as-banner" role="status">
+          <p>You are previewing the member view. Admin tools are hidden.</p>
+          <ViewAsSwitch viewAs={viewer.viewAs} />
         </div>
       ) : null}
       <main className="main">{children}</main>

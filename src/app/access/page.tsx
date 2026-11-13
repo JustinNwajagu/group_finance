@@ -8,9 +8,11 @@ import {
 import { assignExcoOfficeAction } from "@/app/actions/exco";
 import { ApproveAccessForm } from "@/components/approve-access-form";
 import { AppShell } from "@/components/app-shell";
+import { ChangeLoginEmailForm } from "@/components/change-login-email-form";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
-import { requireAdmin, adminEmail } from "@/lib/auth";
+import { requireAdmin, adminEmail, isAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import {
   listAccessRequests,
   loginCapacity,
@@ -31,6 +33,8 @@ export default async function AccessPage({
 }) {
   await connection();
   const viewer = await requireAdmin();
+  // Member-view preview hides Access; switch back to Admin to manage logins.
+  if (!isAdmin(viewer)) redirect("/");
   const params = await searchParams;
   const ok = typeof params.ok === "string" ? params.ok : undefined;
   const error = typeof params.error === "string" ? params.error : undefined;
@@ -97,6 +101,12 @@ export default async function AccessPage({
             : "Password reset email sent.",
           reset_sent:
             "Password reset link ready to share (email could not be sent).",
+          email_changed: emailedTo
+            ? `Login email updated to ${emailedTo}.`
+            : "Login email updated.",
+          email_changed_reset_sent: emailedTo
+            ? `Login email updated to ${emailedTo}. Password reset email sent.`
+            : "Login email updated. Password reset email sent.",
           exco_updated: "EXCO position updated.",
         }}
       />
@@ -311,6 +321,12 @@ export default async function AccessPage({
                                 pendingLabel="Sending…"
                               />
                             </form>
+                            {!locked && email ? (
+                              <ChangeLoginEmailForm
+                                memberId={m.id}
+                                currentEmail={email}
+                              />
+                            ) : null}
                             {!locked ? (
                               <form action={deleteLoginAction}>
                                 <input

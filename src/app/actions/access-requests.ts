@@ -17,7 +17,9 @@ import {
 } from "@/lib/access-requests";
 import {
   getMemberById,
+  getMemberByLoginEmail,
   listMembersWithoutLogin,
+  updateMemberRow,
 } from "@/lib/store";
 export type LoginFailureKind =
   | "wrong_password"
@@ -445,6 +447,173 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
     memberRemoved
       ? "/access?ok=login_deleted_member_removed"
       : "/access?ok=login_deleted",
+  );
+}
+
+/** Admin updates a member's login email and emails a reset to the new address. */
+export async function changeMemberLoginEmail(
+  formData: FormData,
+): Promise<void> {
+  await requireAdmin();
+  const memberId = Number(formData.get("member_id"));
+  const newEmail = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!Number.isFinite(memberId) || memberId <= 0) {
+    redirect("/access?error=" + encodeURIComponent("Invalid member."));
+  }
+  if (!newEmail || !newEmail.includes("@")) {
+    redirect(
+      "/access?error=" + encodeURIComponent("Enter a valid login email."),
+    );
+  }
+
+  const member = await getMemberById(memberId);
+  if (!member) {
+    redirect("/access?error=" + encodeURIComponent("Member not found."));
+  }
+
+  const oldEmail = (member.login_email || member.email || "")
+    .trim()
+    .toLowerCase();
+  if (!oldEmail) {
+    redirect(
+      "/access?error=" + encodeURIComponent("This member has no login email."),
+    );
+  }
+  if (isAdminEmail(oldEmail)) {
+    redirect(
+      "/access?error=" +
+        encodeURIComponent("The primary admin login email cannot be changed here."),
+    );
+  }
+  if (isAdminEmail(newEmail) && newEmail !== oldEmail) {
+    redirect(
+      "/access?error=" +
+        encodeURIComponent("That email is reserved for the primary admin."),
+    );
+  }
+  if (newEmail === oldEmail) {
+    redirect(
+      "/access?error=" +
+        encodeURIComponent("That is already this member’s login email."),
+    );
+  }
+
+  const taken = await getMemberByLoginEmail(newEmail);
+  if (taken && taken.id !== memberId) {
+    redirect(
+      "/access?error=" +
+        encodeURIComponent("Another member already uses that login email."),
+    );
+  }
+
+  const { adminAuth } = await import("@/lib/firebase-admin");
+  const { firebaseAdminConfigured } = await import("@/lib/config");
+  const auth = adminAuth();
+
+  if (firebaseAdminConfigured() && auth) {
+    if (await emailHasAuthAccount(newEmail)) {
+      redirect(
+        "/access?error=" +
+          encodeURIComponent(
+            "That email already has a Firebase login. Pick a different address.",
+          ),
+      );
+    }
+
+    let uid = (member.auth_uid || "").trim();
+    if (!uid) {
+      try {
+        const existing = await auth.getUserByEmail(oldEmail);
+        uid = existing.uid;
+      } catch {
+        redirect(
+          "/access?error=" +
+            encodeURIComponent(
+              "Could not find the Firebase login for this member.",
+            ),
+        );
+      }
+    }
+
+    try {
+      await auth.updateUser(uid, {
+        email: newEmail,
+        emailVerified: false,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not update login email.";
+      redirect("/access?error=" + encodeURIComponent(message));
+    }
+
+    const contactEmail = (member.email || "").trim().toLowerCase();
+    await updateMemberRow(memberId, {
+      auth_uid: uid,
+      login_email: newEmail,
+      ...(contactEmail === oldEmail ? { email: newEmail } : {}),
+    });
+  } else {
+    const contactEmail = (member.email || "").trim().toLowerCase();
+    await updateMemberRow(memberId, {
+      login_email: newEmail,
+      ...(contactEmail === oldEmail ? { email: newEmail } : {}),
+    });
+  }
+
+  const { deleteUserRole, setUserRole } = await import("@/lib/user-roles");
+  try {
+    await deleteUserRole(oldEmail);
+    await setUserRole({
+      email: newEmail,
+      role: "member",
+      updatedBy: "admin-email-change",
+    });
+  } catch {
+    /* role docs are optional; EXCO still drives admin */
+  }
+
+  const { sendMemberPasswordResetEmail } = await import(
+    "@/lib/password-reset-server"
+  );
+  const result = await sendMemberPasswordResetEmail(newEmail);
+
+  revalidatePath("/access");
+  revalidatePath("/members", "layout");
+  revalidatePath("/profile");
+
+  if (result.emailed) {
+    redirect(
+      "/access?ok=email_changed_reset_sent&email=" +
+        encodeURIComponent(newEmail),
+    );
+  }
+
+  if (result.link) {
+    const params = new URLSearchParams({
+      ok: "email_changed",
+      link: result.link,
+      email: newEmail,
+    });
+    if (result.error) {
+      params.set(
+        "error",
+        `Email updated, but the reset mail failed (${result.error}). Share the link below.`,
+      );
+    }
+    redirect(`/access?${params.toString()}`);
+  }
+
+  redirect(
+    "/access?ok=email_changed&email=" +
+      encodeURIComponent(newEmail) +
+      "&error=" +
+      encodeURIComponent(
+        result.error ||
+          "Email updated, but a password reset email could not be sent.",
+      ),
   );
 }
 

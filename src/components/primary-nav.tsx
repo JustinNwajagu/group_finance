@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 export type PrimaryNavItem = {
   href: string;
@@ -11,7 +11,14 @@ export type PrimaryNavItem = {
   badge?: number;
 };
 
-export function PrimaryNav({ items }: { items: PrimaryNavItem[] }) {
+export function PrimaryNav({
+  items,
+  mobileExtra,
+}: {
+  items: PrimaryNavItem[];
+  /** Shown inside the mobile menu only (e.g. Sign out). */
+  mobileExtra?: ReactNode;
+}) {
   const pathname = usePathname();
   const [menuPath, setMenuPath] = useState<string | null>(null);
   const open = menuPath === pathname;
@@ -68,6 +75,9 @@ export function PrimaryNav({ items }: { items: PrimaryNavItem[] }) {
             </Link>
           );
         })}
+        {mobileExtra ? (
+          <div className="nav-mobile-extra">{mobileExtra}</div>
+        ) : null}
       </nav>
     </div>
   );

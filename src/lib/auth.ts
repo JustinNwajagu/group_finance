@@ -12,6 +12,10 @@ export const SESSION_COOKIE = "__session";
 export const DEV_SESSION_COOKIE = "klef_dev_session";
 /** Client + server readable timestamp (ms) of last user activity. */
 export const LAST_ACTIVE_COOKIE = "klef_last_active";
+/** True admins may preview the member UI without losing admin rights. */
+export const VIEW_AS_COOKIE = "klef_view_as";
+
+export type ViewAsMode = "admin" | "member";
 
 /** Default idle window before the next visit requires sign-in again. */
 export const DEFAULT_SESSION_IDLE_MINUTES = 30;
@@ -35,6 +39,8 @@ export type ViewerContext = {
   name: string;
   simulated: boolean;
   access: AppUser | null;
+  /** Effective UI mode. Only true admins may set this to `"member"`. */
+  viewAs: ViewAsMode;
 };
 
 async function viewerFromIdentity(input: {
@@ -42,6 +48,7 @@ async function viewerFromIdentity(input: {
   email: string;
   name: string;
   simulated: boolean;
+  viewAs?: ViewAsMode;
 }): Promise<ViewerContext> {
   const email = input.email.trim().toLowerCase();
   const role = await resolveAppRole(email);
@@ -53,18 +60,24 @@ async function viewerFromIdentity(input: {
     role,
     created_at: new Date().toISOString(),
   };
+  const viewAs: ViewAsMode =
+    role === "admin" && input.viewAs === "member" ? "member" : "admin";
   return {
     sub: input.sub,
     email,
     name: access.name,
     simulated: input.simulated,
     access,
+    viewAs: role === "admin" ? viewAs : "member",
   };
 }
 
 export const resolveViewer = cache(async (): Promise<ViewerContext | null> => {
   await connection();
   const jar = await cookies();
+  const cookieViewAs = jar.get(VIEW_AS_COOKIE)?.value;
+  const viewAs: ViewAsMode | undefined =
+    cookieViewAs === "member" ? "member" : cookieViewAs === "admin" ? "admin" : undefined;
 
   if (firebaseAdminConfigured()) {
     const session = jar.get(SESSION_COOKIE)?.value;
@@ -80,6 +93,7 @@ export const resolveViewer = cache(async (): Promise<ViewerContext | null> => {
         email,
         name: (decoded.name as string | undefined) || email,
         simulated: false,
+        viewAs,
       });
     } catch {
       return null;
@@ -101,6 +115,7 @@ export const resolveViewer = cache(async (): Promise<ViewerContext | null> => {
       email: parsed.email,
       name: parsed.name || parsed.email,
       simulated: true,
+      viewAs,
     });
   } catch {
     return null;
@@ -125,12 +140,21 @@ export async function requireAdmin(): Promise<
   ViewerContext & { access: AppUser }
 > {
   const viewer = await requireAccess();
-  if (viewer.access.role !== "admin") redirect("/");
+  if (!isTrueAdmin(viewer)) redirect("/");
   return viewer;
 }
 
-export function isAdmin(viewer: ViewerContext): boolean {
+/** True account role is admin (ignores member-view preview). */
+export function isTrueAdmin(viewer: ViewerContext): boolean {
   return viewer.access?.role === "admin";
+}
+
+/**
+ * Effective admin for UI / tools. False when a true admin is previewing as
+ * member so they can verify what members see.
+ */
+export function isAdmin(viewer: ViewerContext): boolean {
+  return isTrueAdmin(viewer) && viewer.viewAs !== "member";
 }
 
 /** Post-login landing for every role. */

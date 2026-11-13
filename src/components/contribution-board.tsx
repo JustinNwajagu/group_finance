@@ -14,60 +14,64 @@ import type { ContributionLists, MemberPaymentRow } from "@/lib/types";
 
 function MemberList({
   title,
+  tone,
   members,
   empty,
   renderExtra,
 }: {
   title: string;
+  tone: "paid" | "pledge" | "outstanding";
   members: MemberPaymentRow[];
   empty: string;
   renderExtra?: (m: MemberPaymentRow) => ReactNode;
 }) {
   return (
-    <div className="contrib-list">
-      <h4>
-        {title}{" "}
-        <span className="muted" style={{ fontWeight: 500 }}>
-          ({members.length})
-        </span>
-      </h4>
-      {members.length === 0 ? (
-        <p className="muted" style={{ margin: 0 }}>
-          {empty}
-        </p>
-      ) : (
-        <ul className="name-list">
-          {members.map((m) => (
-            <li key={m.id} className="name-list-item">
-              <div className="name-list-meta">
-                <Link className="row-link" href={`/members/${m.id}`}>
-                  {m.name}
-                </Link>
-                {m.status ? (
-                  <span
-                    className={
-                      m.status === "paid"
-                        ? "badge badge-paid"
-                        : "badge badge-pledge"
-                    }
-                    style={{ marginLeft: "0.4rem" }}
-                  >
-                    {m.status === "paid" ? "Paid" : "Pledge"}
-                  </span>
-                ) : null}
-                {m.amount ? (
-                  <span className="muted"> · {formatMoney(m.amount)}</span>
-                ) : null}
-                {m.notes ? (
-                  <span className="muted"> · {m.notes}</span>
-                ) : null}
-              </div>
-              {renderExtra?.(m)}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <section className={`contrib-list contrib-list-${tone}`}>
+      <header className="contrib-list-head">
+        <h4>
+          {title}{" "}
+          <span className="contrib-list-count">({members.length})</span>
+        </h4>
+      </header>
+      <div className="contrib-list-body">
+        {members.length === 0 ? (
+          <p className="muted" style={{ margin: 0 }}>
+            {empty}
+          </p>
+        ) : (
+          <ul className="name-list">
+            {members.map((m) => (
+              <li key={m.id} className="name-list-item">
+                <div className="name-list-meta">
+                  <Link className="row-link" href={`/members/${m.id}`}>
+                    {m.name}
+                  </Link>
+                  {m.status ? (
+                    <span
+                      className={
+                        m.status === "paid"
+                          ? "badge badge-paid"
+                          : "badge badge-pledge"
+                      }
+                      style={{ marginLeft: "0.4rem" }}
+                    >
+                      {m.status === "paid" ? "Paid" : "Pledge"}
+                    </span>
+                  ) : null}
+                  {m.amount ? (
+                    <span className="muted"> · {formatMoney(m.amount)}</span>
+                  ) : null}
+                  {m.notes ? (
+                    <span className="muted"> · {m.notes}</span>
+                  ) : null}
+                </div>
+                {renderExtra?.(m)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -198,6 +202,7 @@ export function ContributionBoard({
       <div className="contrib-split contrib-split-3">
         <MemberList
           title="Contributed"
+          tone="paid"
           members={contributed}
           empty="No paid contributions yet."
           renderExtra={
@@ -217,6 +222,7 @@ export function ContributionBoard({
         />
         <MemberList
           title="Pledged"
+          tone="pledge"
           members={pledged}
           empty="No pledges."
           renderExtra={
@@ -236,6 +242,7 @@ export function ContributionBoard({
         />
         <MemberList
           title={outstandingTitle}
+          tone="outstanding"
           members={outstanding}
           empty={outstandingEmpty}
           renderExtra={

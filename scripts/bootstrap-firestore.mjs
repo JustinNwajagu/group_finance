@@ -98,6 +98,11 @@ const collections = [
     note: "Group bank outflows (member or miscellaneous) with dual-admin cert.",
     stub: true,
   },
+  {
+    name: "audit_logs",
+    note: "In-app changelog: who changed what (not deploys).",
+    stub: true,
+  },
 ];
 
 const DEFAULT_BANK = {

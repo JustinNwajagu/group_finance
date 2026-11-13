@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { recordExpense } from "@/app/actions/expenses";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { ScrollSelect } from "@/components/scroll-select";
 import { formatMoney } from "@/lib/format";
 import type {
   ContributionFundingOption,
@@ -279,21 +280,20 @@ export function RecordExpenseForm({
       {usesContribution ? (
         <label className="field">
           Contribution
-          <select
+          <ScrollSelect
             name="payment_request_id"
             required
             value={contributionId}
-            onChange={(e) => applyContribution(e.target.value)}
-          >
-            <option value="">Select contribution</option>
-            {contributions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-                {c.concluded ? " (concluded)" : " (open)"} · left{" "}
-                {formatMoney(c.remaining)}
-              </option>
-            ))}
-          </select>
+            placeholder="Select contribution"
+            onChange={(next) => applyContribution(next)}
+            options={[
+              { value: "", label: "Select contribution" },
+              ...contributions.map((c) => ({
+                value: String(c.id),
+                label: `${c.title}${c.concluded ? " (concluded)" : " (open)"} · left ${formatMoney(c.remaining)}`,
+              })),
+            ]}
+          />
           {selectedContribution ? (
             <span className="field-hint">
               Remaining realised {formatMoney(selectedContribution.remaining)}

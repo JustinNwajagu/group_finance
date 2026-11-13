@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { ScrollSelect } from "@/components/scroll-select";
 import { formatDate, formatMoney, todayIsoDate } from "@/lib/format";
 import type { Member, PaymentRequest, PaymentStatus } from "@/lib/types";
 
@@ -66,48 +67,45 @@ export function AmendArchivedForm({
       <input type="hidden" name="return_to" value="/archive" />
       <label className="field">
         Payment title
-        <select
+        <ScrollSelect
           name="payment_request_id"
           required
           value={requestId}
-          onChange={(e) => {
-            const next = e.target.value;
+          placeholder="Select archived payment"
+          onChange={(next) => {
             setRequestId(next);
             backfill(next, memberId);
           }}
-        >
-          <option value="" disabled>
-            Select archived payment
-          </option>
-          {requests.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.title} · min {formatMoney(r.amount)} · concluded{" "}
-              {r.concluded_at ? formatDate(r.concluded_at.slice(0, 10)) : "—"}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Select archived payment", disabled: true },
+            ...requests.map((r) => ({
+              value: String(r.id),
+              label: `${r.title} · min ${formatMoney(r.amount)} · concluded ${
+                r.concluded_at ? formatDate(r.concluded_at.slice(0, 10)) : "—"
+              }`,
+            })),
+          ]}
+        />
       </label>
       <label className="field">
         Member
-        <select
+        <ScrollSelect
           name="member_id"
           required
           value={memberId}
-          onChange={(e) => {
-            const next = e.target.value;
+          placeholder="Select member"
+          onChange={(next) => {
             setMemberId(next);
             backfill(requestId, next);
           }}
-        >
-          <option value="" disabled>
-            Select member
-          </option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Select member", disabled: true },
+            ...members.map((m) => ({
+              value: String(m.id),
+              label: m.name,
+            })),
+          ]}
+        />
       </label>
       <div className="form-grid two">
         <label className="field">
@@ -126,20 +124,24 @@ export function AmendArchivedForm({
         </label>
         <label className="field">
           Status
-          <select
+          <ScrollSelect
             name="status"
             value={status}
-            onChange={(e) => {
-              const next = e.target.value;
-              if (next === "paid" || next === "pledge" || next === "outstanding") {
+            onChange={(next) => {
+              if (
+                next === "paid" ||
+                next === "pledge" ||
+                next === "outstanding"
+              ) {
                 setStatus(next);
               }
             }}
-          >
-            <option value="outstanding">Not yet contributed</option>
-            <option value="pledge">Pledge</option>
-            <option value="paid">Paid</option>
-          </select>
+            options={[
+              { value: "outstanding", label: "Not yet contributed" },
+              { value: "pledge", label: "Pledge" },
+              { value: "paid", label: "Paid" },
+            ]}
+          />
         </label>
       </div>
       <label className="field">

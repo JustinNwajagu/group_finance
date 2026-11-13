@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatDate,
   formatExpenseFunding,
@@ -16,6 +16,18 @@ export function CertifiedExpensesList({
   expenses: ExpenseView[];
 }) {
   const [openId, setOpenId] = useState<number | null>(null);
+  const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useEffect(() => {
+    if (openId == null) return;
+    const node = itemRefs.current.get(openId);
+    if (!node) return;
+    node.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [openId]);
 
   if (expenses.length === 0) {
     return <div className="hero-empty">No certified expenses yet.</div>;
@@ -41,6 +53,10 @@ export function CertifiedExpensesList({
           <div
             key={expense.id}
             className={`archive-item${open ? " is-open" : ""}`}
+            ref={(el) => {
+              if (el) itemRefs.current.set(expense.id, el);
+              else itemRefs.current.delete(expense.id);
+            }}
           >
             <button
               type="button"
@@ -70,43 +86,47 @@ export function CertifiedExpensesList({
               </span>
             </button>
             {open ? (
-              <div id={panelId} className="archive-item-body stack">
-                <p className="expense-funding" style={{ margin: 0 }}>
-                  <span className="expense-meta-label">Funded from</span>{" "}
-                  {formatExpenseFunding({
-                    funding_source: expense.funding_source,
-                    contribution_title: expense.contribution_title,
-                    contribution_amount: expense.contribution_amount,
-                    bank_amount: expense.bank_amount,
-                  })}
-                </p>
-                {expense.notes ? (
-                  <p className="expense-notes" style={{ margin: 0 }}>
-                    <span className="expense-meta-label">Notes</span>{" "}
-                    {expense.notes}
-                  </p>
-                ) : null}
-                {expense.allocations.length > 0 ? (
-                  <ul className="expense-alloc-list">
-                    {expense.allocations.map((a) => (
-                      <li key={`${expense.id}-${a.member_id}`}>
-                        <Link
-                          className="row-link"
-                          href={`/members/${a.member_id}`}
-                        >
-                          {a.member_name}
-                        </Link>{" "}
-                        · {formatMoney(a.amount)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                <p className="muted" style={{ margin: 0 }}>
-                  Certified by{" "}
-                  {expense.certifications
-                    .map((c) => c.name || c.email)
-                    .join(", ")}
-                </p>
+              <div id={panelId} className="archive-item-body">
+                <div className="archive-scroll-pane">
+                  <div className="archive-scroll-pane-inner stack">
+                    <p className="expense-funding" style={{ margin: 0 }}>
+                      <span className="expense-meta-label">Funded from</span>{" "}
+                      {formatExpenseFunding({
+                        funding_source: expense.funding_source,
+                        contribution_title: expense.contribution_title,
+                        contribution_amount: expense.contribution_amount,
+                        bank_amount: expense.bank_amount,
+                      })}
+                    </p>
+                    {expense.notes ? (
+                      <p className="expense-notes" style={{ margin: 0 }}>
+                        <span className="expense-meta-label">Notes</span>{" "}
+                        {expense.notes}
+                      </p>
+                    ) : null}
+                    {expense.allocations.length > 0 ? (
+                      <ul className="expense-alloc-list">
+                        {expense.allocations.map((a) => (
+                          <li key={`${expense.id}-${a.member_id}`}>
+                            <Link
+                              className="row-link"
+                              href={`/members/${a.member_id}`}
+                            >
+                              {a.member_name}
+                            </Link>{" "}
+                            · {formatMoney(a.amount)}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <p className="muted" style={{ margin: 0 }}>
+                      Certified by{" "}
+                      {expense.certifications
+                        .map((c) => c.name || c.email)
+                        .join(", ")}
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>

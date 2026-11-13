@@ -845,7 +845,7 @@ function normalizeDuesSchedule(
     id: Number(raw.id),
     year,
     title:
-      titleRaw || `${year} Dues (Sept ${year}–Sept ${year + 1})`,
+      titleRaw || `${year} Dues (Sept ${year}–Aug ${year + 1})`,
     monthly_amount: money(
       (raw.monthly_amount as string | number | undefined) ??
         (raw.amount as string | number | undefined) ??
@@ -976,8 +976,8 @@ export async function createDuesSchedule(input: {
     title:
       normalizePaymentTitle(
         input.title?.trim() ||
-          `${input.year} Dues (Sept ${input.year}–Sept ${input.year + 1})`,
-      ) || `${input.year} Dues (Sept ${input.year}–Sept ${input.year + 1})`,
+          `${input.year} Dues (Sept ${input.year}–Aug ${input.year + 1})`,
+      ) || `${input.year} Dues (Sept ${input.year}–Aug ${input.year + 1})`,
     monthly_amount: money(input.monthly_amount),
     deadline,
     concluded_at: input.concluded_at ?? null,

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
 import { isExcoOffice } from "@/lib/exco";
 import { assignExcoOffice, getMemberById } from "@/lib/store";
 
@@ -45,6 +46,15 @@ export async function assignExcoOfficeAction(
     redirect("/access?error=" + encodeURIComponent(message));
   }
 
+  const officeLabel = officeRaw.split("_").join(" ");
+  await recordAudit(viewer, {
+    action: "exco.assign",
+    summary: holder_name
+      ? `Assigned ${officeLabel} to ${holder_name}`
+      : `Cleared ${officeLabel} office`,
+    entityType: "exco",
+    entityId: officeRaw,
+  });
   revalidatePath("/access");
   revalidatePath("/");
   revalidatePath("/profile");

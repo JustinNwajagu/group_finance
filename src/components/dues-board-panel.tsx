@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DuesYearTable } from "@/components/dues-year-table";
+import { duesYearTitle, normalizeDuesYearTitle } from "@/lib/dues-title";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { DuesYearBoard } from "@/lib/types";
 
@@ -31,7 +32,10 @@ export function DuesBoardPanel({
       <div className="panel-heading-row">
         <h2>
           {board
-            ? board.schedule.title || `${board.schedule.year} dues`
+            ? normalizeDuesYearTitle(
+                board.schedule.title || duesYearTitle(board.schedule.year),
+                board.schedule.year,
+              )
             : "Year tracker"}
         </h2>
         {board ? (

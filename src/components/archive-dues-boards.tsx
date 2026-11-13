@@ -1,12 +1,79 @@
 "use client";
 
-import { useState } from "react";
-import { removeDuesPayment } from "@/app/actions/dues";
+import { useRef, useState } from "react";
 import { DuesYearTable } from "@/components/dues-year-table";
-import { PendingSubmitButton } from "@/components/pending-submit-button";
-import { formatCoveredMonths } from "@/lib/dues-months";
+import { useScrollOpenIntoView } from "@/hooks/use-scroll-open-into-view";
 import { formatDate, formatMoney } from "@/lib/format";
+import { normalizeDuesYearTitle } from "@/lib/dues-title";
 import type { DuesYearBoard } from "@/lib/types";
+
+function ArchiveDuesItem({
+  board,
+  isAdmin,
+  open,
+  onToggle,
+}: {
+  board: DuesYearBoard;
+  isAdmin: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { schedule, total_collected } = board;
+  const panelId = `archive-dues-${schedule.id}`;
+  const rootRef = useRef<HTMLDivElement>(null);
+  useScrollOpenIntoView(open, rootRef);
+  const title = normalizeDuesYearTitle(
+    schedule.title || `${schedule.year} dues`,
+    schedule.year,
+  );
+
+  return (
+    <div
+      ref={rootRef}
+      className={`archive-item${open ? " is-open" : ""}`}
+    >
+      <button
+        type="button"
+        className="archive-item-toggle"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={onToggle}
+      >
+        <span className="archive-item-main">
+          <span className="archive-item-title">{title}</span>
+          <span className="archive-item-meta muted">
+            Monthly {formatMoney(schedule.monthly_amount)}
+            {" · "}
+            Deadline {formatDate(schedule.deadline)}
+            {schedule.concluded_at
+              ? ` · Concluded ${formatDate(schedule.concluded_at.slice(0, 10))}`
+              : ""}
+            {" · "}
+            Collected {formatMoney(total_collected)}
+          </span>
+        </span>
+        <span className="archive-item-chevron" aria-hidden="true">
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      {open ? (
+        <div id={panelId} className="archive-item-body">
+          <div className="archive-scroll-pane">
+            <div className="archive-scroll-pane-inner">
+              <DuesYearTable board={board} />
+            </div>
+          </div>
+          {isAdmin ? (
+            <p className="muted archive-item-note">
+              This dues year stays in Archive. Use Admin tools to amend
+              payments — it cannot be opened again.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function ArchiveDuesBoards({
   boards,
@@ -23,108 +90,19 @@ export function ArchiveDuesBoards({
 
   return (
     <div className="archive-boards">
-      {boards.map((board) => {
-        const { schedule, total_collected } = board;
-        const open = openId === schedule.id;
-        const panelId = `archive-dues-${schedule.id}`;
-        return (
-          <div
-            key={schedule.id}
-            className={`archive-item${open ? " is-open" : ""}`}
-          >
-            <button
-              type="button"
-              className="archive-item-toggle"
-              aria-expanded={open}
-              aria-controls={panelId}
-              onClick={() =>
-                setOpenId((current) =>
-                  current === schedule.id ? null : schedule.id,
-                )
-              }
-            >
-              <span className="archive-item-main">
-                <span className="archive-item-title">
-                  {schedule.title || `${schedule.year} dues`}
-                </span>
-                <span className="archive-item-meta muted">
-                  Monthly {formatMoney(schedule.monthly_amount)}
-                  {" · "}
-                  Deadline {formatDate(schedule.deadline)}
-                  {schedule.concluded_at
-                    ? ` · Concluded ${formatDate(schedule.concluded_at.slice(0, 10))}`
-                    : ""}
-                  {" · "}
-                  Collected {formatMoney(total_collected)}
-                </span>
-              </span>
-              <span className="archive-item-chevron" aria-hidden="true">
-                {open ? "▾" : "▸"}
-              </span>
-            </button>
-            {open ? (
-              <div id={panelId} className="archive-item-body stack">
-                <DuesYearTable board={board} />
-                {isAdmin ? (
-                  <p className="muted" style={{ margin: 0, fontSize: "0.85rem" }}>
-                    This dues year stays in Archive. Amend payments below — it
-                    cannot be opened again.
-                  </p>
-                ) : null}
-                {isAdmin && board.payments.length > 0 ? (
-                  <div className="table-wrap">
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          <th>Date</th>
-                          <th>Member</th>
-                          <th>Amount</th>
-                          <th>Months</th>
-                          <th>Notes</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {board.payments.slice(0, 40).map((p) => (
-                          <tr key={p.id}>
-                            <td>{formatDate(p.payment_date)}</td>
-                            <td>{p.member_name}</td>
-                            <td>{formatMoney(p.amount)}</td>
-                            <td className="muted">
-                              {p.covered_months.length} (
-                              {formatCoveredMonths(p.covered_months)})
-                            </td>
-                            <td className="muted">{p.notes || "—"}</td>
-                            <td>
-                              <form action={removeDuesPayment}>
-                                <input type="hidden" name="id" value={p.id} />
-                                <input
-                                  type="hidden"
-                                  name="return_to"
-                                  value="/archive"
-                                />
-                                <PendingSubmitButton
-                                  className="btn-ghost"
-                                  style={{
-                                    padding: "0.15rem 0.45rem",
-                                    fontSize: "0.8rem",
-                                  }}
-                                  idleLabel="Remove"
-                                  pendingLabel="Removing…"
-                                />
-                              </form>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        );
-      })}
+      {boards.map((board) => (
+        <ArchiveDuesItem
+          key={board.schedule.id}
+          board={board}
+          isAdmin={isAdmin}
+          open={openId === board.schedule.id}
+          onToggle={() =>
+            setOpenId((current) =>
+              current === board.schedule.id ? null : board.schedule.id,
+            )
+          }
+        />
+      ))}
     </div>
   );
 }

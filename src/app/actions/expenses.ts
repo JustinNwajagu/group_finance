@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isAdmin, requireAccess, requireAdmin } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit-log";
+import { formatMoney } from "@/lib/format";
 import {
   disbursedFromContribution,
   listContributionFundingOptions,
@@ -85,6 +87,11 @@ export async function saveBankAccountDetails(
     account_number,
     bank_code,
     updated_by: viewer.email,
+  });
+  await recordAudit(viewer, {
+    action: "bank.update",
+    summary: `Updated bank details (${bank_name} · ${account_number})`,
+    entityType: "bank_account",
   });
   revalidatePath("/expenses");
   redirect("/expenses?ok=bank");
@@ -223,7 +230,7 @@ export async function recordExpense(formData: FormData): Promise<void> {
       ? `Full payout of remaining realised amount for contribution #${payment_request_id}.`
       : "");
 
-  await createExpense({
+  const expense = await createExpense({
     expense_date,
     amount,
     kind,
@@ -235,6 +242,15 @@ export async function recordExpense(formData: FormData): Promise<void> {
     bank_amount,
     created_by_email: viewer.email,
     created_by_name: viewer.name,
+  });
+
+  await recordAudit(viewer, {
+    action: "expense.record",
+    summary: `Recorded ${kind} expense ${formatMoney(amount)}${
+      storedNotes ? ` — ${storedNotes.slice(0, 80)}` : ""
+    }`,
+    entityType: "expense",
+    entityId: expense.id,
   });
 
   revalidateExpensePaths(allocations.map((a) => a.member_id));
@@ -267,6 +283,13 @@ export async function certifyExpenseAction(
   });
   if (!updated) fail("Could not certify this expense.");
 
+  await recordAudit(viewer, {
+    action: "expense.certify",
+    summary: `Certified expense #${id} (${formatMoney(expense.amount)})`,
+    entityType: "expense",
+    entityId: id,
+  });
+
   revalidateExpensePaths(updated.allocations.map((a) => a.member_id));
   redirect(
     updated.certified_at || updated.certifications.length >= 2
@@ -290,6 +313,12 @@ export async function removeExpense(formData: FormData): Promise<void> {
     fail("Certified expenses cannot be removed.");
   }
   await deleteExpense(id);
+  await recordAudit(viewer, {
+    action: "expense.remove",
+    summary: `Removed expense #${id} (${formatMoney(expense.amount)})`,
+    entityType: "expense",
+    entityId: id,
+  });
   revalidateExpensePaths(expense.allocations.map((a) => a.member_id));
   redirect("/expenses?ok=removed");
 }

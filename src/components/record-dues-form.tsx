@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import { ScrollSelect } from "@/components/scroll-select";
 import { monthsFromAmount } from "@/lib/dues-months";
 import { formatMoney } from "@/lib/format";
 
@@ -73,31 +74,30 @@ export function RecordDuesForm({
       <input type="hidden" name="return_to" value={returnTo} />
       <label className="field">
         Member
-        <select
+        <ScrollSelect
           name="member_id"
           required
           value={memberId}
-          onChange={(e) => {
-            const nextId = e.target.value;
+          placeholder="Select member"
+          onChange={(nextId) => {
             setMemberId(nextId);
             const nextRemaining =
               members.find((m) => String(m.id) === nextId)
                 ?.remainingInCurrentYear ?? 0;
             suggestYearRange(months, nextRemaining);
           }}
-        >
-          <option value="" disabled>
-            Select member
-          </option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name} · {12 - m.remainingInCurrentYear}/12 in {currentYear}
-              {m.remainingInCurrentYear > 0
-                ? ` · up to ${formatMoney(m.remainingInCurrentYear * monthly)}`
-                : " · year full"}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Select member", disabled: true },
+            ...members.map((m) => ({
+              value: String(m.id),
+              label: `${m.name} · ${12 - m.remainingInCurrentYear}/12 in ${currentYear}${
+                m.remainingInCurrentYear > 0
+                  ? ` · up to ${formatMoney(m.remainingInCurrentYear * monthly)}`
+                  : " · year full"
+              }`,
+            })),
+          ]}
+        />
       </label>
       <label className="field">
         Amount paid (₦)
@@ -131,33 +131,29 @@ export function RecordDuesForm({
         <div className="form-grid two">
           <label className="field">
             Apply from year
-            <select
+            <ScrollSelect
               name="year_from"
               required
               value={yearFrom}
-              onChange={(e) => setYearFrom(e.target.value)}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+              onChange={setYearFrom}
+              options={years.map((y) => ({
+                value: String(y),
+                label: String(y),
+              }))}
+            />
           </label>
           <label className="field">
             Through year
-            <select
+            <ScrollSelect
               name="year_to"
               required
               value={yearTo}
-              onChange={(e) => setYearTo(e.target.value)}
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+              onChange={setYearTo}
+              options={years.map((y) => ({
+                value: String(y),
+                label: String(y),
+              }))}
+            />
           </label>
           <p className="muted" style={{ margin: 0, gridColumn: "1 / -1" }}>
             This payment exceeds what fits in {currentYear}

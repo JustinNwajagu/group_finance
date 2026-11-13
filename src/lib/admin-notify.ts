@@ -18,7 +18,7 @@ export type AdminNotifyPayload = {
 
 export type AdminNotifyResult = {
   emailed: boolean;
-  channel: "resend" | "smtp" | "firestore_mail" | "none";
+  channel: "smtp" | "firestore_mail" | "none";
   recipients: string[];
   error?: string;
 };
@@ -108,22 +108,21 @@ export async function listAdminNotifyEmails(): Promise<string[]> {
 }
 
 /**
- * Send a transactional email via Resend, then SMTP.
- * Used by admin alerts and password-reset mail.
+ * Send a transactional email via SMTP when configured.
+ * Used by admin alerts and password-reset fallback mail.
  */
 export async function sendTransactionalEmail(input: {
   to: string[];
   subject: string;
   text: string;
   html: string;
-}): Promise<{ channel: "resend" | "smtp" | "none"; error?: string }> {
+}): Promise<{ channel: "smtp" | "none"; error?: string }> {
   try {
-    if (await sendWithResend(input)) return { channel: "resend" };
     if (await sendWithSmtp(input)) return { channel: "smtp" };
     return {
       channel: "none",
       error:
-        "No email provider configured. Set RESEND_API_KEY (recommended) or SMTP_HOST/SMTP_USER/SMTP_PASS.",
+        "No email provider configured. Set SMTP_HOST/SMTP_USER/SMTP_PASS, or rely on Firebase Auth email / Access UI.",
     };
   } catch (err) {
     return {
@@ -131,42 +130,6 @@ export async function sendTransactionalEmail(input: {
       error: err instanceof Error ? err.message : "Could not send email.",
     };
   }
-}
-
-async function sendWithResend(input: {
-  to: string[];
-  subject: string;
-  text: string;
-  html: string;
-}): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) return false;
-  const from =
-    process.env.RESEND_FROM_EMAIL?.trim() ||
-    "KLEF 13 <onboarding@resend.dev>";
-
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from,
-      to: input.to,
-      subject: input.subject,
-      text: input.text,
-      html: input.html,
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Resend failed (${response.status})${body ? `: ${body.slice(0, 240)}` : ""}`,
-    );
-  }
-  return true;
 }
 
 async function sendWithSmtp(input: {
@@ -185,9 +148,7 @@ async function sendWithSmtp(input: {
     String(process.env.SMTP_SECURE ?? "").toLowerCase() === "true" ||
     port === 465;
   const from =
-    process.env.SMTP_FROM?.trim() ||
-    process.env.RESEND_FROM_EMAIL?.trim() ||
-    `KLEF 13 <${user}>`;
+    process.env.SMTP_FROM?.trim() || `KLEF 13 <${user}>`;
 
   const nodemailer = await import("nodemailer");
   const transport = nodemailer.createTransport({
@@ -237,7 +198,7 @@ async function queueFirestoreMail(input: {
 
 /**
  * Notify admins of a new login/account request by email.
- * Prefers Resend, then SMTP, then Firestore `mail` (Trigger Email extension).
+ * Prefers SMTP, then Firestore `mail` (Trigger Email extension).
  */
 export async function notifyAdminsOfAccessRequest(
   payload: AdminNotifyPayload,
@@ -331,7 +292,7 @@ export async function notifyAdminsOfAccessRequest(
   }
 
   return {
-    emailed: channel === "resend" || channel === "smtp",
+    emailed: channel === "smtp",
     channel,
     recipients,
     error,

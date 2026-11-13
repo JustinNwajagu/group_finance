@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export type PrimaryNavItem = {
   href: string;
@@ -12,13 +12,10 @@ export type PrimaryNavItem = {
 };
 
 export function PrimaryNav({ items }: { items: PrimaryNavItem[] }) {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const [menuPath, setMenuPath] = useState<string | null>(null);
+  const open = menuPath === pathname;
   const activeLabel = items.find((item) => item.active)?.label ?? "Menu";
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   return (
     <div className={`primary-nav${open ? " is-open" : ""}`}>
@@ -27,7 +24,7 @@ export function PrimaryNav({ items }: { items: PrimaryNavItem[] }) {
         className="nav-menu-toggle"
         aria-expanded={open}
         aria-controls="primary-nav-links"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setMenuPath(open ? null : pathname)}
       >
         <span className="nav-menu-label">{activeLabel}</span>
         <span className="nav-menu-chevron" aria-hidden="true">
@@ -60,6 +57,7 @@ export function PrimaryNav({ items }: { items: PrimaryNavItem[] }) {
                     }`
                   : undefined
               }
+              onClick={() => setMenuPath(null)}
             >
               {item.label}
               {hasBadge ? (

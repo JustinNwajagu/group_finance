@@ -96,6 +96,57 @@ export type YearMonthAllocation = {
   partial?: boolean;
 };
 
+export type EarliestUnpaidPoint = {
+  /** Dues-year label (Sept start year). */
+  year: number;
+  /** Dues-year month index 1–12 (Sep→Aug). */
+  month: number;
+};
+
+/**
+ * Earliest unpaid dues month across years (ascending).
+ * Years with no monthly rate are skipped. Returns null when every listed year
+ * is fully paid (or the list is empty).
+ */
+export function earliestUnpaidPoint(
+  years: number[],
+  creditsByYear: Map<number, number[]>,
+  monthlyByYear: Map<number, number>,
+): EarliestUnpaidPoint | null {
+  const sorted = [...new Set(years)]
+    .filter((y) => Number.isFinite(y))
+    .sort((a, b) => a - b);
+  const emptyCredits = () => Array.from({ length: 12 }, () => 0);
+  for (const year of sorted) {
+    const monthly = Number(monthlyByYear.get(year) ?? 0);
+    if (!Number.isFinite(monthly) || monthly <= 0) continue;
+    const credits = creditsByYear.get(year) ?? emptyCredits();
+    const paid = monthsFullyPaidFromCredits(credits, monthly);
+    const month = paid.findIndex((v) => !v) + 1;
+    if (month >= 1) return { year, month };
+  }
+  return null;
+}
+
+/**
+ * Earliest dues year (ascending) that still has an unpaid month for this member.
+ */
+export function earliestUnpaidYear(
+  years: number[],
+  creditsByYear: Map<number, number[]>,
+  monthlyByYear: Map<number, number>,
+): number | null {
+  return earliestUnpaidPoint(years, creditsByYear, monthlyByYear)?.year ?? null;
+}
+
+/** e.g. dues year 2023 month 1 → "Sep 2023"; month 5 → "Jan 2024". */
+export function formatDuesMonthPoint(year: number, month: number): string {
+  if (month < 1 || month > 12) return String(year);
+  const label = DUES_MONTH_LABELS[month - 1];
+  const calendarYear = month <= 4 ? year : year + 1;
+  return `${label} ${calendarYear}`;
+}
+
 /**
  * Split a payment amount across years in [yearFrom, yearTo].
  * Each year uses its own monthly due. Full months are filled first within the

@@ -1,10 +1,5 @@
 import { connection } from "next/server";
 import { recordDuesPayment } from "@/app/actions/dues";
-import { recordMemberContribution } from "@/app/actions/payments";
-import {
-  AmendArchivedForm,
-  type ExistingContribution,
-} from "@/components/amend-archived-form";
 import { AmendArchivedDuesForm } from "@/components/amend-archived-dues-form";
 import { ArchiveBoards } from "@/components/archive-boards";
 import { ArchiveDuesBoards } from "@/components/archive-dues-boards";
@@ -13,16 +8,15 @@ import { DashTools } from "@/components/dash-tools";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
-  listAllPaymentRequests,
   listContributionBoards,
   listMemberOptions,
 } from "@/lib/data";
 import {
   getDuesBoard,
   listConcludedDuesSchedules,
+  mapEarliestUnpaidDuesPoints,
 } from "@/lib/dues-data";
 import { todayIsoDate } from "@/lib/format";
-import { listAllPaymentRows } from "@/lib/store";
 
 export const instant = false;
 
@@ -35,8 +29,6 @@ export default async function ArchivePage({
   const viewerPromise = requireAccess();
   const boardsPromise = listContributionBoards(false);
   const membersPromise = listMemberOptions();
-  const requestsPromise = listAllPaymentRequests();
-  const paymentsPromise = listAllPaymentRows();
   const concludedDuesPromise = listConcludedDuesSchedules();
   const params = await searchParams;
   const viewer = await viewerPromise;
@@ -47,13 +39,12 @@ export default async function ArchivePage({
   const bulkTitle =
     typeof params.title === "string" ? params.title : undefined;
   const admin = isAdmin(viewer);
-  const [allBoards, members, allRequests, allPayments, concludedDues] =
+  const [allBoards, members, concludedDues, earliestUnpaidByMember] =
     await Promise.all([
       boardsPromise,
       admin ? membersPromise : Promise.resolve([]),
-      admin ? requestsPromise : Promise.resolve([]),
-      admin ? paymentsPromise : Promise.resolve([]),
       concludedDuesPromise,
+      admin ? mapEarliestUnpaidDuesPoints() : Promise.resolve(new Map()),
     ]);
   const boards = allBoards
     .filter((b) => b.request.concluded_at)
@@ -65,33 +56,13 @@ export default async function ArchivePage({
         b.request.deadline.localeCompare(a.request.deadline) ||
         b.request.id - a.request.id,
     );
-  const requests = allRequests
-    .filter((r) => r.concluded_at)
-    .sort(
-      (a, b) =>
-        (b.concluded_at ?? "").localeCompare(a.concluded_at ?? "") ||
-        b.deadline.localeCompare(a.deadline) ||
-        b.id - a.id,
-    );
-  const archivedRequestIds = new Set(requests.map((r) => r.id));
-  const existing: Record<string, ExistingContribution> = {};
-  for (const p of allPayments) {
-    if (!archivedRequestIds.has(p.payment_request_id)) continue;
-    existing[`${p.payment_request_id}:${p.member_id}`] = {
-      amount: p.amount,
-      status: p.status,
-      payment_date: p.payment_date,
-      notes: p.notes,
-    };
-  }
 
   const duesBoards = (
     await Promise.all(concludedDues.map((s) => getDuesBoard(s.id)))
   ).filter((b): b is NonNullable<typeof b> => b != null);
 
   const today = todayIsoDate();
-  const showAside =
-    admin && (requests.length > 0 || concludedDues.length > 0);
+  const showAside = admin && concludedDues.length > 0;
 
   return (
     <AppShell viewer={viewer} active="archive">
@@ -146,39 +117,26 @@ export default async function ArchivePage({
 
         {showAside ? (
           <DashTools title="Admin tools">
-            {requests.length > 0 ? (
-              <section className="panel">
-                <h2>Amend archived contribution</h2>
-                <AmendArchivedForm
-                  action={recordMemberContribution}
-                  requests={requests}
-                  members={members}
-                  existing={existing}
-                  today={today}
-                />
-              </section>
-            ) : null}
-
-            {concludedDues.length > 0 ? (
-              <section className="panel">
-                <h2>Amend archived dues</h2>
-                <AmendArchivedDuesForm
-                  action={recordDuesPayment}
-                  schedules={duesBoards.map((b) => b.schedule)}
-                  boards={duesBoards.map((b) => ({
-                    schedule: b.schedule,
-                    remainingByMember: Object.fromEntries(
-                      b.rows.map((row) => [
-                        row.member.id,
-                        row.remaining_months,
-                      ]),
-                    ),
-                  }))}
-                  members={members}
-                  today={today}
-                />
-              </section>
-            ) : null}
+            <section className="panel">
+              <h2>Amend archived dues</h2>
+              <AmendArchivedDuesForm
+                action={recordDuesPayment}
+                boards={duesBoards.map((b) => ({
+                  schedule: b.schedule,
+                  remainingByMember: Object.fromEntries(
+                    b.rows.map((row) => [
+                      row.member.id,
+                      row.remaining_months,
+                    ]),
+                  ),
+                }))}
+                members={members}
+                today={today}
+                earliestUnpaidByMember={Object.fromEntries(
+                  earliestUnpaidByMember.entries(),
+                )}
+              />
+            </section>
           </DashTools>
         ) : null}
       </div>

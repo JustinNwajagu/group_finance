@@ -33,6 +33,10 @@ type LocalAuditFile = {
 const MAX_LIST = 300;
 const MAX_LOCAL = 1000;
 
+/** Avoid hammering Firestore purge on every changelog refresh. */
+let lastPurgeAtMs = 0;
+const PURGE_COOLDOWN_MS = 60_000;
+
 function auditFile() {
   return path.join(process.cwd(), "data", "audit-log.json");
 }
@@ -58,7 +62,7 @@ function newId(): string {
 
 /**
  * Append an in-app change event. Never throws — audit must not block the
- * primary write if logging fails.
+ * primary write if logging fails. Skips actions outside the Changelog allowlist.
  */
 export async function recordAudit(
   actor: AuditActor,
@@ -70,6 +74,9 @@ export async function recordAudit(
   },
 ): Promise<void> {
   try {
+    const action = input.action.trim();
+    if (!isChangelogAction(action)) return;
+
     const event: AuditEvent = {
       id: newId(),
       created_at: new Date().toISOString(),
@@ -77,7 +84,7 @@ export async function recordAudit(
       actor_name: actor.name.trim() || actor.email.trim(),
       actor_sub: actor.sub,
       view_as: actor.viewAs === "member" ? "member" : "admin",
-      action: input.action.trim(),
+      action,
       summary: input.summary.trim(),
       entity_type: input.entityType?.trim() || null,
       entity_id:
@@ -119,8 +126,6 @@ export const CHANGELOG_ACTIONS = new Set([
   "dues.year.delete",
   "dues.payment.record",
   "dues.payment.remove",
-  "access.request.approve",
-  "access.request.reject",
   "access.login.delete",
   "expense.record",
   "expense.certify",
@@ -133,11 +138,62 @@ function isChangelogAction(action: string): boolean {
   return CHANGELOG_ACTIONS.has(action);
 }
 
+/**
+ * Delete stored audit rows that are outside the Changelog allowlist
+ * (approvals, email/password, roster, etc. that should never have been kept).
+ */
+export async function purgeExcludedAuditEvents(): Promise<number> {
+  const now = Date.now();
+  if (now - lastPurgeAtMs < PURGE_COOLDOWN_MS) return 0;
+  lastPurgeAtMs = now;
+
+  try {
+    if (isFirestore() && adminDb()) {
+      const snap = await adminDb()!
+        .collection("audit_logs")
+        .orderBy("created_at", "desc")
+        .limit(800)
+        .get();
+      const doomed = snap.docs.filter((doc) => {
+        const data = doc.data() as Partial<AuditEvent> & { _meta?: boolean };
+        if (data._meta) return false;
+        return !isChangelogAction(String(data.action ?? ""));
+      });
+      if (doomed.length === 0) return 0;
+      const db = adminDb()!;
+      let deleted = 0;
+      for (let i = 0; i < doomed.length; i += 400) {
+        const chunk = doomed.slice(i, i + 400);
+        const batch = db.batch();
+        for (const doc of chunk) batch.delete(doc.ref);
+        await batch.commit();
+        deleted += chunk.length;
+      }
+      return deleted;
+    }
+
+    const file = await loadLocal();
+    const kept = file.events.filter((event) => isChangelogAction(event.action));
+    const removed = file.events.length - kept.length;
+    if (removed > 0) {
+      file.events = kept;
+      await saveLocal(file);
+    }
+    return removed;
+  } catch (err) {
+    console.error("[audit] purge failed", err);
+    return 0;
+  }
+}
+
 /** Newest-first changelog rows for the admin dash. */
 export async function listAuditEvents(
   limit = MAX_LIST,
 ): Promise<AuditEvent[]> {
   const take = Math.min(Math.max(1, limit), MAX_LIST);
+
+  // Drop previously stored noise (approvals, email resets, roster edits, …).
+  await purgeExcludedAuditEvents();
 
   if (isFirestore() && adminDb()) {
     try {
@@ -185,8 +241,6 @@ export async function listAuditEvents(
 /** Short label for action codes in the UI. */
 export function formatAuditAction(action: string): string {
   const labels: Record<string, string> = {
-    "access.request.approve": "Approve login",
-    "access.request.reject": "Reject login",
     "access.login.delete": "Remove login",
     "contribution.open": "Open contribution",
     "contribution.conclude": "Archive contribution",

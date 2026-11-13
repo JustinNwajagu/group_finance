@@ -308,7 +308,7 @@ export async function submitAccessRequest(input: {
 export async function approveAccessRequest(
   formData: FormData,
 ): Promise<void> {
-  const viewer = await requireAdmin();
+  await requireAdmin();
   const id = Number(formData.get("id"));
 
   if (!Number.isFinite(id)) {
@@ -364,12 +364,6 @@ export async function approveAccessRequest(
     redirect("/access?error=" + encodeURIComponent(message));
   }
 
-  await recordAudit(viewer, {
-    action: "access.request.approve",
-    summary: `Approved login for ${request.email} → ${result.member.name}`,
-    entityType: "access_request",
-    entityId: id,
-  });
   revalidatePath("/access");
   revalidatePath("/");
   revalidatePath("/members");
@@ -387,7 +381,7 @@ export async function approveAccessRequest(
 }
 
 export async function rejectAccessRequest(formData: FormData): Promise<void> {
-  const viewer = await requireAdmin();
+  await requireAdmin();
   const id = Number(formData.get("id"));
   if (!Number.isFinite(id)) return;
   const request = await getAccessRequestById(id);
@@ -408,12 +402,6 @@ export async function rejectAccessRequest(formData: FormData): Promise<void> {
 
   // Do not keep rejection history.
   await deleteAccessRequest(id);
-  await recordAudit(viewer, {
-    action: "access.request.reject",
-    summary: `Rejected access request from ${request?.email ?? id}`,
-    entityType: "access_request",
-    entityId: id,
-  });
 
   revalidatePath("/access");
   redirect("/access?ok=rejected");

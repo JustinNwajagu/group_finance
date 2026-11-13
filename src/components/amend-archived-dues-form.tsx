@@ -1,9 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { RecordDuesForm } from "@/components/record-dues-form";
-import { ScrollSelect } from "@/components/scroll-select";
-import { formatDate, formatMoney } from "@/lib/format";
 import type { DuesSchedule, Member } from "@/lib/types";
 
 type BoardMeta = {
@@ -11,29 +8,29 @@ type BoardMeta = {
   remainingByMember: Record<number, number>;
 };
 
+type EarliestPoint = { year: number; month: number } | null;
+
 export function AmendArchivedDuesForm({
   action,
-  schedules,
   boards,
   members,
   today,
+  earliestUnpaidByMember = {},
 }: {
   action: (formData: FormData) => Promise<void>;
-  schedules: DuesSchedule[];
+  /** @deprecated Year is chosen automatically; kept for call-site compat. */
+  schedules?: DuesSchedule[];
   boards: BoardMeta[];
   members: Member[];
   today: string;
+  /** Member id → earliest unpaid dues month (null when fully paid). */
+  earliestUnpaidByMember?: Record<number, EarliestPoint>;
 }) {
-  const [scheduleId, setScheduleId] = useState(
-    schedules[0] ? String(schedules[0].id) : "",
-  );
+  // Anchor on the newest concluded board; allocation still starts from each
+  // member's earliest unpaid year regardless of this schedule.
+  const selected = boards[0] ?? null;
 
-  const selected = useMemo(
-    () => boards.find((b) => String(b.schedule.id) === scheduleId) ?? null,
-    [boards, scheduleId],
-  );
-
-  if (schedules.length === 0) {
+  if (!selected) {
     return (
       <p className="muted" style={{ margin: 0 }}>
         No concluded dues years to amend yet.
@@ -41,51 +38,25 @@ export function AmendArchivedDuesForm({
     );
   }
 
-  const yearOptions = schedules.map((s) => s.year);
-
   return (
-    <div className="stack" style={{ gap: "0.85rem" }}>
-      <label className="field">
-        Concluded dues year
-        <ScrollSelect
-          value={scheduleId}
-          onChange={setScheduleId}
-          options={schedules.map((s) => ({
-            value: String(s.id),
-            label: `${s.title || `${s.year} dues`} · deadline ${formatDate(
-              s.deadline,
-            )}${
-              s.concluded_at
-                ? ` · concluded ${formatDate(s.concluded_at.slice(0, 10))}`
-                : ""
-            }`,
-          }))}
-        />
-      </label>
-
-      {selected ? (
-        <>
-          <p className="muted" style={{ margin: 0 }}>
-            Monthly {formatMoney(selected.schedule.monthly_amount)}. Recording
-            here updates the archived year the same way as open dues.
-          </p>
-          <RecordDuesForm
-            action={action}
-            scheduleId={selected.schedule.id}
-            currentYear={selected.schedule.year}
-            monthly={Number(selected.schedule.monthly_amount)}
-            today={today}
-            yearOptions={yearOptions}
-            returnTo="/archive"
-            members={members.map((m) => ({
-              id: m.id,
-              name: m.name,
-              remainingInCurrentYear:
-                selected.remainingByMember[m.id] ?? 12,
-            }))}
-          />
-        </>
-      ) : null}
-    </div>
+    <RecordDuesForm
+      key={selected.schedule.id}
+      action={action}
+      scheduleId={selected.schedule.id}
+      currentYear={selected.schedule.year}
+      monthly={Number(selected.schedule.monthly_amount)}
+      today={today}
+      returnTo="/archive"
+      members={members.map((m) => {
+        const point = earliestUnpaidByMember[m.id] ?? null;
+        return {
+          id: m.id,
+          name: m.name,
+          remainingInCurrentYear: selected.remainingByMember[m.id] ?? 12,
+          earliestUnpaidYear: point?.year ?? null,
+          earliestUnpaidMonth: point?.month ?? null,
+        };
+      })}
+    />
   );
 }

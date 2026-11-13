@@ -158,6 +158,9 @@ export async function AppShell({
         </div>
       ) : null}
       <main className="main">{children}</main>
+      <footer className="site-footnote" aria-label="Class dedication">
+        <p>Sacred Heart Seminary, Nsude Class of 07 - 13</p>
+      </footer>
     </div>
   );
 }

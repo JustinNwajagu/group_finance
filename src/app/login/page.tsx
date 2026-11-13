@@ -38,6 +38,9 @@ export default async function LoginPage({
           unlinkedMembers={unlinkedMembers}
         />
       </div>
+      <footer className="site-footnote" aria-label="Class dedication">
+        <p>Sacred Heart Seminary, Nsude Class of 07 - 13</p>
+      </footer>
     </div>
   );
 }

@@ -16,7 +16,11 @@ import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { RecordDuesForm } from "@/components/record-dues-form";
 import { requireAccess, isAdmin } from "@/lib/auth";
-import { getDuesBoard, listOpenDuesSchedules } from "@/lib/dues-data";
+import {
+  getDuesBoard,
+  listOpenDuesSchedules,
+  mapEarliestUnpaidDuesPoints,
+} from "@/lib/dues-data";
 import { formatCoveredMonths } from "@/lib/dues-months";
 import { formatDate, formatMoney, todayIsoDate } from "@/lib/format";
 import { listMemberOptions } from "@/lib/data";
@@ -53,11 +57,12 @@ export default async function DuesPage({
   const selectedSchedule =
     schedules.find((s) => s.year === selectedYear) ?? schedules[0] ?? null;
 
-  const [board, members] = await Promise.all([
+  const [board, members, earliestUnpaidByMember] = await Promise.all([
     selectedSchedule
       ? getDuesBoard(selectedSchedule.id)
       : Promise.resolve(null),
     admin ? listMemberOptions() : Promise.resolve([]),
+    admin ? mapEarliestUnpaidDuesPoints() : Promise.resolve(new Map()),
   ]);
 
   const today = todayIsoDate();
@@ -72,9 +77,9 @@ export default async function DuesPage({
           <h1>Dues</h1>
           <p>
             Monthly dues run September–August each year (year label = the Sept
-            start). Amount paid ÷ monthly due = months covered. Payments that
-            cover more than one year are split across a year range you choose.
-            Concluded years move to Archive.
+            start). Amount paid ÷ monthly due = months covered. Payments always
+            fill from each member&apos;s earliest unpaid year forward — earlier
+            years cannot be skipped. Concluded years move to Archive.
           </p>
         </div>
         <div className="page-head-tools">
@@ -147,13 +152,15 @@ export default async function DuesPage({
                   currentYear={board.schedule.year}
                   monthly={monthly}
                   today={today}
-                  yearOptions={schedules.map((s) => s.year)}
                   members={members.map((m) => {
                     const row = board.rows.find((r) => r.member.id === m.id);
+                    const point = earliestUnpaidByMember.get(m.id) ?? null;
                     return {
                       id: m.id,
                       name: m.name,
                       remainingInCurrentYear: row?.remaining_months ?? 12,
+                      earliestUnpaidYear: point?.year ?? null,
+                      earliestUnpaidMonth: point?.month ?? null,
                     };
                   })}
                 />

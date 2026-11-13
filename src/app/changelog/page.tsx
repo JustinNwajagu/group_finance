@@ -39,9 +39,8 @@ export default async function ChangelogPage() {
           <h1>Changelog</h1>
           <p>
             Open/close of contributions and dues, archive dues amends, edits on
-            open contribution titles, expenses, imports, and access
-            approve/reject/remove. Deployments and routine access maintenance
-            are not listed.
+            open contribution titles, expenses, imports, and login removals.
+            Account approvals and other access maintenance are not listed.
           </p>
         </div>
       </div>

@@ -3,14 +3,33 @@
 import { useMemo, useState } from "react";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { ScrollSelect } from "@/components/scroll-select";
-import { monthsFromAmount } from "@/lib/dues-months";
+import {
+  formatDuesMonthPoint,
+  monthsFromAmount,
+} from "@/lib/dues-months";
 import { formatMoney } from "@/lib/format";
 
 type MemberOption = {
   id: number;
   name: string;
   remainingInCurrentYear: number;
+  /** Earliest dues year still owing; null when all existing years are full. */
+  earliestUnpaidYear: number | null;
+  /** Dues-year month index 1–12 (Sep→Aug) for earliest unpaid. */
+  earliestUnpaidMonth: number | null;
 };
+
+function fillFromLabel(
+  year: number | null | undefined,
+  month: number | null | undefined,
+  fallbackYear: number,
+): string {
+  if (year != null && month != null) {
+    return formatDuesMonthPoint(year, month);
+  }
+  if (year != null) return String(year);
+  return String(fallbackYear);
+}
 
 export function RecordDuesForm({
   action,
@@ -19,7 +38,6 @@ export function RecordDuesForm({
   monthly,
   today,
   members,
-  yearOptions,
   returnTo = "/dues",
 }: {
   action: (formData: FormData) => Promise<void>;
@@ -28,45 +46,64 @@ export function RecordDuesForm({
   monthly: number;
   today: string;
   members: MemberOption[];
-  yearOptions: number[];
+  /** @deprecated Year ranges are chosen automatically from earliest unpaid. */
+  yearOptions?: number[];
   returnTo?: string;
 }) {
   const [memberId, setMemberId] = useState("");
   const [amount, setAmount] = useState("");
-  const [yearFrom, setYearFrom] = useState(String(currentYear));
-  const [yearTo, setYearTo] = useState(String(currentYear));
 
   const selected = members.find((m) => String(m.id) === memberId);
-  const remaining = selected?.remainingInCurrentYear ?? 0;
   const amountNum = Number(amount);
   const months =
     Number.isFinite(amountNum) && monthly > 0
       ? monthsFromAmount(amountNum, monthly)
       : null;
-  const needsYearRange =
-    months != null && (months > remaining || months > 12);
+  const fillFrom = fillFromLabel(
+    selected?.earliestUnpaidYear,
+    selected?.earliestUnpaidMonth,
+    currentYear,
+  );
+  const fillsEarlierYear = Boolean(
+    selected &&
+      selected.earliestUnpaidYear != null &&
+      selected.earliestUnpaidYear < currentYear,
+  );
 
-  const years = useMemo(() => {
-    const set = new Set(yearOptions);
-    set.add(currentYear);
-    // Offer nearby years so admin can span past/future even before opening them.
-    for (let y = currentYear - 5; y <= currentYear + 5; y += 1) set.add(y);
-    return [...set].sort((a, b) => a - b);
-  }, [yearOptions, currentYear]);
-
-  function suggestYearRange(nextMonths: number | null, nextRemaining: number) {
-    if (nextMonths == null) return;
-    if (nextMonths > 12) {
-      setYearFrom(String(currentYear));
-      setYearTo(String(currentYear + Math.ceil(nextMonths / 12) - 1));
-      return;
-    }
-    if (nextMonths > nextRemaining) {
-      const overflow = nextMonths - nextRemaining;
-      setYearFrom(String(currentYear));
-      setYearTo(String(currentYear + Math.max(1, Math.ceil(overflow / 12))));
-    }
-  }
+  const memberOptions = useMemo(() => {
+    const ranked = [...members].sort((a, b) => {
+      const aPaid = a.remainingInCurrentYear < 12;
+      const bPaid = b.remainingInCurrentYear < 12;
+      if (aPaid !== bPaid) return aPaid ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
+    return [
+      { value: "", label: "Select member", disabled: true },
+      ...ranked.map((m) => {
+        const paidMonths = 12 - m.remainingInCurrentYear;
+        const hasPaid = paidMonths > 0;
+        const oweEarlier =
+          m.earliestUnpaidYear != null && m.earliestUnpaidYear < currentYear;
+        const oweFrom = fillFromLabel(
+          m.earliestUnpaidYear,
+          m.earliestUnpaidMonth,
+          currentYear,
+        );
+        return {
+          value: String(m.id),
+          label: `${m.name} · ${paidMonths}/12 in ${currentYear}${
+            oweEarlier
+              ? ` · owes from ${oweFrom}`
+              : m.remainingInCurrentYear > 0
+                ? ` · up to ${formatMoney(m.remainingInCurrentYear * monthly)}`
+                : " · year full"
+          }`,
+          searchText: m.name,
+          group: hasPaid ? "Paid this year" : "No payments yet",
+        };
+      }),
+    ];
+  }, [members, currentYear, monthly]);
 
   return (
     <form action={action} className="form-grid">
@@ -77,26 +114,12 @@ export function RecordDuesForm({
         <ScrollSelect
           name="member_id"
           required
+          searchable
+          searchPlaceholder="Search member…"
           value={memberId}
           placeholder="Select member"
-          onChange={(nextId) => {
-            setMemberId(nextId);
-            const nextRemaining =
-              members.find((m) => String(m.id) === nextId)
-                ?.remainingInCurrentYear ?? 0;
-            suggestYearRange(months, nextRemaining);
-          }}
-          options={[
-            { value: "", label: "Select member", disabled: true },
-            ...members.map((m) => ({
-              value: String(m.id),
-              label: `${m.name} · ${12 - m.remainingInCurrentYear}/12 in ${currentYear}${
-                m.remainingInCurrentYear > 0
-                  ? ` · up to ${formatMoney(m.remainingInCurrentYear * monthly)}`
-                  : " · year full"
-              }`,
-            })),
-          ]}
+          onChange={setMemberId}
+          options={memberOptions}
         />
       </label>
       <label className="field">
@@ -109,61 +132,29 @@ export function RecordDuesForm({
           required
           placeholder={String(monthly || "0.00")}
           value={amount}
-          onChange={(e) => {
-            const next = e.target.value;
-            setAmount(next);
-            const nextMonths =
-              Number.isFinite(Number(next)) && monthly > 0
-                ? monthsFromAmount(Number(next), monthly)
-                : null;
-            suggestYearRange(nextMonths, remaining);
-          }}
+          onChange={(e) => setAmount(e.target.value)}
         />
       </label>
       <p className="muted" style={{ margin: 0 }}>
         Must be a multiple of {formatMoney(monthly)}. Example:{" "}
         {formatMoney(monthly * 3)} covers 3 months. Full year ={" "}
         {formatMoney(monthly * 12)}.
-        {months != null ? ` This amount covers ${months} month${months === 1 ? "" : "s"}.` : ""}
+        {months != null
+          ? ` This amount covers ${months} month${months === 1 ? "" : "s"}.`
+          : ""}
       </p>
-
-      {needsYearRange ? (
-        <div className="form-grid two">
-          <label className="field">
-            Apply from year
-            <ScrollSelect
-              name="year_from"
-              required
-              value={yearFrom}
-              onChange={setYearFrom}
-              options={years.map((y) => ({
-                value: String(y),
-                label: String(y),
-              }))}
-            />
-          </label>
-          <label className="field">
-            Through year
-            <ScrollSelect
-              name="year_to"
-              required
-              value={yearTo}
-              onChange={setYearTo}
-              options={years.map((y) => ({
-                value: String(y),
-                label: String(y),
-              }))}
-            />
-          </label>
-          <p className="muted" style={{ margin: 0, gridColumn: "1 / -1" }}>
-            This payment exceeds what fits in {currentYear}
-            {selected ? ` for ${selected.name}` : ""}. Choose a retrospective or
-            prospective year range to place the excess. Each year keeps its own
-            monthly split; any leftover balance becomes a partial month payment.
-            Existing open or archived years are reused (not opened again).
-          </p>
-        </div>
-      ) : null}
+      {selected ? (
+        <p className="muted" style={{ margin: 0 }}>
+          {fillsEarlierYear
+            ? `${selected.name} still owes from ${fillFrom}. This payment fills from ${fillFrom} forward — earlier unpaid years cannot be skipped.`
+            : `This payment fills from ${fillFrom} forward (next unpaid months after their last dues payment).`}
+        </p>
+      ) : (
+        <p className="muted" style={{ margin: 0 }}>
+          Payments always fill from each member&apos;s earliest unpaid dues month
+          forward. Earlier months must be cleared before later ones.
+        </p>
+      )}
 
       <label className="field">
         Payment date

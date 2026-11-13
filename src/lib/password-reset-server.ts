@@ -100,12 +100,12 @@ async function generatePasswordResetLink(email: string): Promise<string> {
 
 /**
  * Email a password reset to a member.
- * Prefers Firebase Auth’s built-in mailer; falls back to Resend/SMTP with a
+ * Prefers Firebase Auth’s built-in mailer; falls back to SMTP with a
  * generated link so admins still have a path when Auth email is blocked.
  */
 export async function sendMemberPasswordResetEmail(email: string): Promise<{
   emailed: boolean;
-  channel: "firebase" | "resend" | "smtp" | "link_only";
+  channel: "firebase" | "smtp" | "link_only";
   link?: string;
   error?: string;
 }> {
@@ -152,8 +152,8 @@ export async function sendMemberPasswordResetEmail(email: string): Promise<{
       html,
     });
 
-    if (sent.channel === "resend" || sent.channel === "smtp") {
-      return { emailed: true, channel: sent.channel, link };
+    if (sent.channel === "smtp") {
+      return { emailed: true, channel: "smtp", link };
     }
 
     return {

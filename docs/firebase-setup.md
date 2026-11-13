@@ -14,16 +14,17 @@ Other users default to **member**. Admins can assign `admin` / `member` roles on
 
 ### Access-request email alerts
 
-New create-account requests email `ADMIN_EMAIL` (and President/Treasurer login emails when linked). Configure one sender:
+New create-account requests can email `ADMIN_EMAIL` (and President/Treasurer login emails when linked) via SMTP:
 
 ```bash
-# Recommended
-RESEND_API_KEY=re_xxxxxxxxx
-RESEND_FROM_EMAIL="KLEF 13 <onboarding@resend.dev>"
-APP_BASE_URL=https://your-app.web.app
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM="KLEF 13 <klef2007.2013@gmail.com>"
+APP_BASE_URL=https://klefapp--klefapp.europe-west4.hosted.app
 ```
 
-Or SMTP (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, optional `SMTP_FROM` / `SMTP_PORT`). Without Resend/SMTP, requests still appear on **Access** (badge/banner), but no inbox email is sent.
+Password resets use Firebase Authentication’s built-in mailer. Without SMTP, access requests still appear on **Access** (badge/banner), but no inbox alert is sent (unless you use the optional Firebase Trigger Email extension on the `mail` collection).
 
 ## 1. Create a Firebase project
 

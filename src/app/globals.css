@@ -1132,7 +1132,7 @@ textarea {
 
 .archive-boards {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.55rem;
   margin-top: 0.35rem;
 }
 
@@ -1192,11 +1192,26 @@ textarea {
 }
 
 .archive-item-body {
-  padding: 0.35rem 0.55rem 0.65rem;
-  max-height: min(32rem, 70vh);
-  overflow-x: hidden;
-  overflow-y: auto;
+  padding: 0.55rem 0.7rem 0.75rem;
+  /* Size to content — avoid a tall empty scrollport below the last row */
+  max-height: none;
+  overflow: visible;
+}
+
+.archive-item-body .table-wrap,
+.archive-item-body .dues-table-wrap {
+  max-height: min(22rem, 55vh);
+  overflow: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+.archive-item-body .contrib-board {
+  padding-bottom: 0.35rem;
+}
+
+.archive-item-note {
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
 }
 
 .contrib-board-embedded {

@@ -138,7 +138,7 @@ async function resolveScheduleForYear(
     year,
     monthly_amount: monthlyFallback,
     title:
-      titleHint || `${year} Dues (Sept ${year}–Sept ${year + 1})`,
+      titleHint || `${year} Dues (Sept ${year}–Aug ${year + 1})`,
     deadline: deadlineHint || `${year + 1}-09-30`,
   });
 }
@@ -294,7 +294,7 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
       monthly,
       year === schedule.year
         ? schedule.title
-        : `${year} Dues (Sept ${year}–Sept ${year + 1})`,
+        : `${year} Dues (Sept ${year}–Aug ${year + 1})`,
       year === schedule.year ? schedule.deadline : `${year + 1}-09-30`,
     );
     schedulesByYear.set(year, row);

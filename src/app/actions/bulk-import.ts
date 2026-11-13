@@ -304,7 +304,7 @@ export async function bulkImportDues(formData: FormData): Promise<void> {
     const created = await createDuesSchedule({
       year: targetYear,
       monthly_amount: anchorMonthly,
-      title: `${targetYear} Dues (Sept ${targetYear}–Sept ${targetYear + 1})`,
+      title: `${targetYear} Dues (Sept ${targetYear}–Aug ${targetYear + 1})`,
       deadline: `${targetYear + 1}-09-30`,
     });
     schedulesByYear.set(targetYear, created);

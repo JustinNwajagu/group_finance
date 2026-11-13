@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { deleteMemberAction } from "@/app/actions/members";
 import { AppShell } from "@/components/app-shell";
+import { CollapsePanel } from "@/components/collapse-panel";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
 import { EditMemberNameForm } from "@/components/edit-member-name-form";
 import { Flash } from "@/components/flash";
@@ -175,186 +176,198 @@ export default async function MemberDetailPage({
       />
 
       <div className="stack">
-        <section className="panel">
-          <h2>Contributions</h2>
-          {payments.length === 0 ? (
-            <div className="hero-empty">
-              No contribution payments recorded for this member.
-            </div>
-          ) : (
-            <PaymentGroups groups={groups} showMember={false} isAdmin={admin} />
-          )}
-        </section>
+        <div className="archive-boards">
+          <CollapsePanel
+            title="Contributions"
+            meta={
+              payments.length > 0
+                ? `${payments.length} payment${payments.length === 1 ? "" : "s"} · ${formatMoney(paidTotal)}`
+                : "None recorded"
+            }
+          >
+            {payments.length === 0 ? (
+              <div className="hero-empty">
+                No contribution payments recorded for this member.
+              </div>
+            ) : (
+              <PaymentGroups
+                groups={groups}
+                showMember={false}
+                isAdmin={admin}
+              />
+            )}
+          </CollapsePanel>
 
-        <section className="panel">
-          <div className="panel-heading-row">
-            <h2>Dues</h2>
-            {dues.years_count > 0 ? (
-              <p className="panel-heading-meta">
-                {formatDuesCount(dues.dues_count)}/{dues.years_count} years ·{" "}
-                {formatMoney(dues.amount_paid)}
-              </p>
-            ) : null}
-          </div>
-          {dues.years_count === 0 ? (
-            <div className="hero-empty">No dues years opened yet.</div>
-          ) : (
-            <div className="stack">
+          <CollapsePanel
+            title="Dues"
+            meta={
+              dues.years_count > 0
+                ? `${formatDuesCount(dues.dues_count)}/${dues.years_count} years · ${formatMoney(dues.amount_paid)}`
+                : "No years opened"
+            }
+          >
+            {dues.years_count === 0 ? (
+              <div className="hero-empty">No dues years opened yet.</div>
+            ) : (
+              <div className="stack">
+                <div className="table-wrap">
+                  <table className="data dues-grid">
+                    <thead>
+                      <tr>
+                        <th>Year</th>
+                        {DUES_MONTH_LABELS.map((label) => (
+                          <th key={label} className="dues-month">
+                            {label}
+                          </th>
+                        ))}
+                        <th className="num">Paid</th>
+                        <th className="num">Credit</th>
+                        <th>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dues.years.map((year) => (
+                        <tr key={year.schedule.id}>
+                          <td>
+                            <Link
+                              className="row-link"
+                              href={`/dues?year=${year.schedule.year}`}
+                            >
+                              {year.schedule.year}
+                            </Link>
+                          </td>
+                          {year.months_paid.map((paid, i) => (
+                            <td
+                              key={DUES_MONTH_LABELS[i]}
+                              className={
+                                paid
+                                  ? "dues-month dues-paid dues-month-tip"
+                                  : "dues-month dues-month-tip"
+                              }
+                              data-tip={
+                                paid
+                                  ? `${DUES_MONTH_LABELS[i]} · Paid`
+                                  : `${DUES_MONTH_LABELS[i]} · Unpaid`
+                              }
+                            >
+                              <span
+                                className="dues-month-mark"
+                                aria-hidden="true"
+                              >
+                                {paid ? "●" : "·"}
+                              </span>
+                              <span className="sr-only">
+                                {paid
+                                  ? `${DUES_MONTH_LABELS[i]} paid`
+                                  : `${DUES_MONTH_LABELS[i]} unpaid`}
+                              </span>
+                            </td>
+                          ))}
+                          <td className="num">{year.months_count}/12</td>
+                          <td className="num">
+                            {formatDuesCount(year.year_fraction)}
+                          </td>
+                          <td>{formatMoney(year.amount_paid)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {dues.years.some((y) => y.payments.length > 0) ? (
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Year</th>
+                          <th>Amount</th>
+                          <th>Months</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dues.years.flatMap((year) =>
+                          year.payments.map((p) => (
+                            <tr key={p.id}>
+                              <td>{formatDate(p.payment_date)}</td>
+                              <td>{year.schedule.year}</td>
+                              <td>{formatMoney(p.amount)}</td>
+                              <td className="muted">
+                                {p.covered_months.length} (
+                                {formatCoveredMonths(p.covered_months)})
+                              </td>
+                              <td className="muted">{p.notes || "—"}</td>
+                            </tr>
+                          )),
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </CollapsePanel>
+
+          <CollapsePanel
+            title="Expenses received"
+            meta={
+              expenseReceipts.length > 0
+                ? `Certified ${formatMoney(expensesReceived)}`
+                : "None recorded"
+            }
+          >
+            {expenseReceipts.length === 0 ? (
+              <div className="hero-empty">
+                No expense payouts recorded for this member.
+              </div>
+            ) : (
               <div className="table-wrap">
-                <table className="data dues-grid">
+                <table className="data">
                   <thead>
                     <tr>
-                      <th>Year</th>
-                      {DUES_MONTH_LABELS.map((label) => (
-                        <th key={label} className="dues-month">
-                          {label}
-                        </th>
-                      ))}
-                      <th className="num">Paid</th>
-                      <th className="num">Credit</th>
-                      <th>Amount</th>
+                      <th>Date</th>
+                      <th>Amount received</th>
+                      <th>Funded from</th>
+                      <th>Status</th>
+                      <th>Notes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {dues.years.map((year) => (
-                      <tr key={year.schedule.id}>
+                    {expenseReceipts.map(({ expense, amount }) => (
+                      <tr key={`${expense.id}-${amount}`}>
                         <td>
-                          <Link
-                            className="row-link"
-                            href={`/dues?year=${year.schedule.year}`}
-                          >
-                            {year.schedule.year}
+                          <Link className="row-link" href="/expenses">
+                            {formatDate(expense.expense_date)}
                           </Link>
                         </td>
-                        {year.months_paid.map((paid, i) => (
-                          <td
-                            key={DUES_MONTH_LABELS[i]}
-                            className={
-                              paid
-                                ? "dues-month dues-paid dues-month-tip"
-                                : "dues-month dues-month-tip"
-                            }
-                            data-tip={
-                              paid
-                                ? `${DUES_MONTH_LABELS[i]} · Paid`
-                                : `${DUES_MONTH_LABELS[i]} · Unpaid`
-                            }
-                          >
-                            <span className="dues-month-mark" aria-hidden="true">
-                              {paid ? "●" : "·"}
-                            </span>
-                            <span className="sr-only">
-                              {paid
-                                ? `${DUES_MONTH_LABELS[i]} paid`
-                                : `${DUES_MONTH_LABELS[i]} unpaid`}
-                            </span>
-                          </td>
-                        ))}
-                        <td className="num">{year.months_count}/12</td>
-                        <td className="num">
-                          {formatDuesCount(year.year_fraction)}
+                        <td>{formatMoney(amount)}</td>
+                        <td className="muted">
+                          {formatExpenseFunding({
+                            funding_source: expense.funding_source,
+                            contribution_title: expense.contribution_title,
+                            contribution_amount: expense.contribution_amount,
+                            bank_amount: expense.bank_amount,
+                          })}
                         </td>
-                        <td>{formatMoney(year.amount_paid)}</td>
+                        <td>
+                          {expense.certified ? (
+                            <span className="badge-paid">Certified</span>
+                          ) : (
+                            <span className="badge-pledge">
+                              {expense.certifications.length}/2
+                            </span>
+                          )}
+                        </td>
+                        <td className="muted">{expense.notes || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {dues.years.some((y) => y.payments.length > 0) ? (
-                <div className="table-wrap">
-                  <table className="data">
-                    <thead>
-                      <tr>
-                        <th>Date</th>
-                        <th>Year</th>
-                        <th>Amount</th>
-                        <th>Months</th>
-                        <th>Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dues.years.flatMap((year) =>
-                        year.payments.map((p) => (
-                          <tr key={p.id}>
-                            <td>{formatDate(p.payment_date)}</td>
-                            <td>{year.schedule.year}</td>
-                            <td>{formatMoney(p.amount)}</td>
-                            <td className="muted">
-                              {p.covered_months.length} (
-                              {formatCoveredMonths(p.covered_months)})
-                            </td>
-                            <td className="muted">{p.notes || "—"}</td>
-                          </tr>
-                        )),
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </section>
-
-        <section className="panel">
-          <div className="panel-heading-row">
-            <h2>Expenses received</h2>
-            {expenseReceipts.length > 0 ? (
-              <p className="panel-heading-meta">
-                Certified {formatMoney(expensesReceived)}
-              </p>
-            ) : null}
-          </div>
-          {expenseReceipts.length === 0 ? (
-            <div className="hero-empty">
-              No expense payouts recorded for this member.
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Amount received</th>
-                    <th>Funded from</th>
-                    <th>Status</th>
-                    <th>Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenseReceipts.map(({ expense, amount }) => (
-                    <tr key={`${expense.id}-${amount}`}>
-                      <td>
-                        <Link className="row-link" href="/expenses">
-                          {formatDate(expense.expense_date)}
-                        </Link>
-                      </td>
-                      <td>{formatMoney(amount)}</td>
-                      <td className="muted">
-                        {formatExpenseFunding({
-                          funding_source: expense.funding_source,
-                          contribution_title: expense.contribution_title,
-                          contribution_amount: expense.contribution_amount,
-                          bank_amount: expense.bank_amount,
-                        })}
-                      </td>
-                      <td>
-                        {expense.certified ? (
-                          <span className="badge-paid">Certified</span>
-                        ) : (
-                          <span className="badge-pledge">
-                            {expense.certifications.length}/2
-                          </span>
-                        )}
-                      </td>
-                      <td className="muted">{expense.notes || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+            )}
+          </CollapsePanel>
+        </div>
 
         {admin ? (
           <section className="panel">

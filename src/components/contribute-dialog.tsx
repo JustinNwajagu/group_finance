@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { saveBoardContribution } from "@/app/actions/payments";
+import { DialogCloseButton } from "@/components/dialog-close-button";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { formatMoney, todayIsoDate } from "@/lib/format";
 import type { PaymentStatus } from "@/lib/types";
@@ -81,14 +82,7 @@ export function ContributeDialog({
         <form action={saveBoardContribution} className="contrib-dialog-panel">
           <div className="contrib-dialog-head">
             <h3 id={titleId}>{triggerLabel}</h3>
-            <button
-              type="button"
-              className="btn-ghost"
-              style={{ padding: "0.2rem 0.5rem" }}
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
+            <DialogCloseButton onClick={() => setOpen(false)} />
           </div>
 
           <p className="muted" style={{ margin: 0 }}>

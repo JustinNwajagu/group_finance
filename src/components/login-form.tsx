@@ -19,6 +19,7 @@ import {
   submitAccessRequest,
   type UnlinkedMemberOption,
 } from "@/app/actions/access-requests";
+import { DialogCloseButton } from "@/components/dialog-close-button";
 import { PasswordInput } from "@/components/password-input";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
 import { NAME_TITLES } from "@/lib/name-titles";
@@ -391,9 +392,7 @@ function ForgotPasswordDialog({
       <form onSubmit={onSubmit} className="contrib-dialog-panel">
         <div className="contrib-dialog-head">
           <h3 id={titleId}>Reset password</h3>
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Close
-          </button>
+          <DialogCloseButton onClick={onClose} disabled={pending} />
         </div>
         <p className="muted" style={{ margin: 0 }}>
           Enter the email for your account. We&apos;ll send a link to choose a
@@ -545,9 +544,7 @@ function AccessRequestDialog({
       <form onSubmit={onSubmit} className="contrib-dialog-panel">
         <div className="contrib-dialog-head">
           <h3 id={titleId}>Create an account</h3>
-          <button type="button" className="btn-ghost" onClick={onClose}>
-            Close
-          </button>
+          <DialogCloseButton onClick={onClose} disabled={pending} />
         </div>
         <p className="muted signup-choice-hint">
           Find your name on the roster if you are already a member. If not,

@@ -1,5 +1,19 @@
 {
   "firestore": {
     "rules": "firestore.rules"
-  }
+  },
+  "hosting": [
+    {
+      "site": "shsnklef",
+      "public": "hosting/shsnklef",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "redirects": [
+        {
+          "source": "**",
+          "destination": "https://klefapp--klefapp.europe-west4.hosted.app/:splat",
+          "type": 302
+        }
+      ]
+    }
+  ]
 }

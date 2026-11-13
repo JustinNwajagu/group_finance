@@ -403,7 +403,9 @@ a.viewer-name.is-active {
   max-width: 100%;
   min-width: 0;
   margin: 0 auto;
-  padding: 2rem 0 3.5rem;
+  padding: 2rem 0 2rem;
+  flex: 0 0 auto;
+  height: fit-content;
   animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   box-sizing: border-box;
 }
@@ -1140,7 +1142,9 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
-  overflow: hidden;
+  overflow: clip;
+  height: fit-content;
+  max-width: 100%;
 }
 
 .archive-item-toggle {
@@ -1192,25 +1196,34 @@ textarea {
 }
 
 .archive-item-body {
-  padding: 0.55rem 0.7rem 0.75rem;
-  /* Size to content — avoid a tall empty scrollport below the last row */
-  max-height: none;
-  overflow: visible;
+  /* Cap the open panel so the page does not grow by a full year grid */
+  padding: 0.5rem 0.65rem 0.65rem;
+  max-height: min(22rem, 50vh);
+  max-height: min(22rem, 50dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .archive-item-body .table-wrap,
 .archive-item-body .dues-table-wrap {
-  max-height: min(22rem, 55vh);
-  overflow: auto;
+  /* Let the panel body own vertical scroll; keep horizontal scroll for month grid */
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 
 .archive-item-body .contrib-board {
-  padding-bottom: 0.35rem;
+  padding: 0.35rem 0.15rem 0.15rem;
+}
+
+.archive-item-body .contrib-split {
+  gap: 0.65rem;
 }
 
 .archive-item-note {
-  margin: 0.65rem 0 0;
+  margin: 0.55rem 0 0;
   font-size: 0.85rem;
 }
 
@@ -1895,6 +1908,7 @@ textarea {
   gap: 1.25rem;
   align-items: start;
   width: 100%;
+  height: fit-content;
 }
 
 .dash-main,
@@ -1903,12 +1917,21 @@ textarea {
 .expenses-aside {
   min-width: 0;
   width: 100%;
+  height: fit-content;
+  max-width: 100%;
 }
 
 .dash-aside,
 .expenses-aside {
   position: sticky;
   top: 1rem;
+  /* Keep tools on-screen without stretching the page scroll range */
+  max-height: calc(100dvh - 2rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  align-self: start;
 }
 
 .dash-tools-toggle {

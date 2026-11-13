@@ -106,11 +106,17 @@ async function fixExpenses() {
     if (doc.data()?._meta) continue;
     const data = doc.data() || {};
     const patch = {};
-    if (looksLikeGrandMom(data.notes)) {
-      patch.notes = "Dads Memorial service";
+    const memorialNote =
+      "Historical backlog: Nwajagu Obinna Dads Memorial service 2021, Akkpugoeze. Amount unknown — placeholder ₦0.";
+    if (
+      looksLikeGrandMom(data.notes) ||
+      (typeof data.notes === "string" &&
+        data.notes.toLowerCase().includes("dads memorial"))
+    ) {
+      patch.notes = memorialNote;
     }
     if (looksLikeGrandMom(data.contribution_title)) {
-      patch.contribution_title = "Dads Memorial service";
+      patch.contribution_title = memorialNote;
     }
     if (Object.keys(patch).length === 0) continue;
     await doc.ref.update(patch);

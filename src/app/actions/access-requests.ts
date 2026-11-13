@@ -293,20 +293,6 @@ export async function submitAccessRequest(input: {
     console.error("[access-request] admin notify failed:", err);
   }
 
-  await recordAudit(
-    {
-      email,
-      name: name || email,
-      sub: `access-request:${email}`,
-      viewAs: "member",
-    },
-    {
-      action: "access.request.submit",
-      summary: `Submitted access request for ${name || email}`,
-      entityType: "access_request",
-      entityId: requestId,
-    },
-  );
 
   revalidatePath("/access");
   revalidatePath("/");
@@ -490,7 +476,7 @@ export async function deleteLoginAction(formData: FormData): Promise<void> {
 export async function changeMemberLoginEmail(
   formData: FormData,
 ): Promise<void> {
-  const viewer = await requireAdmin();
+  await requireAdmin();
   const memberId = Number(formData.get("member_id"));
   const newEmail = String(formData.get("email") ?? "")
     .trim()
@@ -616,13 +602,6 @@ export async function changeMemberLoginEmail(
   );
   const result = await sendMemberPasswordResetEmail(newEmail);
 
-  await recordAudit(viewer, {
-    action: "access.login.email_change",
-    summary: `Changed login email for ${member.name}: ${oldEmail} → ${newEmail}`,
-    entityType: "member",
-    entityId: memberId,
-  });
-
   revalidatePath("/access");
   revalidatePath("/members", "layout");
   revalidatePath("/profile");
@@ -664,7 +643,7 @@ export async function changeMemberLoginEmail(
 export async function sendMemberPasswordReset(
   formData: FormData,
 ): Promise<void> {
-  const viewer = await requireAdmin();
+  await requireAdmin();
   const memberId = Number(formData.get("member_id"));
   const member = await getMemberById(memberId);
   const email = (member?.login_email || member?.email || "").trim().toLowerCase();
@@ -678,13 +657,6 @@ export async function sendMemberPasswordReset(
     "@/lib/password-reset-server"
   );
   const result = await sendMemberPasswordResetEmail(email);
-
-  await recordAudit(viewer, {
-    action: "access.login.password_reset",
-    summary: `Sent password reset to ${member?.name ?? email} (${email})`,
-    entityType: "member",
-    entityId: memberId,
-  });
 
   revalidatePath("/access");
 

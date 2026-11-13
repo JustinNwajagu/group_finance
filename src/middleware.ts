@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const SESSION_COOKIE = "__session";
 const DEV_SESSION_COOKIE = "klef_dev_session";
 const LAST_ACTIVE_COOKIE = "klef_last_active";
-const DEFAULT_IDLE_MINUTES = 30;
+const DEFAULT_IDLE_MINUTES = 15;
 
 const IDLE_MESSAGE = "Signed out after inactivity. Sign in again to continue.";
 

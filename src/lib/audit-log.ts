@@ -105,6 +105,34 @@ export async function recordAudit(
   }
 }
 
+/** Actions shown on the admin Changelog (and still written going forward). */
+export const CHANGELOG_ACTIONS = new Set([
+  "contribution.open",
+  "contribution.conclude",
+  "contribution.reopen",
+  "contribution.delete",
+  "contribution.record",
+  "contribution.clear",
+  "contribution.mark_paid",
+  "dues.year.open",
+  "dues.year.conclude",
+  "dues.year.delete",
+  "dues.payment.record",
+  "dues.payment.remove",
+  "access.request.approve",
+  "access.request.reject",
+  "access.login.delete",
+  "expense.record",
+  "expense.certify",
+  "expense.remove",
+  "import.contributions",
+  "import.dues",
+]);
+
+function isChangelogAction(action: string): boolean {
+  return CHANGELOG_ACTIONS.has(action);
+}
+
 /** Newest-first changelog rows for the admin dash. */
 export async function listAuditEvents(
   limit = MAX_LIST,
@@ -113,15 +141,18 @@ export async function listAuditEvents(
 
   if (isFirestore() && adminDb()) {
     try {
+      // Over-fetch then filter so older noisy event types drop out of the UI.
       const snap = await adminDb()!
         .collection("audit_logs")
         .orderBy("created_at", "desc")
-        .limit(take)
+        .limit(Math.min(MAX_LIST * 2, 600))
         .get();
       return snap.docs
         .map((doc) => {
           const data = doc.data() as Partial<AuditEvent> & { _meta?: boolean };
           if (data._meta) return null;
+          const action = String(data.action ?? "");
+          if (!isChangelogAction(action)) return null;
           return {
             id: String(data.id ?? doc.id),
             created_at: String(data.created_at ?? ""),
@@ -129,13 +160,14 @@ export async function listAuditEvents(
             actor_name: String(data.actor_name ?? ""),
             actor_sub: String(data.actor_sub ?? ""),
             view_as: data.view_as === "member" ? "member" : "admin",
-            action: String(data.action ?? ""),
+            action,
             summary: String(data.summary ?? ""),
             entity_type: data.entity_type ? String(data.entity_type) : null,
             entity_id: data.entity_id != null ? String(data.entity_id) : null,
           } satisfies AuditEvent;
         })
-        .filter((row): row is AuditEvent => row != null && Boolean(row.created_at));
+        .filter((row): row is AuditEvent => row != null && Boolean(row.created_at))
+        .slice(0, take);
     } catch (err) {
       console.error("[audit] list failed", err);
       return [];
@@ -144,6 +176,7 @@ export async function listAuditEvents(
 
   const file = await loadLocal();
   return file.events
+    .filter((event) => isChangelogAction(event.action))
     .slice()
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, take);
@@ -152,16 +185,9 @@ export async function listAuditEvents(
 /** Short label for action codes in the UI. */
 export function formatAuditAction(action: string): string {
   const labels: Record<string, string> = {
-    "access.request.submit": "Access request",
     "access.request.approve": "Approve login",
     "access.request.reject": "Reject login",
     "access.login.delete": "Remove login",
-    "access.login.email_change": "Change login email",
-    "access.login.password_reset": "Password reset email",
-    "member.create": "Add member",
-    "member.update": "Update member",
-    "member.delete": "Remove member",
-    "exco.assign": "Assign exco",
     "contribution.open": "Open contribution",
     "contribution.conclude": "Archive contribution",
     "contribution.reopen": "Reopen contribution",
@@ -172,13 +198,11 @@ export function formatAuditAction(action: string): string {
     "dues.year.open": "Open dues year",
     "dues.year.conclude": "Archive dues year",
     "dues.year.delete": "Delete dues year",
-    "dues.payment.record": "Record dues",
-    "dues.payment.remove": "Remove dues payment",
+    "dues.payment.record": "Amend archived dues",
+    "dues.payment.remove": "Remove archived dues payment",
     "expense.record": "Record expense",
     "expense.certify": "Certify expense",
     "expense.remove": "Remove expense",
-    "bank.update": "Update bank details",
-    "regulations.save": "Update regulations",
     "import.contributions": "Import contributions",
     "import.dues": "Import dues",
   };

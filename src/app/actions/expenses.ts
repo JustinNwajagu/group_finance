@@ -88,11 +88,6 @@ export async function saveBankAccountDetails(
     bank_code,
     updated_by: viewer.email,
   });
-  await recordAudit(viewer, {
-    action: "bank.update",
-    summary: `Updated bank details (${bank_name} · ${account_number})`,
-    entityType: "bank_account",
-  });
   revalidatePath("/expenses");
   redirect("/expenses?ok=bank");
 }

@@ -1220,7 +1220,8 @@ function normalizeExpenseAllocations(raw: unknown): ExpenseAllocation[] {
       const member_id = Number(row.member_id);
       const amount = Number(row.amount);
       if (!Number.isFinite(member_id) || member_id <= 0) return null;
-      if (!Number.isFinite(amount) || amount <= 0) return null;
+      // Allow 0 for historical placeholder expenses (amount unknown).
+      if (!Number.isFinite(amount) || amount < 0) return null;
       return {
         member_id,
         amount: money(amount),

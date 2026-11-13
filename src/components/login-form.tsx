@@ -178,7 +178,17 @@ export function LoginForm({
         setError("Too many attempts. Wait a moment and try again.");
         return;
       }
-      setError("Sign-in failed. Check your details and try again.");
+      if (
+        code === "auth/api-key-not-valid" ||
+        code === "auth/invalid-api-key"
+      ) {
+        setError(
+          "Sign-in is misconfigured (invalid Firebase API key). Update the NEXT_PUBLIC_FIREBASE_API_KEY secret in App Hosting and redeploy.",
+        );
+        return;
+      }
+      const detail = code ? ` (${code})` : "";
+      setError(`Sign-in failed${detail}. Check your details and try again.`);
     } finally {
       setSigningIn(false);
     }

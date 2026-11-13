@@ -107,7 +107,7 @@ async function fixExpenses() {
     const data = doc.data() || {};
     const patch = {};
     const memorialNote =
-      "Historical backlog: Nwajagu Obinna Dads Memorial service 2021, Akkpugoeze. Amount unknown — placeholder ₦0.";
+      "Historical backlog: Nwajagu Obinna Dads Memorial service 2021, Akpugoeze. Amount unknown — placeholder ₦0";
     if (
       looksLikeGrandMom(data.notes) ||
       (typeof data.notes === "string" &&

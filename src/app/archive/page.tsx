@@ -9,6 +9,7 @@ import { AmendArchivedDuesForm } from "@/components/amend-archived-dues-form";
 import { ArchiveBoards } from "@/components/archive-boards";
 import { ArchiveDuesBoards } from "@/components/archive-dues-boards";
 import { AppShell } from "@/components/app-shell";
+import { DashTools } from "@/components/dash-tools";
 import { Flash } from "@/components/flash";
 import { requireAccess, isAdmin } from "@/lib/auth";
 import {
@@ -144,7 +145,7 @@ export default async function ArchivePage({
         </div>
 
         {showAside ? (
-          <aside className="dash-aside stack">
+          <DashTools title="Admin tools">
             {requests.length > 0 ? (
               <section className="panel">
                 <h2>Amend archived contribution</h2>
@@ -178,7 +179,7 @@ export default async function ArchivePage({
                 />
               </section>
             ) : null}
-          </aside>
+          </DashTools>
         ) : null}
       </div>
     </AppShell>

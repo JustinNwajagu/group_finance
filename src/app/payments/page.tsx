@@ -4,6 +4,7 @@ import { bulkImportContributions } from "@/app/actions/bulk-import";
 import { createPaymentRequest } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
 import { CurrentContributions } from "@/components/current-contributions";
+import { DashTools } from "@/components/dash-tools";
 import { Flash } from "@/components/flash";
 import { PageFallback } from "@/components/page-fallback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
@@ -39,7 +40,7 @@ async function PaymentsBody({
       </div>
 
       {admin ? (
-        <aside className="dash-aside stack">
+        <DashTools title="Admin tools">
           <section className="panel">
             <h2>New payment</h2>
             {members.length === 0 ? (
@@ -134,7 +135,7 @@ async function PaymentsBody({
               </form>
             )}
           </section>
-        </aside>
+        </DashTools>
       ) : null}
     </div>
   );

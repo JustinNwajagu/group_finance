@@ -2,6 +2,10 @@ import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { BrandLogo } from "@/components/brand-logo";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
+import {
+  PrimaryNav,
+  type PrimaryNavItem,
+} from "@/components/primary-nav";
 import { SessionIdleGuard } from "@/components/session-idle-guard";
 import type { ViewerContext } from "@/lib/auth";
 import { homePathForRole, isAdmin, sessionIdleMs } from "@/lib/auth";
@@ -35,6 +39,30 @@ export async function AppShell({
     ? exco.label
     : (viewer.access?.role ?? "guest");
   const showAccessAlert = admin && pendingAccessCount > 0;
+  const navItems: PrimaryNavItem[] = [
+    { href: "/", label: "Home", active: active === "home" },
+    {
+      href: "/payments",
+      label: "Contributions",
+      active: active === "payments",
+    },
+    { href: "/dues", label: "Dues", active: active === "dues" },
+    { href: "/expenses", label: "Expenses", active: active === "expenses" },
+    { href: "/archive", label: "Archive", active: active === "archive" },
+    {
+      href: "/regulations",
+      label: "Regulations",
+      active: active === "regulations",
+    },
+  ];
+  if (admin) {
+    navItems.push({
+      href: "/access",
+      label: "Access",
+      active: active === "access",
+      badge: pendingAccessCount,
+    });
+  }
 
   return (
     <div className="shell">
@@ -44,75 +72,7 @@ export async function AppShell({
           <BrandLogo size={36} />
           <span className="brand-mark">KLEF 13</span>
         </Link>
-        <nav className="nav" aria-label="Primary">
-          <Link
-            href="/"
-            prefetch
-            className={active === "home" ? "nav-link active" : "nav-link"}
-          >
-            Home
-          </Link>
-          <Link
-            href="/payments"
-            prefetch
-            className={active === "payments" ? "nav-link active" : "nav-link"}
-          >
-            Contributions
-          </Link>
-          <Link
-            href="/dues"
-            prefetch
-            className={active === "dues" ? "nav-link active" : "nav-link"}
-          >
-            Dues
-          </Link>
-          <Link
-            href="/expenses"
-            prefetch
-            className={active === "expenses" ? "nav-link active" : "nav-link"}
-          >
-            Expenses
-          </Link>
-          <Link
-            href="/archive"
-            prefetch
-            className={active === "archive" ? "nav-link active" : "nav-link"}
-          >
-            Archive
-          </Link>
-          <Link
-            href="/regulations"
-            prefetch
-            className={
-              active === "regulations" ? "nav-link active" : "nav-link"
-            }
-          >
-            Regulations
-          </Link>
-          {admin ? (
-            <Link
-              href="/access"
-              prefetch
-              className={
-                active === "access"
-                  ? "nav-link active nav-link-with-badge"
-                  : "nav-link nav-link-with-badge"
-              }
-              aria-label={
-                pendingAccessCount > 0
-                  ? `Access, ${pendingAccessCount} pending request${pendingAccessCount === 1 ? "" : "s"}`
-                  : "Access"
-              }
-            >
-              Access
-              {pendingAccessCount > 0 ? (
-                <span className="nav-count" aria-hidden="true">
-                  {pendingAccessCount > 9 ? "9+" : pendingAccessCount}
-                </span>
-              ) : null}
-            </Link>
-          ) : null}
-        </nav>
+        <PrimaryNav items={navItems} />
         <div className="viewer">
           <Link
             href="/profile"

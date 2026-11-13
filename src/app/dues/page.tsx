@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/dues";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmActionForm } from "@/components/confirm-action-form";
+import { DashTools } from "@/components/dash-tools";
 import { DuesBoardPanel } from "@/components/dues-board-panel";
 import { Flash } from "@/components/flash";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
@@ -130,7 +131,7 @@ export default async function DuesPage({
         </div>
 
         {admin ? (
-          <aside className="dash-aside stack">
+          <DashTools title="Admin tools">
             <section className="panel">
               <h2>Record dues payment</h2>
               {!board || members.length === 0 ? (
@@ -394,7 +395,7 @@ export default async function DuesPage({
                 </div>
               </section>
             ) : null}
-          </aside>
+          </DashTools>
         ) : null}
       </div>
     </AppShell>

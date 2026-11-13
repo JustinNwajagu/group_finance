@@ -405,7 +405,6 @@ a.viewer-name.is-active {
   margin: 0 auto;
   padding: 2rem 0 2rem;
   flex: 0 0 auto;
-  height: fit-content;
   animation: rise-in 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   box-sizing: border-box;
 }

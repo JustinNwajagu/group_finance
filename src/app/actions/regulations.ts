@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
-import { recordAudit } from "@/lib/audit-log";
 import type { RegulationSection, RegulationSignatory } from "@/lib/regulations";
 import { saveRegulations } from "@/lib/store";
 
@@ -106,11 +105,6 @@ export async function saveRegulationsAction(
     redirect("/regulations?error=" + encodeURIComponent(message));
   }
 
-  await recordAudit(viewer, {
-    action: "regulations.save",
-    summary: `Updated regulations “${title}”`,
-    entityType: "regulations",
-  });
   revalidatePath("/regulations");
   redirect("/regulations?ok=saved");
 }

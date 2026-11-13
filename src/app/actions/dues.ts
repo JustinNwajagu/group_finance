@@ -260,12 +260,14 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
         payment_date,
         notes,
       });
-      await recordAudit(viewer, {
-        action: "dues.payment.record",
-        summary: `Recorded ${formatMoney(amount)} dues for ${member.name} (${schedule.year})`,
-        entityType: "dues_schedule",
-        entityId: scheduleId,
-      });
+      if (returnTo.startsWith("/archive")) {
+        await recordAudit(viewer, {
+          action: "dues.payment.record",
+          summary: `Recorded ${formatMoney(amount)} dues for ${member.name} (${schedule.year})`,
+          entityType: "dues_schedule",
+          entityId: scheduleId,
+        });
+      }
       revalidateDues(`/members/${memberId}`);
       okDues("recorded", schedule.year, returnTo);
     }
@@ -286,12 +288,14 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
       payment_date,
       notes,
     });
-    await recordAudit(viewer, {
-      action: "dues.payment.record",
-      summary: `Recorded ${formatMoney(amount)} dues for ${member.name} (${schedule.year})`,
-      entityType: "dues_schedule",
-      entityId: scheduleId,
-    });
+    if (returnTo.startsWith("/archive")) {
+      await recordAudit(viewer, {
+        action: "dues.payment.record",
+        summary: `Recorded ${formatMoney(amount)} dues for ${member.name} (${schedule.year})`,
+        entityType: "dues_schedule",
+        entityId: scheduleId,
+      });
+    }
     revalidateDues(`/members/${memberId}`);
     okDues("recorded", schedule.year, returnTo);
   }
@@ -381,12 +385,14 @@ export async function recordDuesPayment(formData: FormData): Promise<void> {
     });
   }
 
-  await recordAudit(viewer, {
-    action: "dues.payment.record",
-    summary: `Recorded ${formatMoney(amount)} dues for ${member.name} across ${start}–${end}`,
-    entityType: "dues_schedule",
-    entityId: scheduleId,
-  });
+  if (returnTo.startsWith("/archive")) {
+    await recordAudit(viewer, {
+      action: "dues.payment.record",
+      summary: `Recorded ${formatMoney(amount)} dues for ${member.name} across ${start}–${end}`,
+      entityType: "dues_schedule",
+      entityId: scheduleId,
+    });
+  }
   revalidateDues(`/members/${memberId}`);
   okDues("recorded", schedule.year, returnTo);
 }
@@ -408,14 +414,16 @@ export async function removeDuesPayment(formData: FormData): Promise<void> {
 
   const schedule = await getDuesScheduleById(payment.dues_schedule_id);
   await deleteDuesPayment(id);
-  await recordAudit(viewer, {
-    action: "dues.payment.remove",
-    summary: schedule
-      ? `Removed dues payment #${id} (${schedule.year})`
-      : `Removed dues payment #${id}`,
-    entityType: "dues_payment",
-    entityId: id,
-  });
+  if (returnTo.startsWith("/archive")) {
+    await recordAudit(viewer, {
+      action: "dues.payment.remove",
+      summary: schedule
+        ? `Removed dues payment #${id} (${schedule.year})`
+        : `Removed dues payment #${id}`,
+      entityType: "dues_payment",
+      entityId: id,
+    });
+  }
   revalidateDues(`/members/${payment.member_id}`);
   okDues(
     "cleared",

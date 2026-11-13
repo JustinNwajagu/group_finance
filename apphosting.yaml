@@ -69,6 +69,6 @@ env:
     availability:
       - RUNTIME
   - variable: SESSION_IDLE_MINUTES
-    value: "30"
+    value: "15"
     availability:
       - RUNTIME

@@ -18,7 +18,7 @@ export const VIEW_AS_COOKIE = "klef_view_as";
 export type ViewAsMode = "admin" | "member";
 
 /** Default idle window before the next visit requires sign-in again. */
-export const DEFAULT_SESSION_IDLE_MINUTES = 30;
+export const DEFAULT_SESSION_IDLE_MINUTES = 15;
 
 export function sessionIdleMinutes(): number {
   const raw = Number(process.env.SESSION_IDLE_MINUTES ?? DEFAULT_SESSION_IDLE_MINUTES);

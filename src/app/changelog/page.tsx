@@ -38,8 +38,10 @@ export default async function ChangelogPage() {
         <div>
           <h1>Changelog</h1>
           <p>
-            In-app changes by login account — contributions, dues, expenses,
-            access, and roster edits. Deployments are not listed here.
+            Open/close of contributions and dues, archive dues amends, edits on
+            open contribution titles, expenses, imports, and access
+            approve/reject/remove. Deployments and routine access maintenance
+            are not listed.
           </p>
         </div>
       </div>
@@ -52,36 +54,38 @@ export default async function ChangelogPage() {
             members update the app.
           </div>
         ) : (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Account</th>
-                  <th>Action</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {events.map((event) => (
-                  <tr key={event.id}>
-                    <td className="muted" style={{ whiteSpace: "nowrap" }}>
-                      {formatWhenLondon(event.created_at)}
-                      <span className="sr-only"> Europe/London</span>
-                    </td>
-                    <td>
-                      <div>{event.actor_name}</div>
-                      <div className="muted" style={{ fontSize: "0.85rem" }}>
-                        {event.actor_email}
-                        {event.view_as === "member" ? " · member view" : ""}
-                      </div>
-                    </td>
-                    <td>{formatAuditAction(event.action)}</td>
-                    <td>{event.summary}</td>
+          <div className="scroll-panel">
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>When</th>
+                    <th>Account</th>
+                    <th>Action</th>
+                    <th>Details</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {events.map((event) => (
+                    <tr key={event.id}>
+                      <td className="muted" style={{ whiteSpace: "nowrap" }}>
+                        {formatWhenLondon(event.created_at)}
+                        <span className="sr-only"> Europe/London</span>
+                      </td>
+                      <td>
+                        <div>{event.actor_name}</div>
+                        <div className="muted" style={{ fontSize: "0.85rem" }}>
+                          {event.actor_email}
+                          {event.view_as === "member" ? " · member view" : ""}
+                        </div>
+                      </td>
+                      <td>{formatAuditAction(event.action)}</td>
+                      <td>{event.summary}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </section>

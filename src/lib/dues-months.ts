@@ -148,6 +148,42 @@ export function formatDuesMonthPoint(year: number, month: number): string {
 }
 
 /**
+ * Last dues month covered when filling `monthCount` months starting at
+ * (year, month) inclusive, advancing Sep→Aug across years.
+ */
+export function duesCoverageEnd(
+  year: number,
+  month: number,
+  monthCount: number,
+): EarliestUnpaidPoint {
+  let y = year;
+  let m = month;
+  const steps = Math.max(1, Math.floor(monthCount));
+  for (let i = 1; i < steps; i += 1) {
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return { year: y, month: m };
+}
+
+/** Human range for a contiguous dues fill, e.g. "Sep 2023 to Nov 2023". */
+export function formatDuesCoverageRange(
+  startYear: number,
+  startMonth: number,
+  monthCount: number,
+): string {
+  const from = formatDuesMonthPoint(startYear, startMonth);
+  if (monthCount <= 1) return from;
+  const end = duesCoverageEnd(startYear, startMonth, monthCount);
+  const to = formatDuesMonthPoint(end.year, end.month);
+  if (from === to) return from;
+  return `${from} to ${to}`;
+}
+
+/**
  * Split a payment amount across years in [yearFrom, yearTo].
  * Each year uses its own monthly due. Full months are filled first within the
  * selected range only. Any leftover balance becomes a partial payment on the

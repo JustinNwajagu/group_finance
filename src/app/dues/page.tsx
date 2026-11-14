@@ -51,6 +51,7 @@ export default async function DuesPage({
 
   const schedules = await schedulesPromise;
   const currentYear = new Date().getFullYear();
+  // No ?year= → earliest open dues year (schedules are ascending).
   const selectedYear = Number.isFinite(yearParam)
     ? yearParam
     : (schedules[0]?.year ?? currentYear);

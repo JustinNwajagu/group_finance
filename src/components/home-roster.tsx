@@ -34,8 +34,10 @@ export function HomeRosterList({
     );
   }, [members, q]);
 
+  const filtering = q.trim().length > 0;
+
   return (
-    <section className="panel">
+    <section className="panel panel-filterable">
       <div className="panel-heading-row">
         <h2>Roster</h2>
         <p className="panel-heading-meta">
@@ -47,69 +49,73 @@ export function HomeRosterList({
         </p>
       </div>
 
-      <MemberFilter value={q} onChange={setQ} />
+      <div className={filtering ? "filter-stack is-filtering" : "filter-stack"}>
+        <MemberFilter value={q} onChange={setQ} />
 
-      {filtered.length === 0 ? (
-        <div className="hero-empty">
-          {q.trim()
-            ? "No members match that filter."
-            : "No members yet. Admins can add or import the first names."}
-        </div>
-      ) : (
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th className="num">#</th>
-                <th>Member</th>
-                <th className="num">Contributions</th>
-                <th className="num">Dues</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((m, index) => {
-                const seat = excoByMember.get(m.id);
-                return (
-                  <tr key={m.id}>
-                    <td className="num muted">{index + 1}</td>
-                    <td>
-                      <Link className="row-link" href={`/members/${m.id}`}>
-                        {m.name}
-                      </Link>
-                      {seat ? (
-                        <span
-                          className={
-                            seat.grants_admin
-                              ? "badge badge-admin"
-                              : "badge badge-exco"
-                          }
-                          style={{ marginLeft: "0.45rem" }}
-                        >
-                          {seat.label}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="num">
-                      {m.contribution_count}
-                      <span className="muted">/{m.payment_count}</span>
-                    </td>
-                    <td className="num">
-                      {m.dues_years_count > 0 ? (
-                        <>
-                          {formatDuesCount(m.dues_count)}
-                          <span className="muted">/{m.dues_years_count}</span>
-                        </>
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
+        <div className="filter-results">
+          {filtered.length === 0 ? (
+            <div className="hero-empty">
+              {filtering
+                ? "No members match that filter."
+                : "No members yet. Admins can add or import the first names."}
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th className="num">#</th>
+                    <th>Member</th>
+                    <th className="num">Contributions</th>
+                    <th className="num">Dues</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {filtered.map((m, index) => {
+                    const seat = excoByMember.get(m.id);
+                    return (
+                      <tr key={m.id}>
+                        <td className="num muted">{index + 1}</td>
+                        <td>
+                          <Link className="row-link" href={`/members/${m.id}`}>
+                            {m.name}
+                          </Link>
+                          {seat ? (
+                            <span
+                              className={
+                                seat.grants_admin
+                                  ? "badge badge-admin"
+                                  : "badge badge-exco"
+                              }
+                              style={{ marginLeft: "0.45rem" }}
+                            >
+                              {seat.label}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="num">
+                          {m.contribution_count}
+                          <span className="muted">/{m.payment_count}</span>
+                        </td>
+                        <td className="num">
+                          {m.dues_years_count > 0 ? (
+                            <>
+                              {formatDuesCount(m.dues_count)}
+                              <span className="muted">/{m.dues_years_count}</span>
+                            </>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </section>
   );
 }

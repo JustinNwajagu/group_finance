@@ -107,6 +107,8 @@ export const listContributionFundingOptions = cache(
           concluded: Boolean(request.concluded_at),
           realised_total: realised.toFixed(2),
           remaining: remaining.toFixed(2),
+          kind: request.kind,
+          beneficiary_member_ids: request.beneficiary_member_ids,
         } satisfies ContributionFundingOption;
       })
       .filter((row) => Number(row.remaining) > 0.009)

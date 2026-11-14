@@ -7,7 +7,7 @@ import { HomeRosterList } from "@/components/home-roster";
 import { PageFallback } from "@/components/page-fallback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
-import { listMembers } from "@/lib/data";
+import { listMembers, requestedPaymentCount } from "@/lib/data";
 import { excoByMemberIdMap, listExcoSeatViews } from "@/lib/exco";
 import type { ExcoSeatView, MemberContribution } from "@/lib/types";
 
@@ -17,21 +17,22 @@ async function HomeBody({
   membersPromise,
   excoPromise,
   excoByMemberPromise,
+  titleCountPromise,
   admin,
 }: {
   membersPromise: Promise<MemberContribution[]>;
   excoPromise: Promise<ExcoSeatView[]>;
   excoByMemberPromise: Promise<Map<number, ExcoSeatView>>;
+  titleCountPromise: Promise<number>;
   admin: boolean;
 }) {
   await connection();
-  const [members, excoSeats, excoByMember] = await Promise.all([
+  const [members, excoSeats, excoByMember, contributionCount] = await Promise.all([
     membersPromise,
     excoPromise,
     excoByMemberPromise,
+    titleCountPromise,
   ]);
-  // Counts are identical on every roster row — avoid extra Firestore round trips.
-  const contributionCount = members[0]?.payment_count ?? 0;
   const duesYearCount = members[0]?.dues_years_count ?? 0;
 
   return (
@@ -105,6 +106,7 @@ export default async function HomePage({
   const membersPromise = listMembers();
   const excoPromise = listExcoSeatViews();
   const excoByMemberPromise = excoByMemberIdMap();
+  const titleCountPromise = requestedPaymentCount();
   const viewer = await viewerPromise;
   const admin = isAdmin(viewer);
   const error = typeof params.error === "string" ? params.error : undefined;
@@ -117,8 +119,9 @@ export default async function HomePage({
           <h1>Home</h1>
           <p>
             Roster overview. <strong>Contributions</strong> is paid contribution
-            titles (pledges do not count). <strong>Dues</strong> treats each
-            opened year as 1.
+            titles (pledges do not count). Recipients of a contribution payout
+            are exempt from that title. <strong>Dues</strong> treats each opened
+            year as 1.
           </p>
         </div>
       </div>
@@ -137,6 +140,7 @@ export default async function HomePage({
           membersPromise={membersPromise}
           excoPromise={excoPromise}
           excoByMemberPromise={excoByMemberPromise}
+          titleCountPromise={titleCountPromise}
           admin={admin}
         />
       </Suspense>

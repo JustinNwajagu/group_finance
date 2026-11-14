@@ -82,20 +82,22 @@ export function ArchiveBoards({
   }
 
   return (
-    <div className="archive-boards">
-      {boards.map((board) => (
-        <ArchiveBoardItem
-          key={board.request.id}
-          board={board}
-          isAdmin={isAdmin}
-          open={openId === board.request.id}
-          onToggle={() =>
-            setOpenId((current) =>
-              current === board.request.id ? null : board.request.id,
-            )
-          }
-        />
-      ))}
+    <div className="archive-boards-scroll">
+      <div className="archive-boards">
+        {boards.map((board) => (
+          <ArchiveBoardItem
+            key={board.request.id}
+            board={board}
+            isAdmin={isAdmin}
+            open={openId === board.request.id}
+            onToggle={() =>
+              setOpenId((current) =>
+                current === board.request.id ? null : board.request.id,
+              )
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 }

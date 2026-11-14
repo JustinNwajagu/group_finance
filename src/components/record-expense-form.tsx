@@ -122,6 +122,19 @@ export function RecordExpenseForm({
     setAmountByMember(redistribute(memberIds, total));
   }
 
+  function beneficiaryIdsFor(option: ContributionFundingOption): number[] {
+    if (option.kind !== "member") return [];
+    const known = new Set(members.map((m) => m.id));
+    return option.beneficiary_member_ids.filter((id) => known.has(id));
+  }
+
+  function applyContributionPurpose(option: ContributionFundingOption) {
+    setKind(option.kind);
+    const nextIds = beneficiaryIdsFor(option);
+    setSelectedMemberIds(nextIds);
+    if (nextIds.length === 0) setAmountByMember({});
+  }
+
   function applyContribution(
     id: string,
     fundingMode: ExpenseFundingSource = funding,
@@ -129,10 +142,14 @@ export function RecordExpenseForm({
     setContributionId(id);
     const option = contributions.find((c) => String(c.id) === id);
     if (!option) return;
+    const nextIds = beneficiaryIdsFor(option);
+    applyContributionPurpose(option);
     if (fundingMode === "contribution") {
       setContributionAmount(option.remaining);
       setBankAmount("");
-      syncMemberAmounts(Number(option.remaining));
+      if (nextIds.length > 0) {
+        syncMemberAmounts(Number(option.remaining), nextIds);
+      }
       return;
     }
     if (fundingMode === "both") {
@@ -147,7 +164,7 @@ export function RecordExpenseForm({
       const total =
         Number(next || 0) +
         (Number.isFinite(Number(bankAmount)) ? Number(bankAmount) : 0);
-      syncMemberAmounts(total);
+      if (nextIds.length > 0) syncMemberAmounts(total, nextIds);
     }
   }
 

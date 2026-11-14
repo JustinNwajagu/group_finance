@@ -11,6 +11,7 @@ import {
 import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
 } from "firebase/auth";
 import { createDevSession, createFirebaseSession } from "@/app/actions/auth";
 import {
@@ -24,9 +25,27 @@ import { PasswordInput } from "@/components/password-input";
 import { ScrollSelect } from "@/components/scroll-select";
 import { getFirebaseAuth, type PublicFirebaseConfig } from "@/lib/firebase-client";
 import { NAME_TITLES } from "@/lib/name-titles";
+import { LAST_ACTIVE_COOKIE } from "@/lib/session-idle-client";
 
 const WRONG_CREDENTIALS_MESSAGE =
   "Incorrect email or password. Check your details and try again.";
+
+const AUTH_CREDENTIAL_CODES = new Set([
+  "auth/invalid-credential",
+  "auth/user-not-found",
+  "auth/wrong-password",
+  "auth/invalid-email",
+  "auth/invalid-login-credentials",
+]);
+
+function clearLastActiveCookie() {
+  if (typeof document === "undefined") return;
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? "; Secure"
+      : "";
+  document.cookie = `${LAST_ACTIVE_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${secure}`;
+}
 
 function firebaseCode(err: unknown): string | null {
   if (!err || typeof err !== "object") return null;
@@ -91,6 +110,18 @@ export function LoginForm({
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const pending = signingIn;
 
+  // After an idle logout the Firebase client can still hold a stale session in
+  // IndexedDB. Clear it (and the activity cookie) so the next sign-in works
+  // without requiring a manual refresh.
+  useEffect(() => {
+    clearLastActiveCookie();
+    if (!firebaseConfig) return;
+    const auth = getFirebaseAuth(firebaseConfig);
+    void firebaseSignOut(auth).catch(() => {
+      /* ignore */
+    });
+  }, [firebaseConfig]);
+
   if (!firebaseConfig) {
     return (
       <form action={createDevSession} className="form-grid">
@@ -148,18 +179,17 @@ export function LoginForm({
     setSigningIn(true);
     try {
       const auth = getFirebaseAuth(firebaseConfig!);
+      // Drop any leftover client session from before the idle logout.
+      try {
+        await firebaseSignOut(auth);
+      } catch {
+        /* ignore */
+      }
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      await finish(await cred.user.getIdToken(), email);
+      await finish(await cred.user.getIdToken(true), email);
     } catch (err) {
       const code = firebaseCode(err);
-      if (
-        code === "auth/invalid-credential" ||
-        code === "auth/user-not-found" ||
-        code === "auth/wrong-password" ||
-        code === "auth/invalid-email" ||
-        code === "auth/invalid-login-credentials" ||
-        !code
-      ) {
+      if (code && AUTH_CREDENTIAL_CODES.has(code)) {
         try {
           const classified = await classifyLoginFailure(email);
           if (classified.kind === "wrong_password") {
@@ -189,7 +219,11 @@ export function LoginForm({
         return;
       }
       const detail = code ? ` (${code})` : "";
-      setError(`Sign-in failed${detail}. Check your details and try again.`);
+      setError(
+        code
+          ? `Sign-in failed${detail}. Check your details and try again.`
+          : "Could not finish sign-in. Please try again.",
+      );
     } finally {
       setSigningIn(false);
     }

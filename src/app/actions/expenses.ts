@@ -175,6 +175,15 @@ export async function recordExpense(formData: FormData): Promise<void> {
     const request = await getPaymentRequestById(paymentRequestId);
     if (!request) fail("That contribution was not found.");
 
+    if (request.concluded_at) {
+      const concludedDay = String(request.concluded_at).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(concludedDay) && expense_date < concludedDay) {
+        fail(
+          `Expense date cannot be before this contribution was concluded (${concludedDay}).`,
+        );
+      }
+    }
+
     const options = await listContributionFundingOptions();
     const option = options.find((o) => o.id === paymentRequestId);
     remaining = Number(option?.remaining ?? 0);

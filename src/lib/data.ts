@@ -10,6 +10,7 @@ import { monthsCoveredForMember } from "./dues-data";
 import { duesYearFraction } from "./dues-months";
 import { compareMembersByName } from "./member-sort";
 import {
+  expenseIsCertified,
   getMemberById,
   listAllDuesPayments,
   listAllDuesSchedules,
@@ -145,6 +146,7 @@ export async function memberContribution(id: number): Promise<string> {
 export async function memberPaymentStats(id: number): Promise<{
   payment_count: number;
   contribution_count: number;
+  exemption_count: number;
 }> {
   const [totalTitles, payments, exemptionsByMember] = await Promise.all([
     requestedPaymentCount(),
@@ -164,7 +166,114 @@ export async function memberPaymentStats(id: number): Promise<{
   return {
     payment_count: Math.max(0, totalTitles - exempt.size),
     contribution_count,
+    exemption_count: exempt.size,
   };
+}
+
+export type MemberExemptionRow = {
+  request_id: number;
+  title: string;
+  /** Open vs archived contribution title. */
+  contribution_status: "open" | "concluded";
+  deadline: string;
+  concluded_at: string | null;
+  /** Designated at open time and/or via a funded expense payout. */
+  source: "beneficiary" | "expense" | "both";
+  /** Latest contribution-funded receipt for this member on this title, if any. */
+  receipt: {
+    expense_id: number;
+    expense_date: string;
+    amount: string;
+    certified: boolean;
+    certification_count: number;
+    notes: string;
+    funding_source: string;
+    contribution_amount: string;
+    bank_amount: string;
+  } | null;
+};
+
+/** Contribution titles this member is exempt from, with payout stage when known. */
+export async function listMemberContributionExemptions(
+  memberId: number,
+): Promise<MemberExemptionRow[]> {
+  const [requests, expenses, exemptionsByMember] = await Promise.all([
+    listAllPaymentRequestRows(),
+    listAllExpenses(),
+    mapContributionExemptionsByMember(),
+  ]);
+  const exemptIds = exemptionsByMember.get(memberId) ?? new Set<number>();
+  if (exemptIds.size === 0) return [];
+
+  const reqById = new Map(requests.map((r) => [r.id, r]));
+  const rows: MemberExemptionRow[] = [];
+
+  for (const requestId of [...exemptIds].sort((a, b) => b - a)) {
+    const request = reqById.get(requestId);
+    if (!request) continue;
+
+    const isBeneficiary =
+      request.kind === "member" &&
+      request.beneficiary_member_ids.includes(memberId);
+
+    const funded = expenses
+      .filter(
+        (e) =>
+          e.payment_request_id === requestId &&
+          Number(e.contribution_amount) > 0.009 &&
+          e.allocations.some(
+            (a) => a.member_id === memberId && Number(a.amount) > 0.009,
+          ),
+      )
+      .sort((a, b) => {
+        const byDate = b.expense_date.localeCompare(a.expense_date);
+        if (byDate !== 0) return byDate;
+        return b.id - a.id;
+      });
+
+    const latest = funded[0] ?? null;
+    const alloc = latest?.allocations.find((a) => a.member_id === memberId);
+    const hasExpense = latest != null && alloc != null;
+
+    rows.push({
+      request_id: request.id,
+      title: request.title,
+      contribution_status: request.concluded_at ? "concluded" : "open",
+      deadline: request.deadline,
+      concluded_at: request.concluded_at,
+      source: isBeneficiary && hasExpense
+        ? "both"
+        : isBeneficiary
+          ? "beneficiary"
+          : "expense",
+      receipt:
+        latest && alloc
+          ? {
+              expense_id: latest.id,
+              expense_date: latest.expense_date,
+              amount: alloc.amount,
+              certified: expenseIsCertified(
+                latest.certifications,
+                latest.certified_at,
+              ),
+              certification_count: latest.certifications.length,
+              notes: latest.notes,
+              funding_source: latest.funding_source,
+              contribution_amount: latest.contribution_amount,
+              bank_amount: latest.bank_amount,
+            }
+          : null,
+    });
+  }
+
+  return rows.sort((a, b) => {
+    if (a.contribution_status !== b.contribution_status) {
+      return a.contribution_status === "open" ? -1 : 1;
+    }
+    const da = a.receipt?.expense_date ?? a.deadline;
+    const db = b.receipt?.expense_date ?? b.deadline;
+    return db.localeCompare(da) || b.request_id - a.request_id;
+  });
 }
 
 export async function listMemberOptions(): Promise<Member[]> {

@@ -28,8 +28,10 @@ export function DuesBoardPanel({
     };
   }, [board, q]);
 
+  const filtering = q.trim().length > 0;
+
   return (
-    <section className="panel">
+    <section className="panel panel-filterable">
       <div className="panel-heading-row">
         <h2>
           {board
@@ -48,21 +50,26 @@ export function DuesBoardPanel({
         ) : null}
       </div>
 
-      {board ? <MemberFilter value={q} onChange={setQ} /> : null}
-
-      {!filtered ? (
+      {board ? (
+        <div className={filtering ? "filter-stack is-filtering" : "filter-stack"}>
+          <MemberFilter value={q} onChange={setQ} />
+          <div className="filter-results">
+            {filtered ? (
+              <DuesYearTable
+                board={filtered}
+                emptyLabel={
+                  filtering
+                    ? "No members match that filter."
+                    : "No members on the roster yet."
+                }
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : (
         <div className="hero-empty">
           Open a dues year to start tracking Sept–Aug payments.
         </div>
-      ) : (
-        <DuesYearTable
-          board={filtered}
-          emptyLabel={
-            q.trim()
-              ? "No members match that filter."
-              : "No members on the roster yet."
-          }
-        />
       )}
     </section>
   );

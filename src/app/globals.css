@@ -1165,9 +1165,17 @@ textarea {
   min-width: min(100%, 18rem);
 }
 
+.filter-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0;
+}
+
 .filter-bar {
   margin-bottom: 0.85rem;
   min-width: min(100%, 18rem);
+  scroll-margin-top: 0.35rem;
 }
 
 .filter-bar .filter {
@@ -1186,27 +1194,93 @@ textarea {
   width: 100%;
 }
 
+.filter-results {
+  min-width: 0;
+}
+
 /* Desktop uses the native search clear control. */
 .filter-clear {
   display: none;
 }
 
 @media (max-width: 720px) {
-  /* Keep the filter pinned while scrolling / while the list reflows under search. */
-  .filter-bar {
+  /*
+   * Mobile search mode (query non-empty only): tuck page chrome above the
+   * filter so a short match list can’t drag the bar mid-screen. Clearing the
+   * query removes this class and JS restores the prior scroll position so EXCO
+   * / headings reappear in place and scrolling continues normally.
+   * Topbar stays visible so exit doesn’t feel like leaving the app shell.
+   */
+  html.is-member-filtering .page-head,
+  html.is-member-filtering .flash,
+  html.is-member-filtering .site-footnote,
+  html.is-member-filtering .dash-aside,
+  html.is-member-filtering .dash-tools {
+    display: none !important;
+  }
+
+  /* Home: hide EXCO / add-member siblings while the roster filter is active. */
+  html.is-member-filtering .stack > :not(.panel-filterable) {
+    display: none !important;
+  }
+
+  html.is-member-filtering .shell {
+    min-height: 0;
+    justify-content: flex-start;
+  }
+
+  html.is-member-filtering .main,
+  html.is-member-filtering .main:has(.dash-layout),
+  html.is-member-filtering .main:has(.expenses-layout),
+  html.is-member-filtering .main:has(.expenses-top) {
+    flex: 0 0 auto;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  html.is-member-filtering .panel-filterable {
+    margin-top: 0;
+  }
+
+  /* Drop the roster title/meta while searching — search bar is the top edge. */
+  html.is-member-filtering .panel-filterable > .panel-heading-row {
+    display: none;
+  }
+
+  html.is-member-filtering .filter-stack,
+  .filter-stack.is-filtering {
+    position: relative;
+    overflow-anchor: none;
+  }
+
+  html.is-member-filtering .filter-bar,
+  .filter-stack.is-filtering .filter-bar,
+  .filter-bar.is-filtering {
     position: sticky;
     top: 0;
     z-index: 6;
+    flex-shrink: 0;
     margin-left: -0.15rem;
     margin-right: -0.15rem;
-    padding: 0.35rem 0.15rem 0.65rem;
-    background: rgba(255, 255, 255, 0.92);
+    margin-bottom: 0.55rem;
+    padding: 0.35rem 0.15rem 0.55rem;
+    background: rgba(255, 255, 255, 0.96);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 8px 16px -12px rgba(20, 32, 51, 0.35);
   }
 
-  .filter-bar.is-filtering {
-    box-shadow: 0 8px 16px -12px rgba(20, 32, 51, 0.35);
+  html.is-member-filtering .filter-results,
+  .filter-stack.is-filtering .filter-results {
+    overflow-anchor: none;
+    min-height: 0;
+  }
+
+  html.is-member-filtering .filter-results tbody,
+  html.is-member-filtering .filter-results tr,
+  .filter-stack.is-filtering .filter-results tbody,
+  .filter-stack.is-filtering .filter-results tr {
+    overflow-anchor: none;
   }
 
   .filter-input {

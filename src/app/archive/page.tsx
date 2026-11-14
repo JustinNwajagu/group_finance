@@ -69,10 +69,7 @@ export default async function ArchivePage({
       <div className="page-head">
         <div>
           <h1>Archive</h1>
-          <p>
-            Concluded contributions and dues years. Lists stay visible; admins
-            can still amend records or clear a concluded date to reopen.
-          </p>
+          <p>Concluded contributions and dues years.</p>
         </div>
       </div>
 

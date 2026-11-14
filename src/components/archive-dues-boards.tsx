@@ -59,8 +59,10 @@ function ArchiveDuesItem({
       {open ? (
         <div id={panelId} className="archive-item-body">
           <div className="archive-scroll-pane">
-            <div className="archive-scroll-pane-inner">
-              <DuesYearTable board={board} />
+            <div className="archive-scroll-x">
+              <div className="archive-scroll-pane-inner">
+                <DuesYearTable board={board} />
+              </div>
             </div>
           </div>
           {isAdmin ? (

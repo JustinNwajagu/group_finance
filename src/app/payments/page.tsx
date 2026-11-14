@@ -135,10 +135,7 @@ export default async function PaymentsPage({
       <div className="page-head">
         <div>
           <h1>Contributions</h1>
-          <p>
-            One-off contribution requests (separate from monthly dues). Use
-            Pledge / Mark paid on each board to record members.
-          </p>
+          <p>One-off contribution requests (separate from monthly dues).</p>
         </div>
       </div>
 

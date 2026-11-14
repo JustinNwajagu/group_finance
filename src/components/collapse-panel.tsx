@@ -45,7 +45,9 @@ export function CollapsePanel({
       {open ? (
         <div id={panelId} className="archive-item-body">
           <div className="archive-scroll-pane">
-            <div className="archive-scroll-pane-inner stack">{children}</div>
+            <div className="archive-scroll-x">
+              <div className="archive-scroll-pane-inner stack">{children}</div>
+            </div>
           </div>
         </div>
       ) : null}

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { ScrollSelect } from "@/components/scroll-select";
 import {
+  formatDuesCoverageRange,
   formatDuesMonthPoint,
   monthsFromAmount,
 } from "@/lib/dues-months";
@@ -59,16 +60,17 @@ export function RecordDuesForm({
     Number.isFinite(amountNum) && monthly > 0
       ? monthsFromAmount(amountNum, monthly)
       : null;
-  const fillFrom = fillFromLabel(
-    selected?.earliestUnpaidYear,
-    selected?.earliestUnpaidMonth,
-    currentYear,
-  );
-  const fillsEarlierYear = Boolean(
+  const coverageRange =
     selected &&
-      selected.earliestUnpaidYear != null &&
-      selected.earliestUnpaidYear < currentYear,
-  );
+    months != null &&
+    selected.earliestUnpaidYear != null &&
+    selected.earliestUnpaidMonth != null
+      ? formatDuesCoverageRange(
+          selected.earliestUnpaidYear,
+          selected.earliestUnpaidMonth,
+          months,
+        )
+      : null;
 
   const memberOptions = useMemo(() => {
     const ranked = [...members].sort((a, b) => {
@@ -143,18 +145,11 @@ export function RecordDuesForm({
           ? ` This amount covers ${months} month${months === 1 ? "" : "s"}.`
           : ""}
       </p>
-      {selected ? (
+      {selected && coverageRange ? (
         <p className="muted" style={{ margin: 0 }}>
-          {fillsEarlierYear
-            ? `${selected.name} still owes from ${fillFrom}. This payment fills from ${fillFrom} forward — earlier unpaid years cannot be skipped.`
-            : `This payment fills from ${fillFrom} forward (next unpaid months after their last dues payment).`}
+          {selected.name}&apos;s payment covers {coverageRange}.
         </p>
-      ) : (
-        <p className="muted" style={{ margin: 0 }}>
-          Payments always fill from each member&apos;s earliest unpaid dues month
-          forward. Earlier months must be cleared before later ones.
-        </p>
-      )}
+      ) : null}
 
       <label className="field">
         Payment date

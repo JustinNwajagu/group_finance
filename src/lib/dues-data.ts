@@ -66,7 +66,10 @@ function toMemberYear(
 
 export async function listOpenDuesSchedules(): Promise<DuesScheduleRow[]> {
   const all = await listAllDuesSchedules();
-  return all.filter((s) => !s.concluded_at);
+  // Lowest open year first so /dues lands on the earliest tracker still open.
+  return all
+    .filter((s) => !s.concluded_at)
+    .sort((a, b) => a.year - b.year || a.id - b.id);
 }
 
 export async function listConcludedDuesSchedules(): Promise<DuesScheduleRow[]> {

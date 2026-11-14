@@ -14,6 +14,7 @@ import { isAdminEmail } from "@/lib/config";
 import { splitTitledName } from "@/lib/name-titles";
 import {
   getMember,
+  listMissedContributionsForMember,
   listPaymentsForMember,
   memberContribution,
   memberPaymentStats,
@@ -55,16 +56,25 @@ export default async function MemberDetailPage({
   const member = await getMember(id);
   if (!member) notFound();
 
-  const [payments, paidTotal, stats, dues, expenseReceipts, exco, paymentCounts] =
-    await Promise.all([
-      listPaymentsForMember(id),
-      memberContribution(id),
-      memberPaymentStats(id),
-      memberDuesSummary(id),
-      listMemberExpenseReceipts(id),
-      getExcoSeatForMember(id),
-      countPaymentsForMember(id),
-    ]);
+  const [
+    payments,
+    paidTotal,
+    stats,
+    dues,
+    expenseReceipts,
+    exco,
+    paymentCounts,
+    missedContributions,
+  ] = await Promise.all([
+    listPaymentsForMember(id),
+    memberContribution(id),
+    memberPaymentStats(id),
+    memberDuesSummary(id),
+    listMemberExpenseReceipts(id),
+    getExcoSeatForMember(id),
+    countPaymentsForMember(id),
+    listMissedContributionsForMember(id),
+  ]);
   const isPrimaryAdminMember =
     isAdminEmail(member.login_email || "") ||
     isAdminEmail(member.email || "");
@@ -180,9 +190,16 @@ export default async function MemberDetailPage({
           <CollapsePanel
             title="Contributions"
             meta={
-              payments.length > 0
-                ? `${payments.length} payment${payments.length === 1 ? "" : "s"} · ${formatMoney(paidTotal)}`
-                : "None recorded"
+              [
+                payments.length > 0
+                  ? `${payments.length} payment${payments.length === 1 ? "" : "s"} · ${formatMoney(paidTotal)}`
+                  : null,
+                missedContributions.length > 0
+                  ? `${missedContributions.length} missed`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "None recorded"
             }
           >
             {payments.length === 0 ? (
@@ -196,6 +213,29 @@ export default async function MemberDetailPage({
                 isAdmin={admin}
               />
             )}
+            {missedContributions.length > 0 ? (
+              <div className="member-missed-block">
+                <h3>Missed contributions</h3>
+                <ul className="member-missed-list">
+                  {missedContributions.map((item) => (
+                    <li key={item.id}>
+                      <span className="member-missed-title">{item.title}</span>
+                      <span className="member-missed-meta">
+                        Expected {formatMoney(item.amount)}
+                        {" · "}
+                        Deadline {formatDate(item.deadline)}
+                        {" · "}
+                        {item.status === "pledge"
+                          ? "Pledge only"
+                          : item.concluded
+                            ? "Didn't contribute"
+                            : "Yet to contribute"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </CollapsePanel>
 
           <CollapsePanel

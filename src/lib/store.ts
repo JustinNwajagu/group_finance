@@ -47,6 +47,10 @@ export type PaymentRequestRow = {
   concluded_at: string | null;
   /** Amount of realised funds released to general bank (not expense outflow). */
   released_to_bank: string;
+  /** Same categories as expenses — what this contribution supports. */
+  kind: ExpenseKind;
+  /** Members this contribution is for (exempt from paying it). */
+  beneficiary_member_ids: number[];
   created_at: string;
 };
 
@@ -545,12 +549,28 @@ export async function getMemberById(id: number): Promise<MemberRow | null> {
     : null;
 }
 
+function normalizeBeneficiaryMemberIds(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<number>();
+  const out: number[] = [];
+  for (const item of raw) {
+    const id = Number(item);
+    if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 function normalizePaymentRequest(
   raw: Record<string, unknown>,
 ): PaymentRequestRow | null {
   if (!isAppRow(raw)) return null;
   // Skip legacy dues rows that may still sit in payment_requests.
   if (raw.type === "dues") return null;
+  const kind = normalizeExpenseKind(raw.kind);
+  const beneficiary_member_ids =
+    kind === "member" ? normalizeBeneficiaryMemberIds(raw.beneficiary_member_ids) : [];
   return {
     id: Number(raw.id),
     title: normalizePaymentTitle(String(raw.title ?? "")),
@@ -558,6 +578,8 @@ function normalizePaymentRequest(
     deadline: String(raw.deadline ?? ""),
     concluded_at: (raw.concluded_at as string | null) ?? null,
     released_to_bank: money(Number(raw.released_to_bank ?? 0)),
+    kind,
+    beneficiary_member_ids,
     created_at: String(raw.created_at ?? nowIso()),
   };
 }
@@ -583,14 +605,23 @@ export async function createPaymentRequestRow(input: {
   deadline: string;
   /** When set, the contribution is closed and appears in Archive. */
   concluded_at?: string | null;
+  kind?: ExpenseKind;
+  beneficiary_member_ids?: number[];
 }): Promise<PaymentRequestRow> {
   const created_at = nowIso();
+  const kind = normalizeExpenseKind(input.kind ?? "miscellaneous");
+  const beneficiary_member_ids =
+    kind === "member"
+      ? normalizeBeneficiaryMemberIds(input.beneficiary_member_ids ?? [])
+      : [];
   const rowBase = {
     title: normalizePaymentTitle(input.title),
     amount: money(input.amount),
     deadline: input.deadline,
     concluded_at: input.concluded_at ?? null,
     released_to_bank: money(0),
+    kind,
+    beneficiary_member_ids,
     created_at,
   };
   if (isFirestore()) {
@@ -654,12 +685,30 @@ export async function getPaymentRequestById(
 export async function updatePaymentRequestRow(
   id: number,
   patch: Partial<
-    Pick<PaymentRequestRow, "concluded_at" | "title" | "released_to_bank">
+    Pick<
+      PaymentRequestRow,
+      | "concluded_at"
+      | "title"
+      | "released_to_bank"
+      | "kind"
+      | "beneficiary_member_ids"
+    >
   >,
 ): Promise<void> {
   const cleaned = { ...patch };
   if (cleaned.released_to_bank != null) {
     cleaned.released_to_bank = money(cleaned.released_to_bank);
+  }
+  if (cleaned.kind != null) {
+    cleaned.kind = normalizeExpenseKind(cleaned.kind);
+  }
+  if (cleaned.beneficiary_member_ids != null) {
+    cleaned.beneficiary_member_ids = normalizeBeneficiaryMemberIds(
+      cleaned.beneficiary_member_ids,
+    );
+  }
+  if (cleaned.kind != null && cleaned.kind !== "member") {
+    cleaned.beneficiary_member_ids = [];
   }
   if (isFirestore()) {
     await adminDb()!

@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { bulkImportContributions } from "@/app/actions/bulk-import";
-import { createPaymentRequest } from "@/app/actions/payments";
 import { AppShell } from "@/components/app-shell";
 import { CurrentContributions } from "@/components/current-contributions";
 import { DashTools } from "@/components/dash-tools";
 import { Flash } from "@/components/flash";
+import { OpenContributionForm } from "@/components/open-contribution-form";
 import { PageFallback } from "@/components/page-fallback";
 import { PendingSubmitButton } from "@/components/pending-submit-button";
 import { requireAccess, isAdmin } from "@/lib/auth";
@@ -48,36 +48,7 @@ async function PaymentsBody({
                 Add a member on Home first, then create a payment request.
               </p>
             ) : (
-              <form action={createPaymentRequest} className="form-grid">
-                <label className="field">
-                  Title
-                  <input name="title" required autoComplete="off" />
-                </label>
-                <label className="field">
-                  Minimum amount per member (₦)
-                  <input
-                    name="amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    required
-                    placeholder="0.00"
-                  />
-                </label>
-                <label className="field">
-                  Payment deadline
-                  <input
-                    name="deadline"
-                    type="date"
-                    required
-                    defaultValue={today}
-                  />
-                </label>
-                <PendingSubmitButton
-                  idleLabel="Create payment"
-                  pendingLabel="Creating…"
-                />
-              </form>
+              <OpenContributionForm members={members} today={today} />
             )}
           </section>
 

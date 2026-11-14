@@ -55,6 +55,7 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
   const title = String(formData.get("title") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const deadline = String(formData.get("deadline") ?? "").trim();
+  const kindRaw = String(formData.get("kind") ?? "").trim();
   const amount = Number(amountRaw);
 
   if (!title) failPayments("Title is required.");
@@ -63,12 +64,34 @@ export async function createPaymentRequest(formData: FormData): Promise<void> {
     failPayments("Choose a payment deadline.");
   }
 
+  const kind =
+    kindRaw === "member" || kindRaw === "meeting" || kindRaw === "miscellaneous"
+      ? kindRaw
+      : null;
+  if (!kind) failPayments("Choose what this contribution is for.");
+
   const members = await listMemberOptions();
   if (members.length === 0) {
     failPayments("Add a member first, then create a payment.");
   }
 
-  const row = await createPaymentRequestRow({ title, amount, deadline });
+  const memberIds = new Set(members.map((m) => m.id));
+  const beneficiaryIds = formData
+    .getAll("beneficiary_member_id")
+    .map((v) => Number(v))
+    .filter((id) => Number.isFinite(id) && id > 0 && memberIds.has(id));
+
+  if (kind === "member" && beneficiaryIds.length === 0) {
+    failPayments("Select at least one member this contribution is for.");
+  }
+
+  const row = await createPaymentRequestRow({
+    title,
+    amount,
+    deadline,
+    kind,
+    beneficiary_member_ids: kind === "member" ? beneficiaryIds : [],
+  });
   await recordAudit(viewer, {
     action: "contribution.open",
     summary: `Opened contribution “${row.title}” (${formatMoney(row.amount)})`,

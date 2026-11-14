@@ -13,6 +13,7 @@ import {
   getMemberById,
   listAllDuesPayments,
   listAllDuesSchedules,
+  listAllExpenses,
   listAllMembers,
   listAllPaymentRequestRows,
   listAllPaymentRows,
@@ -24,19 +25,60 @@ export async function requestedPaymentCount(): Promise<number> {
   return (await listAllPaymentRequestRows()).length;
 }
 
+/**
+ * Members designated as beneficiaries of a contribution (at open time) or who
+ * received a payout funded from that pot are exempt from that title
+ * (member id → exempt payment_request ids).
+ */
+export async function mapContributionExemptionsByMember(): Promise<
+  Map<number, Set<number>>
+> {
+  const [expenses, requests] = await Promise.all([
+    listAllExpenses(),
+    listAllPaymentRequestRows(),
+  ]);
+  const out = new Map<number, Set<number>>();
+
+  function exempt(memberId: number, requestId: number) {
+    const set = out.get(memberId) ?? new Set<number>();
+    set.add(requestId);
+    out.set(memberId, set);
+  }
+
+  for (const request of requests) {
+    if (request.kind !== "member") continue;
+    for (const memberId of request.beneficiary_member_ids) {
+      if (memberId > 0) exempt(memberId, request.id);
+    }
+  }
+
+  for (const expense of expenses) {
+    const requestId = expense.payment_request_id;
+    if (requestId == null || requestId <= 0) continue;
+    if (Number(expense.contribution_amount) <= 0.009) continue;
+    for (const alloc of expense.allocations) {
+      if (!alloc.member_id || Number(alloc.amount) <= 0.009) continue;
+      exempt(alloc.member_id, requestId);
+    }
+  }
+  return out;
+}
+
 export async function listMembers(query?: string): Promise<MemberContribution[]> {
   const q = query?.trim().toLowerCase() ?? "";
   // Parallel core reads (with shared cache + in-flight coalescing). Skip the
   // dues_payments scan when no dues years are open — common and saves a round trip.
-  const [members, requests, payments, schedules] = await Promise.all([
-    listAllMembers(),
-    listAllPaymentRequestRows(),
-    listAllPaymentRows(),
-    listAllDuesSchedules(),
-  ]);
+  const [members, requests, payments, schedules, exemptionsByMember] =
+    await Promise.all([
+      listAllMembers(),
+      listAllPaymentRequestRows(),
+      listAllPaymentRows(),
+      listAllDuesSchedules(),
+      mapContributionExemptionsByMember(),
+    ]);
   const allDuesPayments =
     schedules.length === 0 ? [] : await listAllDuesPayments();
-  const paymentCount = requests.length;
+  const totalTitles = requests.length;
   const duesYearsCount = schedules.length;
   const duesByScheduleMember = new Map<string, typeof allDuesPayments>();
   for (const p of allDuesPayments) {
@@ -45,13 +87,12 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
     list.push(p);
     duesByScheduleMember.set(key, list);
   }
-  const paidContributionCountByMember = new Map<number, number>();
+  const paidRequestIdsByMember = new Map<number, Set<number>>();
   for (const p of payments) {
     if (p.status !== "paid") continue;
-    paidContributionCountByMember.set(
-      p.member_id,
-      (paidContributionCountByMember.get(p.member_id) ?? 0) + 1,
-    );
+    const set = paidRequestIdsByMember.get(p.member_id) ?? new Set<number>();
+    set.add(p.payment_request_id);
+    paidRequestIdsByMember.set(p.member_id, set);
   }
 
   return members
@@ -72,10 +113,16 @@ export async function listMembers(query?: string): Promise<MemberContribution[]>
         ).filter(Boolean).length;
         duesCount += duesYearFraction(monthsPaid);
       }
+      const exempt = exemptionsByMember.get(m.id) ?? new Set<number>();
+      const paid = paidRequestIdsByMember.get(m.id) ?? new Set<number>();
+      let paidCount = 0;
+      for (const requestId of paid) {
+        if (!exempt.has(requestId)) paidCount += 1;
+      }
       return {
         ...m,
-        payment_count: paymentCount,
-        contribution_count: paidContributionCountByMember.get(m.id) ?? 0,
+        payment_count: Math.max(0, totalTitles - exempt.size),
+        contribution_count: paidCount,
         dues_count: duesCount,
         dues_years_count: duesYearsCount,
       };
@@ -99,15 +146,24 @@ export async function memberPaymentStats(id: number): Promise<{
   payment_count: number;
   contribution_count: number;
 }> {
-  const [payment_count, payments] = await Promise.all([
+  const [totalTitles, payments, exemptionsByMember] = await Promise.all([
     requestedPaymentCount(),
     listAllPaymentRows(),
+    mapContributionExemptionsByMember(),
   ]);
+  const exempt = exemptionsByMember.get(id) ?? new Set<number>();
+  const paidIds = new Set(
+    payments
+      .filter((p) => p.member_id === id && p.status === "paid")
+      .map((p) => p.payment_request_id),
+  );
+  let contribution_count = 0;
+  for (const requestId of paidIds) {
+    if (!exempt.has(requestId)) contribution_count += 1;
+  }
   return {
-    payment_count,
-    contribution_count: payments.filter(
-      (p) => p.member_id === id && p.status === "paid",
-    ).length,
+    payment_count: Math.max(0, totalTitles - exempt.size),
+    contribution_count,
   };
 }
 
@@ -144,6 +200,7 @@ function buildContributionLists(
   request: PaymentRequest,
   members: Member[],
   payments: Awaited<ReturnType<typeof listAllPaymentRows>>,
+  exemptMemberIds: Set<number> = new Set(),
 ): ContributionLists {
   const forRequest = payments.filter((p) => p.payment_request_id === request.id);
   const byMember = new Map(forRequest.map((p) => [p.member_id, p]));
@@ -155,6 +212,8 @@ function buildContributionLists(
   for (const m of [...members].sort(byName)) {
     const p = byMember.get(m.id);
     if (!p) {
+      // Recipients of this contribution pot are exempt — omit from outstanding.
+      if (exemptMemberIds.has(m.id)) continue;
       outstanding.push({
         ...m,
         payment_id: null,
@@ -197,14 +256,19 @@ function buildContributionLists(
 export async function listContributionBoards(
   onlyOpen: boolean,
 ): Promise<ContributionLists[]> {
-  const [requests, members, payments] = await Promise.all([
+  const [requests, members, payments, exemptionsByMember] = await Promise.all([
     onlyOpen ? listOpenPaymentRequests() : listAllPaymentRequests(),
     listAllMembers(),
     listAllPaymentRows(),
+    mapContributionExemptionsByMember(),
   ]);
-  return requests.map((request) =>
-    buildContributionLists(request, members, payments),
-  );
+  return requests.map((request) => {
+    const exemptMemberIds = new Set<number>();
+    for (const [memberId, requestIds] of exemptionsByMember) {
+      if (requestIds.has(request.id)) exemptMemberIds.add(memberId);
+    }
+    return buildContributionLists(request, members, payments, exemptMemberIds);
+  });
 }
 
 export async function listPaymentsForMember(
@@ -233,5 +297,52 @@ export async function listPaymentsForMember(
       const db = reqById.get(b.payment_request_id)?.deadline ?? "";
       return db.localeCompare(da) || b.created_at.localeCompare(a.created_at);
     });
+}
+
+/** Contribution titles this member has not paid (no record, or pledge only). */
+export async function listMissedContributionsForMember(memberId: number): Promise<
+  Array<{
+    id: number;
+    title: string;
+    amount: string;
+    deadline: string;
+    concluded: boolean;
+    /** null = no record; pledge = recorded but not paid. */
+    status: "pledge" | null;
+  }>
+> {
+  const [requests, payments, exemptionsByMember] = await Promise.all([
+    listAllPaymentRequests(),
+    listAllPaymentRows(),
+    mapContributionExemptionsByMember(),
+  ]);
+  const exempt = exemptionsByMember.get(memberId) ?? new Set<number>();
+  const byRequest = new Map(
+    payments
+      .filter((p) => p.member_id === memberId)
+      .map((p) => [p.payment_request_id, p] as const),
+  );
+  const missed: Array<{
+    id: number;
+    title: string;
+    amount: string;
+    deadline: string;
+    concluded: boolean;
+    status: "pledge" | null;
+  }> = [];
+  for (const request of requests) {
+    if (exempt.has(request.id)) continue;
+    const payment = byRequest.get(request.id);
+    if (payment?.status === "paid") continue;
+    missed.push({
+      id: request.id,
+      title: request.title,
+      amount: request.amount,
+      deadline: request.deadline,
+      concluded: Boolean(request.concluded_at),
+      status: payment?.status === "pledge" ? "pledge" : null,
+    });
+  }
+  return missed;
 }
 

@@ -63,6 +63,13 @@ export type PaymentRequest = {
    * earmarked for this contribution pot). Does not change ledger totals.
    */
   released_to_bank: string;
+  /**
+   * What the contribution is for — same categories as expenses.
+   * When `member`, `beneficiary_member_ids` lists who it supports.
+   */
+  kind: ExpenseKind;
+  /** Members this contribution is for; exempt from paying/counting it. */
+  beneficiary_member_ids: number[];
   created_at: string;
 };
 
@@ -84,9 +91,12 @@ export type PaymentWithMember = Payment & {
 };
 
 export type MemberContribution = Member & {
-  /** Total contribution titles requested (same for every member). */
+  /**
+   * Contribution titles this member is expected to pay (total titles minus
+   * titles they received as an expense payout from that contribution).
+   */
   payment_count: number;
-  /** Contribution titles this member has paid (excludes dues). */
+  /** Contribution titles this member has paid (excludes dues and exempt titles). */
   contribution_count: number;
   /**
    * Dues progress across opened years: each year is 1.0 when fully paid;
@@ -230,6 +240,10 @@ export type ContributionFundingOption = {
   realised_total: string;
   /** Realised total minus prior expenses drawn from this contribution. */
   remaining: string;
+  /** Purpose set when the contribution was opened. */
+  kind: ExpenseKind;
+  /** Designated beneficiaries (prefill expense member recipients). */
+  beneficiary_member_ids: number[];
 };
 
 export type BankAccountDetails = {

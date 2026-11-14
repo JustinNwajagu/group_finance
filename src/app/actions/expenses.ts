@@ -234,10 +234,20 @@ export async function recordExpense(formData: FormData): Promise<void> {
       ? `Full payout of remaining realised amount for contribution #${payment_request_id}.`
       : "");
 
+  let title = "";
+  if (payment_request_id) {
+    const request = await getPaymentRequestById(payment_request_id);
+    title = request?.title?.trim() || "";
+  }
+  if (!title && notes) {
+    title = notes.split(/[.!\n]/)[0]?.trim().slice(0, 120) || "";
+  }
+
   const expense = await createExpense({
     expense_date,
     amount,
     kind,
+    title,
     notes: storedNotes,
     allocations,
     funding_source,
@@ -251,7 +261,11 @@ export async function recordExpense(formData: FormData): Promise<void> {
   await recordAudit(viewer, {
     action: "expense.record",
     summary: `Recorded ${kind} expense ${formatMoney(amount)}${
-      storedNotes ? ` — ${storedNotes.slice(0, 80)}` : ""
+      title
+        ? ` — ${title.slice(0, 80)}`
+        : storedNotes
+          ? ` — ${storedNotes.slice(0, 80)}`
+          : ""
     }`,
     entityType: "expense",
     entityId: expense.id,

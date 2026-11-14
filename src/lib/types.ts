@@ -200,6 +200,11 @@ export type Expense = {
   amount: string;
   kind: ExpenseKind;
   /**
+   * Short list title for Expenses / certified boards. Separate from notes so
+   * clearing notes does not blank the row heading.
+   */
+  title: string;
+  /**
    * Notes explaining the spend. Required whenever any bank money is used, or
    * when a contribution pot is not paid out in full. Optional only for a
    * contribution-only full remaining payout.

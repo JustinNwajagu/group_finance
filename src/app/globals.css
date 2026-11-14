@@ -1414,9 +1414,11 @@ textarea {
     max-height: min(22rem, calc(100dvh - 12rem));
   }
 
+  /* Contained open state — do not free-flow the page on mobile. */
   .archive-boards-scroll:has(.archive-item.is-open) {
-    max-height: none;
-    overflow: visible;
+    max-height: min(70dvh, 34rem);
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 }
 
@@ -1544,6 +1546,9 @@ textarea {
 /*
  * Open accordion body: grow with content up to a usable on-screen cap,
  * then scroll inside. Page height follows this box only (no trailing blank).
+ *
+ * Vertical and horizontal scroll are split into nested panes so a diagonal
+ * finger move cannot pan freely in both directions at once.
  */
 .archive-scroll-pane {
   box-sizing: border-box;
@@ -1554,7 +1559,8 @@ textarea {
   height: auto;
   max-height: min(36rem, calc(100vh - 11rem));
   max-height: min(36rem, calc(100dvh - 11rem));
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   contain: layout paint;
@@ -1566,16 +1572,15 @@ textarea {
   height: min(36rem, calc(100dvh - 11rem));
 }
 
-@media (max-width: 960px) {
-  .archive-scroll-pane {
-    max-height: min(28rem, calc(100vh - 9.5rem));
-    max-height: min(28rem, calc(100dvh - 9.5rem));
-  }
-
-  .archive-scroll-pane:has(table.dues-grid) {
-    height: min(28rem, calc(100vh - 9.5rem));
-    height: min(28rem, calc(100dvh - 9.5rem));
-  }
+.archive-scroll-x {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .archive-scroll-pane-inner {
@@ -1595,6 +1600,53 @@ textarea {
 .archive-scroll-pane .dues-table-wrap > table.dues-grid {
   width: max-content;
   min-width: 100%;
+}
+
+@media (max-width: 960px) {
+  .archive-scroll-pane {
+    max-height: min(28rem, calc(100vh - 9.5rem));
+    max-height: min(28rem, calc(100dvh - 9.5rem));
+  }
+
+  .archive-scroll-pane:has(table.dues-grid) {
+    height: min(28rem, calc(100vh - 9.5rem));
+    height: min(28rem, calc(100dvh - 9.5rem));
+  }
+}
+
+/*
+ * Smaller screens: keep open Archive dues / Active logins panes contained,
+ * with axis-locked scroll (up/down OR left/right — not free 2D pan).
+ */
+@media (max-width: 720px) {
+  .archive-item.is-open > .archive-item-body {
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .archive-scroll-pane {
+    max-width: 100%;
+    max-height: min(55dvh, 26rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .archive-scroll-pane:has(table.dues-grid) {
+    height: min(55dvh, 26rem);
+    max-height: min(55dvh, 26rem);
+  }
+
+  .archive-scroll-x {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .archive-scroll-pane .table-wrap,
+  .archive-scroll-pane .dues-table-wrap {
+    max-width: none;
+  }
 }
 
 .archive-item-note {

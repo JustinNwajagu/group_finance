@@ -191,7 +191,22 @@ export async function signOut(): Promise<void> {
   redirect("/login");
 }
 
-/** Client idle guard — clear session and send the user back to sign-in. */
+/**
+ * Clear app session cookies after idle. The client does a hard navigation to
+ * /login afterward so Firebase Auth and Server Actions start clean (a soft
+ * redirect left the next sign-in attempt failing until refresh).
+ */
+export async function clearSessionForIdle(): Promise<{ ok: true; loginUrl: string }> {
+  const jar = await cookies();
+  clearSessionCookies(jar);
+  return {
+    ok: true,
+    loginUrl:
+      "/login?error=" + encodeURIComponent(IDLE_SIGNED_OUT_MESSAGE),
+  };
+}
+
+/** @deprecated Prefer clearSessionForIdle + hard navigation from the client. */
 export async function signOutDueToInactivity(): Promise<void> {
   const jar = await cookies();
   clearSessionCookies(jar);

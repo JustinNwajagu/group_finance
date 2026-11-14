@@ -14,6 +14,7 @@ import { isAdminEmail } from "@/lib/config";
 import { splitTitledName } from "@/lib/name-titles";
 import {
   getMember,
+  listMemberContributionExemptions,
   listMissedContributionsForMember,
   listPaymentsForMember,
   memberContribution,
@@ -62,6 +63,7 @@ export default async function MemberDetailPage({
     stats,
     dues,
     expenseReceipts,
+    exemptions,
     exco,
     paymentCounts,
     missedContributions,
@@ -71,10 +73,16 @@ export default async function MemberDetailPage({
     memberPaymentStats(id),
     memberDuesSummary(id),
     listMemberExpenseReceipts(id),
+    listMemberContributionExemptions(id),
     getExcoSeatForMember(id),
     countPaymentsForMember(id),
     listMissedContributionsForMember(id),
   ]);
+  const bankOnlyReceipts = expenseReceipts.filter(
+    (row) =>
+      row.expense.payment_request_id == null ||
+      Number(row.expense.contribution_amount) <= 0.009,
+  );
   const isPrimaryAdminMember =
     isAdminEmail(member.login_email || "") ||
     isAdminEmail(member.email || "");
@@ -172,6 +180,12 @@ export default async function MemberDetailPage({
                   : "—"}
               </strong>
               <span>Expenses received (₦)</span>
+            </div>
+            <div>
+              <strong>
+                {stats.exemption_count > 0 ? stats.exemption_count : "—"}
+              </strong>
+              <span>Exemptions</span>
             </div>
           </div>
         </div>
@@ -352,58 +366,135 @@ export default async function MemberDetailPage({
           <CollapsePanel
             title="Expenses received"
             meta={
-              expenseReceipts.length > 0
-                ? `Certified ${formatMoney(expensesReceived)}`
-                : "None recorded"
+              [
+                exemptions.length > 0
+                  ? `${exemptions.length} exempt`
+                  : null,
+                expenseReceipts.length > 0
+                  ? `Certified ${formatMoney(expensesReceived)}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" · ") || "None recorded"
             }
           >
-            {expenseReceipts.length === 0 ? (
+            {exemptions.length === 0 && bankOnlyReceipts.length === 0 ? (
               <div className="hero-empty">
-                No expense payouts recorded for this member.
+                No expense payouts or contribution exemptions for this member.
               </div>
             ) : (
-              <div className="table-wrap">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Amount received</th>
-                      <th>Funded from</th>
-                      <th>Status</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {expenseReceipts.map(({ expense, amount }) => (
-                      <tr key={`${expense.id}-${amount}`}>
-                        <td>
-                          <Link className="row-link" href="/expenses">
-                            {formatDate(expense.expense_date)}
-                          </Link>
-                        </td>
-                        <td>{formatMoney(amount)}</td>
-                        <td className="muted">
-                          {formatExpenseFunding({
-                            funding_source: expense.funding_source,
-                            contribution_title: expense.contribution_title,
-                            contribution_amount: expense.contribution_amount,
-                            bank_amount: expense.bank_amount,
-                          })}
-                        </td>
-                        <td>
-                          {expense.certified ? (
-                            <span className="badge-paid">Certified</span>
-                          ) : (
-                            <span className="badge-pledge">
-                              {expense.certifications.length}/2
-                            </span>
-                          )}
-                        </td>
-                        <td className="muted">{expense.notes || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="stack">
+                {exemptions.length > 0 ? (
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>Contribution</th>
+                          <th>Contribution status</th>
+                          <th>Amount received</th>
+                          <th>Payout status</th>
+                          <th>Date</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {exemptions.map((row) => (
+                          <tr key={row.request_id}>
+                            <td>
+                              <Link className="row-link" href="/expenses">
+                                {row.title}
+                              </Link>
+                            </td>
+                            <td>
+                              {row.contribution_status === "open" ? (
+                                <span className="badge-pledge">Open</span>
+                              ) : (
+                                <span className="badge-paid">Concluded</span>
+                              )}
+                            </td>
+                            <td>
+                              {row.receipt
+                                ? formatMoney(row.receipt.amount)
+                                : "—"}
+                            </td>
+                            <td>
+                              {row.receipt ? (
+                                row.receipt.certified ? (
+                                  <span className="badge-paid">Certified</span>
+                                ) : (
+                                  <span className="badge-pledge">
+                                    {row.receipt.certification_count}/2
+                                  </span>
+                                )
+                              ) : (
+                                <span className="muted">Awaiting payout</span>
+                              )}
+                            </td>
+                            <td className="muted">
+                              {row.receipt
+                                ? formatDate(row.receipt.expense_date)
+                                : "—"}
+                            </td>
+                            <td className="muted">
+                              {row.receipt?.notes
+                                ? row.receipt.notes
+                                : row.source === "beneficiary"
+                                  ? "Named beneficiary"
+                                  : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+
+                {bankOnlyReceipts.length > 0 ? (
+                  <div className="table-wrap">
+                    <table className="data">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Amount received</th>
+                          <th>Funded from</th>
+                          <th>Status</th>
+                          <th>Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bankOnlyReceipts.map(({ expense, amount }) => (
+                          <tr key={`bank-${expense.id}-${amount}`}>
+                            <td>
+                              <Link className="row-link" href="/expenses">
+                                {formatDate(expense.expense_date)}
+                              </Link>
+                            </td>
+                            <td>{formatMoney(amount)}</td>
+                            <td className="muted">
+                              {formatExpenseFunding({
+                                funding_source: expense.funding_source,
+                                contribution_title: expense.contribution_title,
+                                contribution_amount:
+                                  expense.contribution_amount,
+                                bank_amount: expense.bank_amount,
+                              })}
+                            </td>
+                            <td>
+                              {expense.certified ? (
+                                <span className="badge-paid">Certified</span>
+                              ) : (
+                                <span className="badge-pledge">
+                                  {expense.certifications.length}/2
+                                </span>
+                              )}
+                            </td>
+                            <td className="muted">{expense.notes || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
               </div>
             )}
           </CollapsePanel>

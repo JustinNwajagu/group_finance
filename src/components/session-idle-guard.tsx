@@ -2,9 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import {
-  signOutDueToInactivity,
+  clearSessionForIdle,
   touchSessionActivity,
 } from "@/app/actions/auth";
+import { getApps } from "firebase/app";
+import { getAuth, signOut as firebaseSignOut } from "firebase/auth";
 import { LAST_ACTIVE_COOKIE } from "@/lib/session-idle-client";
 
 const ACTIVITY_EVENTS: Array<keyof WindowEventMap> = [
@@ -34,6 +36,24 @@ function writeLastActive(when = Date.now()) {
   document.cookie = `${LAST_ACTIVE_COOKIE}=${when}; Path=/; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 
+function clearLastActiveCookie() {
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:"
+      ? "; Secure"
+      : "";
+  document.cookie = `${LAST_ACTIVE_COOKIE}=; Path=/; SameSite=Lax; Max-Age=0${secure}`;
+}
+
+async function clearFirebaseClientAuth() {
+  try {
+    const app = getApps()[0];
+    if (!app) return;
+    await firebaseSignOut(getAuth(app));
+  } catch {
+    /* ignore — login page will also reset auth */
+  }
+}
+
 export function SessionIdleGuard({ idleMs }: { idleMs: number }) {
   const signingOut = useRef(false);
   const lastBump = useRef(0);
@@ -46,7 +66,19 @@ export function SessionIdleGuard({ idleMs }: { idleMs: number }) {
       const last = readLastActive();
       if (!last || Date.now() - last <= idleMs) return;
       signingOut.current = true;
-      await signOutDueToInactivity();
+      clearLastActiveCookie();
+      await clearFirebaseClientAuth();
+      try {
+        const result = await clearSessionForIdle();
+        window.location.replace(result.loginUrl);
+      } catch {
+        window.location.replace(
+          "/login?error=" +
+            encodeURIComponent(
+              "Signed out after inactivity. Sign in again to continue.",
+            ),
+        );
+      }
     };
 
     const bump = () => {

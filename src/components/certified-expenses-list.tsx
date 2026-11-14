@@ -31,9 +31,13 @@ function CertifiedExpenseItem({
         ? `${expense.allocations[0]!.member_name} · ${formatMoney(expense.allocations[0]!.amount)}`
         : `${expense.allocations.length} members`;
   const title =
-    expense.notes?.trim() ||
-    expense.contribution_title ||
-    formatExpenseKind(expense.kind);
+    expense.title?.trim() ||
+    expense.contribution_title?.trim() ||
+    (expense.allocations.length === 1
+      ? `Payout to ${expense.allocations[0]!.member_name}`
+      : expense.allocations.length > 1
+        ? `Payout to ${expense.allocations.length} members`
+        : formatExpenseKind(expense.kind));
 
   return (
     <div

@@ -94,6 +94,8 @@ export type ExpenseRow = {
   expense_date: string;
   amount: string;
   kind: ExpenseKind;
+  /** Short display title (independent of notes). */
+  title: string;
   notes: string;
   allocations: ExpenseAllocation[];
   funding_source: ExpenseFundingSource;
@@ -1359,11 +1361,14 @@ function normalizeExpense(raw: Record<string, unknown>): ExpenseRow | null {
     else if (Number(contribution_amount) <= 0) bank_amount = amount;
   }
 
+  const title = String(raw.title ?? "").trim();
+
   return {
     id: Number(raw.id),
     expense_date: String(raw.expense_date ?? "").slice(0, 10),
     amount,
     kind,
+    title,
     notes,
     allocations: normalizeExpenseAllocations(raw.allocations),
     funding_source: normalizeFundingSource(
@@ -1665,6 +1670,7 @@ export async function createExpense(input: {
   amount: number;
   kind: ExpenseKind;
   notes: string;
+  title?: string;
   allocations: ExpenseAllocation[];
   funding_source: ExpenseFundingSource;
   payment_request_id?: number | null;
@@ -1697,10 +1703,12 @@ export async function createExpense(input: {
       ? Number(contribution_amount) + Number(bank_amount)
       : input.amount,
   );
+  const title = String(input.title ?? "").trim();
   const base = {
     expense_date: input.expense_date,
     amount,
     kind: input.kind,
+    title,
     notes,
     allocations:
       input.kind === "member"
